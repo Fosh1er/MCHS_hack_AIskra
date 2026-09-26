@@ -36,6 +36,13 @@ STATUS_WORDS = {
 GREETING = re.compile(r"^\s*(служба\s*112|112|здравствуйте|алло|слушаю)", re.IGNORECASE)
 
 
+def people(n: int) -> str:
+    """«1 человек», «2 человека», «5 человек», «11 человек», «21 человек»."""
+    tail = n % 100
+    word = "человека" if n % 10 in (2, 3, 4) and not 12 <= tail <= 14 else "человек"
+    return f"{n} {word}"
+
+
 def topic_of(question: str) -> str | None:
     q = question.lower().replace("ё", "е")
     for topic, keys in TOPICS:
@@ -63,7 +70,7 @@ def applicant_reply(legend: dict[str, Any], question: str, revealed: list[str]) 
     text = {
         "opening": legend.get("opening") or f"Здравствуйте, у нас {legend.get('what', 'происшествие')}.",
         "address": f"{a.get('label', 'Не знаю точно')}"
-        + (f", {a['district_name']} район" if a.get("district_name") else ""),
+        + (f", район {a['district_name']}" if a.get("district_name") else ""),
         "floor": (
             f"{a['entrance']} подъезд, {a['floor']} этаж, квартира {a['flat']}"
             if a.get("floor")
@@ -72,7 +79,7 @@ def applicant_reply(legend: dict[str, Any], question: str, revealed: list[str]) 
         "name": app.get("name", "Не хочу называть"),
         "phone": f"Мой номер {app.get('phone', 'этот же')}.",
         "victims": (
-            f"Да, пострадавшие есть, {victims.get('count', 1)} человек(а)."
+            f"Да, пострадавшие есть, {people(int(victims.get('count') or 1))}."
             if victims.get("has")
             else "Нет, вроде никто не пострадал."
         ),
