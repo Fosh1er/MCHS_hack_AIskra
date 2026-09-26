@@ -1,6 +1,7 @@
 /** Модуль identity: вход, выход, текущий пользователь (п. 0.3). */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { http, isUnauthorized } from './http';
+import { isTransient } from './resilience';
 
 export type Role = 'admin' | 'teacher' | 'student';
 
@@ -42,6 +43,9 @@ export const useMe = () =>
     },
     staleTime: 60_000,
     retry: false,
+    // сбой связи (6.1): пока сервер недоступен — спрашиваем каждые 3 с, приложение оживёт само
+    refetchInterval: (q) => (q.state.status === 'error' && isTransient(q.state.error) ? 3_000 : false),
+    refetchIntervalInBackground: true,
   });
 
 export const useLogin = () => {

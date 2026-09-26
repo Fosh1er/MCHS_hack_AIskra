@@ -112,6 +112,8 @@ class SqlCardRepository:
                     added_by=s.added_by.value,
                     service_type=s.service_type,
                     current_status="added",
+                    card_saved_at=card.saved_at,
+                    card_number=card.number,
                 )
             )
             self._s.add(

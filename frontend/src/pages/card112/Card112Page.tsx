@@ -10,6 +10,7 @@ import {
   type IncidentTypeDetails, type Questionnaire,
 } from '../../shared/api/dictionaries';
 import { SERVICE_STATUS, useCard, useOpenCard, useSaveCard, type CardView } from '../../shared/api/incidents';
+import { dropDraft, loadDraft, saveDraft } from '../../shared/api/resilience';
 import { shortName } from '../../shared/ui/ArmTopBar';
 import { CardHeader } from './CardHeader';
 import { CardViewer } from './CardViewer';
@@ -24,7 +25,7 @@ import { AddServicesModal, CloseCardModal, EmptyCardModal, SaveModal } from './M
 import { focusId, useHotkeys, type HotkeyMap } from './useHotkeys';
 import {
   cardFlags, flagQuestions, fromCardData, initialState, leafCode, missingFields, panelServices,
-  questionnaireAnswers, reducer, toCardData, toServicesIn,
+  questionnaireAnswers, reducer, toCardData, toServicesIn, type CardState,
 } from './state';
 
 const hhmm = (iso: string | null) => (iso ? new Date(iso).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : '');
@@ -84,10 +85,20 @@ function CardEditor({ view, editable, me }: { view: CardView; editable: boolean;
   const readOnly = !editable;
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const [state, dispatch] = useReducer(reducer, view, (v) => (editable ? initialState(v.data.phones?.aon ?? '', v.data.channel ?? '') : fromCardData(v.data)));
+  // черновик (6.1): незавершённая карточка переживает перезагрузку страницы и обрыв связи
+  const draft = useMemo(() => (editable ? loadDraft<CardState>(view.id) : null), [editable, view.id]);
+  const [state, dispatch] = useReducer(reducer, view, (v) => (editable ? draft?.state ?? initialState(v.data.phones?.aon ?? '', v.data.channel ?? '') : fromCardData(v.data)));
+  useEffect(() => {
+    if (!editable) return;
+    const t = setTimeout(() => saveDraft(view.id, state), 500);
+    return () => clearTimeout(t);
+  }, [editable, view.id, state]);
   const [modal, setModal] = useState<ModalKind>(null);
   const [banner, setBanner] = useState<{ title: string; items: string[] } | null>(null);
   const save = useSaveCard(view.id);
+  useEffect(() => {
+    if (draft) setBanner({ title: 'Восстановлен черновик карточки', items: [`сохранён на этом компьютере в ${new Date(draft.at).toLocaleTimeString('ru-RU')}`] });
+  }, [draft]);
   const qRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   // --- справочники
@@ -159,7 +170,7 @@ function CardEditor({ view, editable, me }: { view: CardView; editable: boolean;
     save.mutate(
       { data, services: empty ? [] : toServicesIn(panel) },
       {
-        onSuccess: () => { setModal(null); qc.invalidateQueries({ queryKey: ['card', view.id] }); },
+        onSuccess: () => { dropDraft(view.id); setModal(null); qc.invalidateQueries({ queryKey: ['card', view.id] }); },
         onError: (e) => { setModal(null); setBanner({ title: 'Карточка не сохранена', items: [e.message] }); },
       },
     );

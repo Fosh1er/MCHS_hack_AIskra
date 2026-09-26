@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import BigInteger, DateTime, Float, ForeignKey, Integer, String, Text, Uuid, func
+from sqlalchemy import BigInteger, DateTime, Float, ForeignKey, Index, Integer, String, Text, Uuid, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from aiskra.platform.db import Base
@@ -33,6 +33,7 @@ class AssessmentModel(Base):
     """Оценка попытки/карточки: итог, разбивка по критериям и ошибкам, уверенность."""
 
     __tablename__ = "assessments"
+    __table_args__ = (Index("ix_assessments_card_created", "card_id", "created_at"),)  # п. 6.1, миграция 0011
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     assignment_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("assignments.id"), index=True)
     card_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("incident_cards.id"), index=True)

@@ -55,14 +55,17 @@ _unnotified = exists(
     .where(
         CS.card_id == C.id,
         _services.c.integrated.is_(False),
-        ~exists(select(1).where(W.card_id == C.id, W.service_code == CS.service_code)),
+        # корреляция — со строкой card_services уровнем выше (а не с incident_cards через уровень): иначе
+        # SQLAlchemy добавляет incident_cards в FROM подзапроса, и отработка в одной карточке «оповещает» все (6.1)
+        ~exists(select(1).where(W.card_id == CS.card_id, W.service_code == CS.service_code)),
     )
 )
 DISPLAY_STATUS = case(
     (and_(C.status.in_(("registered", "worked")), _unnotified), "not_notified"),
     else_=C.status,
 )
-_REGISTERED_AT = func.coalesce(C.opened_at, C.created_at)
+# «Дата регистрации» = opened_at (миграция 0011 заполнила пустые из created_at): сортировка идёт по индексу
+_REGISTERED_AT = C.opened_at
 
 
 def _address(line: str | None, okrug: str | None, district: str | None) -> str | None:
@@ -100,7 +103,15 @@ class SqlCardReader:
             .outerjoin(_districts, _districts.c.code == C.district_code)
             .where(*conditions)
         )
-        total = int((await self._s.execute(select(func.count()).select_from(base.subquery()))).scalar_one())
+        # подсчёт — без вычисляемого статуса и справочных join (6.1): они нужны только строкам страницы
+        counted = select(C.id).select_from(C)
+        if flt.q:
+            counted = counted.outerjoin(_users, _users.c.id == C.author_id)
+        total = int(
+            (
+                await self._s.execute(select(func.count()).select_from(counted.where(*conditions).subquery()))
+            ).scalar_one()
+        )
         rows = (
             await self._s.execute(
                 base.order_by(_REGISTERED_AT.desc(), C.number.desc()).limit(flt.limit).offset(flt.offset)

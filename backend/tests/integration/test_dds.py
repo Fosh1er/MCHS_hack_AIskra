@@ -101,3 +101,18 @@ def test_visibility_and_roles(app_client: Callable[[], TestClient]) -> None:
     assert set_status(teacher, card["id"], "accepted", "1", "x").status_code == 403
     admin = as_user(app_client, "admin")
     assert admin.get(f"/api/v1/incidents/dds/{DDS}/journal").status_code == 403
+
+
+def test_dds_journal_order_count_and_filter(app_client: Callable[[], TestClient]) -> None:
+    """6.1: журнал ДДС считает и сортирует по копии времени сохранения в строке службы — новые сверху."""
+    operator, dds = as_user(app_client, "student"), as_user(app_client, "petrov")
+    first, second = new_card(operator), new_card(operator)
+    rows = dds_journal(dds, page_size=100)["items"]
+    numbers = [r["number"] for r in rows]
+    assert numbers.index(second["number"]) < numbers.index(first["number"])  # новые сверху
+    before = dds_journal(dds, status=["added"])["total"]
+    dds.post(f"/api/v1/incidents/dds/{DDS}/cards/{second['id']}/received")
+    assert dds_journal(dds, status=["added"])["total"] == before - 1
+    total = dds_journal(dds)["total"]
+    page2 = dds_journal(dds, page_size=10, page=2)
+    assert page2["total"] == total and len(page2["items"]) == max(0, min(10, total - 10))

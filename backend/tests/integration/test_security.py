@@ -109,3 +109,16 @@ def test_session_cookie_flags(settings: Settings) -> None:
         assert "httponly" in cookie and "samesite=strict" in cookie and "path=/" in cookie
         assert ("secure" in cookie) is secure
         assert PASSWORD.lower() not in r.text.lower()  # пароль не возвращается и не отражается
+
+
+def test_dictionaries_cacheable_and_compressed(settings: Settings) -> None:
+    """6.1: справочники кешируются браузером (без ПДн), большие ответы сжимаются; прочий API — no-store."""
+    with TestClient(create_app(settings)) as c:
+        login(c, "student")
+        r = c.get("/api/v1/dictionaries/card-types", headers={"Accept-Encoding": "gzip"})
+        assert r.status_code == 200 and r.headers["cache-control"] == "private, max-age=600"
+        big = c.get("/api/v1/auth/me", headers={"Accept-Encoding": "gzip"})
+        assert big.headers["cache-control"] == "no-store"
+        journal = c.get("/api/v1/incidents/journal", params={"page_size": 100}, headers={"Accept-Encoding": "gzip"})
+        if len(journal.content) > 1024:
+            assert journal.headers.get("content-encoding") == "gzip"

@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, String, Text, Uuid, false, func
+from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Index, Integer, String, Text, Uuid, false, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from aiskra.platform.db import Base
@@ -18,6 +18,11 @@ class IncidentCardModel(Base):
     часто фильтруемые поля продублированы колонками для журнала."""
 
     __tablename__ = "incident_cards"
+    __table_args__ = (
+        Index("ix_incident_cards_author_opened", "author_id", "opened_at"),
+        Index("ix_incident_cards_opened", "opened_at"),
+        Index("ix_incident_cards_saved", "saved_at"),
+    )  # п. 6.1, миграция 0011
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     number: Mapped[int] = mapped_column(BigInteger, unique=True)  # «Происшествие 36814845»
     session_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("training_sessions.id"), index=True)
@@ -54,18 +59,29 @@ class CardServiceModel(Base):
     """Служба, назначенная на карточку (авто по классификатору или вручную)."""
 
     __tablename__ = "card_services"
+    __table_args__ = (
+        Index("ix_card_services_service_status", "service_code", "current_status", "card_saved_at"),
+        Index("ix_card_services_service_saved", "service_code", "card_saved_at", "card_number"),
+    )  # п. 6.1, миграция 0011
     card_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("incident_cards.id", ondelete="CASCADE"), primary_key=True)
     service_code: Mapped[str] = mapped_column(ForeignKey("dict_services.code"), primary_key=True)
     is_main: Mapped[bool] = mapped_column(Boolean, default=False)
     added_by: Mapped[str] = mapped_column(String(16), default="auto")  # auto | manual | external (ВИС)
     service_type: Mapped[str | None] = mapped_column(Text)  # «Класс.:» у службы
     current_status: Mapped[str] = mapped_column(String(32), default="added")  # enums.service_status
+    # копия времени сохранения и номера карточки (6.1): журнал ДДС сортирует и считает по одному индексу службы,
+    # без поиска каждой карточки по ключу; пишется один раз — строки служб создаются при сохранении карточки
+    card_saved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    card_number: Mapped[int | None] = mapped_column(BigInteger)
 
 
 class CardServiceStatusModel(Base):
     """История статусов службы по карточке (нижние поля карточки ДДС)."""
 
     __tablename__ = "card_service_statuses"
+    __table_args__ = (
+        Index("ix_card_service_statuses_card_service", "card_id", "service_code", "at"),
+    )  # п. 6.1, миграция 0011
     id: Mapped[int] = mapped_column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True, autoincrement=True)
     card_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("incident_cards.id", ondelete="CASCADE"), index=True)
     service_code: Mapped[str] = mapped_column(String(64))
@@ -94,6 +110,7 @@ class CardWorkoutModel(Base):
     """Отработка (`image70`): звонок оператора в службу или другому адресату после сохранения карточки."""
 
     __tablename__ = "card_workouts"
+    __table_args__ = (Index("ix_card_workouts_card_service", "card_id", "service_code"),)  # п. 6.1, миграция 0011
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
     card_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("incident_cards.id", ondelete="CASCADE"), index=True)
     author_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))

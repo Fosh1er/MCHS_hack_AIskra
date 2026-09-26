@@ -108,6 +108,7 @@ def test_search_filters_and_paging(app_client: Callable[[], TestClient]) -> None
 
 def test_not_notified_until_workout(app_client: Callable[[], TestClient]) -> None:
     c = as_user(app_client, "student")
+    other = new_card(c, extra_services=["DEP_GKH"])  # вторая карточка с той же службой — отработки у неё нет
     card = new_card(c, extra_services=["DEP_GKH"])  # «Деп. ЖКХ» — без интеграции
     assert journal(c, q=str(card["number"]))["items"][0]["display_status"] == "not_notified"
     assert any(r["number"] == card["number"] for r in journal(c, status="not_notified", page_size=100)["items"])
@@ -124,6 +125,8 @@ def test_not_notified_until_workout(app_client: Callable[[], TestClient]) -> Non
     )
     assert r.status_code == 201, r.text
     assert journal(c, q=str(card["number"]))["items"][0]["display_status"] == "registered"
+    # регрессия 6.1: отработка по службе в одной карточке не «оповещает» другие карточки с той же службой
+    assert journal(c, q=str(other["number"]))["items"][0]["display_status"] == "not_notified"
     view = c.get(f"/api/v1/incidents/cards/{card['id']}").json()
     assert view["workouts"][0]["receiver"] == "Сидоров" and view["display_status"] == "registered"
     gkh = next(s for s in view["services"] if s["code"] == "DEP_GKH")

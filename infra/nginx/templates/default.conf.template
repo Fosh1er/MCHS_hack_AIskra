@@ -28,6 +28,12 @@ server {
 
   client_max_body_size 30m;   # учебные материалы — до 25 МБ (п. 4.4)
 
+  # сжатие (6.1): JSON справочников и журналов, сборка SPA; API сжимает и сам — повторно nginx не жмёт
+  gzip on;
+  gzip_min_length 1024;
+  gzip_types application/json application/javascript text/css image/svg+xml application/geo+json;
+  gzip_vary on;
+
   # X-Forwarded-*: реальный IP клиента — в аудит и ограничение входа; схема — для HSTS и cookie Secure
   proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
   proxy_set_header X-Forwarded-Proto $scheme;
