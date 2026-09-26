@@ -69,5 +69,7 @@ export const useLogout = () => {
 export function homeFor(me: Me): string {
   if (me.permissions.includes(PERMISSIONS.auditRead)) return '/admin/audit';
   if (me.role === 'teacher') return '/teacher';
+  // обучающийся сразу попадает в «Список происшествий», как оператор в АРМ-112 (п. 1.3)
+  if (me.permissions.includes(PERMISSIONS.trainingParticipate)) return '/arm/112/journal';
   return '/student';
 }

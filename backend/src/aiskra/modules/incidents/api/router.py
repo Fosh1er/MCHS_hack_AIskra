@@ -3,29 +3,48 @@
 from __future__ import annotations
 
 from dataclasses import asdict
+from datetime import datetime
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 
 from aiskra.modules.incidents.api import deps
 from aiskra.modules.incidents.api.schemas import (
+    AppendIn,
+    CardFlagsIn,
     CardOpenedOut,
     CardSavedOut,
     CardServiceOut,
+    ChangedOut,
+    CreatedOut,
     OpenCardIn,
     SaveCardIn,
+    StatusCommentIn,
+    StatusOut,
+    WorkoutIn,
+)
+from aiskra.modules.incidents.application.commands.add_workout import AddWorkout, AddWorkoutHandler
+from aiskra.modules.incidents.application.commands.append_card import AppendCard, AppendCardHandler
+from aiskra.modules.incidents.application.commands.change_card_status import (
+    ChangeCardStatus,
+    ChangeCardStatusHandler,
+    StatusAction,
 )
 from aiskra.modules.incidents.application.commands.open_card import OpenCard, OpenCardHandler
+from aiskra.modules.incidents.application.commands.record_card_view import RecordCardView, RecordCardViewHandler
 from aiskra.modules.incidents.application.commands.save_card import SaveCard, SaveCardHandler
+from aiskra.modules.incidents.application.commands.set_card_flags import SetCardFlags, SetCardFlagsHandler
 from aiskra.modules.incidents.application.ports.cards import CardView
 from aiskra.modules.incidents.application.queries.get_card import GetCard, GetCardHandler
-from aiskra.modules.incidents.domain.incident import AddedBy, CardService
+from aiskra.modules.incidents.application.queries.search_journal import JournalPage, SearchJournal, SearchJournalHandler
+from aiskra.modules.incidents.domain.incident import AddedBy, Appendix, CardService
 from aiskra.shared.security import Permission, Principal
 from aiskra.shared.web import CurrentPrincipal, Meta, require
 
 router = APIRouter(prefix="/incidents", tags=["incidents"])
 Trainee = Annotated[Principal, Depends(require(Permission.TRAINING_PARTICIPATE))]
+Checker = Annotated[Principal, Depends(require(Permission.CARDS_CHECK))]
 
 
 @router.post("/cards", response_model=CardOpenedOut, status_code=201, summary="Открыть новую карточку (Insert)")
@@ -71,3 +90,137 @@ async def get_card(
     handler: Annotated[GetCardHandler, Depends(deps.provide_get_card)],
 ) -> CardView:
     return await handler(GetCard(actor=actor, card_id=card_id))
+
+
+# ------------------------------------------------------------------ п. 1.3: журнал и работа с сохранённой карточкой
+
+
+@router.get(
+    "/journal", response_model=JournalPage, summary="«Список происшествий»: свои — обучающемуся, все — преподавателю"
+)
+async def journal(
+    actor: CurrentPrincipal,
+    handler: Annotated[SearchJournalHandler, Depends(deps.provide_search_journal)],
+    q: str = "",
+    status: Annotated[
+        list[str] | None, Query(description="draft, registered, not_notified, worked, checked, completed")
+    ] = None,
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
+    page: int = 1,
+    page_size: int = 15,
+) -> JournalPage:
+    return await handler(
+        SearchJournal(
+            actor=actor,
+            q=q,
+            statuses=status or [],
+            date_from=date_from,
+            date_to=date_to,
+            page=page,
+            page_size=page_size,
+        )
+    )
+
+
+@router.post(
+    "/cards/{card_id}/viewed", status_code=204, summary="Отметить открытие карточки в аудите («Просмотр карточки»)"
+)
+async def viewed(
+    card_id: UUID,
+    actor: CurrentPrincipal,
+    meta: Meta,
+    handler: Annotated[RecordCardViewHandler, Depends(deps.provide_record_view)],
+) -> None:
+    await handler(RecordCardView(actor=actor, card_id=card_id, meta=meta))
+
+
+async def _status(
+    handler: ChangeCardStatusHandler,
+    actor: Principal,
+    card_id: UUID,
+    action: StatusAction,
+    body: StatusCommentIn,
+    meta: Meta,
+) -> StatusOut:
+    status = await handler(
+        ChangeCardStatus(actor=actor, card_id=card_id, action=action, comment=body.comment, meta=meta)
+    )
+    return StatusOut(status=status)
+
+
+@router.post("/cards/{card_id}/worked", response_model=StatusOut, summary="«отработана» (Alt+S в просмотре) — автор")
+async def worked(
+    card_id: UUID,
+    body: StatusCommentIn,
+    actor: Trainee,
+    meta: Meta,
+    handler: Annotated[ChangeCardStatusHandler, Depends(deps.provide_change_status)],
+) -> StatusOut:
+    return await _status(handler, actor, card_id, StatusAction.WORKED, body, meta)
+
+
+@router.post("/cards/{card_id}/checked", response_model=StatusOut, summary="«Проверена» (Alt+Y) — преподаватель")
+async def checked(
+    card_id: UUID,
+    body: StatusCommentIn,
+    actor: Checker,
+    meta: Meta,
+    handler: Annotated[ChangeCardStatusHandler, Depends(deps.provide_change_status)],
+) -> StatusOut:
+    return await _status(handler, actor, card_id, StatusAction.CHECKED, body, meta)
+
+
+@router.post(
+    "/cards/{card_id}/returned", response_model=StatusOut, summary="«Вернуть на доработку» (Alt+N) — преподаватель"
+)
+async def returned(
+    card_id: UUID,
+    body: StatusCommentIn,
+    actor: Checker,
+    meta: Meta,
+    handler: Annotated[ChangeCardStatusHandler, Depends(deps.provide_change_status)],
+) -> StatusOut:
+    return await _status(handler, actor, card_id, StatusAction.RETURNED, body, meta)
+
+
+@router.post("/cards/{card_id}/flags", response_model=ChangedOut, summary="Признаки ЧС / ЧП")
+async def flags(
+    card_id: UUID,
+    body: CardFlagsIn,
+    actor: Trainee,
+    meta: Meta,
+    handler: Annotated[SetCardFlagsHandler, Depends(deps.provide_set_flags)],
+) -> ChangedOut:
+    changed = await handler(
+        SetCardFlags(actor=actor, card_id=card_id, emergency=body.emergency, incident=body.incident, meta=meta)
+    )
+    return ChangedOut(changed=changed)
+
+
+@router.post(
+    "/cards/{card_id}/append", response_model=ChangedOut, summary="«дополнение» (Shift+F2): только пустые поля"
+)
+async def append(
+    card_id: UUID,
+    body: AppendIn,
+    actor: Trainee,
+    meta: Meta,
+    handler: Annotated[AppendCardHandler, Depends(deps.provide_append)],
+) -> ChangedOut:
+    appendix = Appendix(fields=body.fields, description_add=body.description_add, victims_count=body.victims_count)
+    return ChangedOut(changed=await handler(AppendCard(actor=actor, card_id=card_id, appendix=appendix, meta=meta)))
+
+
+@router.post(
+    "/cards/{card_id}/workouts", response_model=CreatedOut, status_code=201, summary="Отработка — звонок в службу"
+)
+async def add_workout(
+    card_id: UUID,
+    body: WorkoutIn,
+    actor: Trainee,
+    meta: Meta,
+    handler: Annotated[AddWorkoutHandler, Depends(deps.provide_add_workout)],
+) -> CreatedOut:
+    workout_id = await handler(AddWorkout(actor=actor, card_id=card_id, meta=meta, **body.model_dump()))
+    return CreatedOut(id=workout_id)

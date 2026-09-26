@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, String, Text, Uuid, func
+from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, String, Text, Uuid, false, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from aiskra.platform.db import Base
@@ -41,6 +41,12 @@ class IncidentCardModel(Base):
     opened_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     saved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     processing_ms: Mapped[int | None] = mapped_column(Integer)  # таймер карточки
+    is_emergency: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())  # ЧС
+    is_incident: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())  # ЧП
+    worked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    checked_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
+    search_key: Mapped[str | None] = mapped_column(Text)  # номер, адрес, телефоны, заявитель, описание (п. 1.3)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -82,3 +88,20 @@ class DdsQueueItemModel(Base):
     enqueued_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     taken_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class CardWorkoutModel(Base):
+    """Отработка (`image70`): звонок оператора в службу или другому адресату после сохранения карточки."""
+
+    __tablename__ = "card_workouts"
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
+    card_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("incident_cards.id", ondelete="CASCADE"), index=True)
+    author_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
+    operator_number: Mapped[str | None] = mapped_column(String(16))
+    service_code: Mapped[str | None] = mapped_column(ForeignKey("dict_services.code"))
+    target: Mapped[str] = mapped_column(String(255), default="")
+    called_to: Mapped[str] = mapped_column(String(255), default="")
+    phone: Mapped[str] = mapped_column(String(32), default="")
+    receiver: Mapped[str] = mapped_column(String(255), default="")
+    message: Mapped[str] = mapped_column(Text, default="")
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

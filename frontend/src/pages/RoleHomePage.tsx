@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { PERMISSIONS, useMe } from '../shared/api/auth';
 import { keyCode } from './card112/useHotkeys';
 import { ArmTopBar } from '../shared/ui/ArmTopBar';
+import { ARM_MENU } from '../shared/ui/armMenu';
 
 const NEXT: Record<string, string> = {
   teacher: 'Пульт преподавателя: сценарии, занятия, мониторинг и оценки — пункты 3.x и 4.x плана.',
@@ -32,7 +33,7 @@ export function RoleHomePage() {
             </button>
           )}
         </div>
-        <ArmTopBar me={me} menu={[]} />
+        <ArmTopBar me={me} menu={ARM_MENU} />
       </div>
     </div>
   );

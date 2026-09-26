@@ -9,13 +9,15 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from aiskra.modules.incidents.domain.card import IncidentCardData
-from aiskra.modules.incidents.domain.incident import AddedBy, CardService, CardStatus, IncidentCard
+from aiskra.modules.incidents.domain.incident import AddedBy, CardService, CardStatus, IncidentCard, Workout
 from aiskra.modules.incidents.infrastructure.models import (
     CardServiceModel,
     CardServiceStatusModel,
+    CardWorkoutModel,
     IncidentCardModel,
 )
 from aiskra.platform.types import as_utc
+from aiskra.shared.text import search_key
 
 NUMBER_BASE = 36_900_000  # восьмизначные номера, как на стенде 2026 («Происшествие 36814851»)
 _NUMBER_ATTEMPTS = 5
@@ -63,6 +65,11 @@ class SqlCardRepository:
                 for s in services
             ],
             saved_at=as_utc(row.saved_at),
+            is_emergency=row.is_emergency,
+            is_incident=row.is_incident,
+            worked_at=as_utc(row.worked_at),
+            checked_at=as_utc(row.checked_at),
+            checked_by=row.checked_by,
         )
 
     async def save(self, card: IncidentCard) -> None:
@@ -70,6 +77,28 @@ class SqlCardRepository:
         if row is None:
             raise LookupError(f"Карточка {card.id} не найдена при сохранении")
         _fill(row, card)
+        await self._s.flush()
+
+    async def add_workout(self, workout: Workout) -> None:
+        self._s.add(
+            CardWorkoutModel(
+                id=workout.id,
+                card_id=workout.card_id,
+                author_id=workout.author_id,
+                operator_number=workout.operator_number,
+                service_code=workout.service_code,
+                target=workout.target,
+                called_to=workout.called_to,
+                phone=workout.phone,
+                receiver=workout.receiver,
+                message=workout.message,
+                at=workout.at,
+            )
+        )
+        await self._s.flush()
+
+    async def register(self, card: IncidentCard) -> None:
+        await self.save(card)
         await self._s.execute(delete(CardServiceModel).where(CardServiceModel.card_id == card.id))
         for s in card.services:
             self._s.add(
@@ -115,18 +144,35 @@ def _fill(row: IncidentCardModel, card: IncidentCard) -> None:
     row.opened_at = card.opened_at
     row.saved_at = card.saved_at
     row.processing_ms = card.processing_ms
+    row.is_emergency = card.is_emergency
+    row.is_incident = card.is_incident
+    row.worked_at = card.worked_at
+    row.checked_at = card.checked_at
+    row.checked_by = card.checked_by
+    row.search_key = search_key(
+        str(card.number),
+        d.phones.aon,
+        d.phones.provided,
+        d.phones.on_site,
+        d.applicant.name,
+        row.address_text,
+        d.address.descriptive,
+        d.description,
+    )
 
 
 def address_line(d: IncidentCardData) -> str | None:
-    """Адрес одной строкой, как в сохранённой карточке: «Москва, Новая Басманная улица, 6, к. 1, кв. 5»."""
+    """Адрес одной строкой, как в журнале: «г. Москва, Новая Басманная улица, 6, к. 1, кв. 5».
+    Округ и район в скобках добавляет чтение (названия — из справочников)."""
     a = d.address
+    if not (a.street or a.house):
+        return a.descriptive.strip() or None
     parts = [
-        a.city or a.region,
+        f"г. {a.city}" if a.city else a.region,
         a.street,
         a.house,
         f"к. {a.building}" if a.building else "",
         f"с. {a.structure}" if a.structure else "",
         f"кв. {a.flat}" if a.flat else "",
     ]
-    line = ", ".join(p for p in parts if p)
-    return line if (a.street or a.house or a.descriptive) else (a.descriptive or None)
+    return ", ".join(p for p in parts if p)

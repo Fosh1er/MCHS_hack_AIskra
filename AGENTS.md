@@ -84,6 +84,12 @@ cd backend && uv run python -m aiskra.cli create-user --login admin --full-name 
 - **Автоподбор служб:** `GET /api/v1/dictionaries/services/resolve?incident_type=…&flag=…&district=…` — основа п. 1.5.
 - **Правила сохранения** — `modules/incidents/domain/incident.py:missing_for_save` (сервер) и `state.ts:missingFields` (клиент). Меняете одно — меняйте и другое.
 
+## Журнал и сохранённая карточка (п. 1.3) — что уже есть
+- **Журнал:** `frontend/src/pages/journal/JournalPage.tsx`, маршрут `/arm/112/journal` — стартовый экран обучающегося (`auth.ts:homeFor`). API `GET /api/v1/incidents/journal` (свои — обучающемуся, все — преподавателю). Сетка `.arm-j112` в ui-kit.
+- **Просмотр сохранённой карточки:** `pages/card112/CardViewer.tsx` (Card112Page показывает его для любого статуса, кроме `draft`). Действия — `shared/api/incidents.ts:useCardActions`: `worked`, `checked`, `returned`, `flags`, `append`, `workout`; «Просмотр карточки» в аудит — `markCardViewed` один раз при открытии.
+- **Статусы:** хранимый `status` и вычисляемый `display_status` (`not_notified`). Подписи — `incidents.ts:CARD_STATUS`, `SERVICE_STATUS`.
+- **Дополняемые поля** — `domain/incident.py:APPENDABLE_FIELDS` (сервер) и `CardViewer.tsx:APPENDABLE` (клиент). Меняете одно — меняйте и другое.
+
 ## Рецепты
 **Новая команда** (пример: `SaveCard` в `incidents`):
 1. `modules/incidents/application/commands/save_card.py` — `@dataclass(frozen=True, kw_only=True) class SaveCard(Command)` и `class SaveCardHandler` с зависимостями-портами в `__init__` и `async __call__(cmd) -> Result`.

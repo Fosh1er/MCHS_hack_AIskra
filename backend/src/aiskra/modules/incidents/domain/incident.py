@@ -14,7 +14,7 @@ from datetime import datetime
 from enum import StrEnum
 from uuid import UUID
 
-from aiskra.modules.incidents.domain.card import IncidentCardData
+from aiskra.modules.incidents.domain.card import DESCRIPTION_MAX, IncidentCardData
 from aiskra.shared.domain import Entity
 from aiskra.shared.errors import DomainError
 
@@ -22,6 +22,8 @@ from aiskra.shared.errors import DomainError
 class CardStatus(StrEnum):
     DRAFT = "draft"  # открыта, заполняется
     REGISTERED = "registered"  # «Зарегистрирована» — сохранена, службы оповещены
+    WORKED = "worked"  # «Отработана» — оператор закончил работу с карточкой (Alt+S в просмотре)
+    CHECKED = "checked"  # «Проверена» — главный специалист (в тренажёре — преподаватель, Alt+Y)
     COMPLETED = "completed"  # «Завершена» — пустая карточка нерезультативного вызова
 
 
@@ -71,6 +73,11 @@ class IncidentCard(Entity):
     data: IncidentCardData = field(default_factory=IncidentCardData)
     services: list[CardService] = field(default_factory=list)
     saved_at: datetime | None = None
+    is_emergency: bool = False  # ЧС
+    is_incident: bool = False  # ЧП
+    worked_at: datetime | None = None
+    checked_at: datetime | None = None
+    checked_by: UUID | None = None
 
     @property
     def processing_ms(self) -> int | None:
@@ -93,3 +100,124 @@ class IncidentCard(Entity):
         self.data.services = [s.code for s in self.services]
         self.status = CardStatus.COMPLETED if data.is_empty_call else CardStatus.REGISTERED
         self.saved_at = now
+
+    # ---------------------------------------------------------------- после сохранения (п. 1.3)
+
+    def _ensure_saved(self) -> None:
+        if self.status is CardStatus.DRAFT:
+            raise DomainError("Карточка ещё не сохранена", code="card_not_saved")
+        if self.status is CardStatus.COMPLETED:
+            raise DomainError("Пустая карточка («нет контакта» / «срыв звонка») не изменяется", code="card_completed")
+
+    def mark_worked(self, now: datetime) -> None:
+        """«Отработана»: оператор закончил работу с карточкой."""
+        if self.status is not CardStatus.REGISTERED:
+            raise DomainError("Отработать можно только зарегистрированную карточку", code="bad_card_status")
+        self.status = CardStatus.WORKED
+        self.worked_at = now
+
+    def mark_checked(self, by: UUID, now: datetime) -> None:
+        """«Проверена»: главный специалист (преподаватель) принял отработанную карточку."""
+        if self.status is not CardStatus.WORKED:
+            raise DomainError("Проверить можно только отработанную карточку", code="bad_card_status")
+        self.status = CardStatus.CHECKED
+        self.checked_at = now
+        self.checked_by = by
+
+    def return_for_rework(self) -> None:
+        """«Вернуть на доработку»: карточка снова в работе у оператора."""
+        if self.status not in (CardStatus.WORKED, CardStatus.CHECKED):
+            raise DomainError("Вернуть можно отработанную или проверенную карточку", code="bad_card_status")
+        self.status = CardStatus.REGISTERED
+        self.worked_at = None
+        self.checked_at = None
+        self.checked_by = None
+
+    def set_flags(self, *, emergency: bool, incident: bool) -> list[str]:
+        """Признаки ЧС / ЧП (тумблеры режима просмотра). Возвращает изменённые признаки."""
+        self._ensure_saved()
+        changed = [
+            name
+            for name, old, new in (("ЧС", self.is_emergency, emergency), ("ЧП", self.is_incident, incident))
+            if old != new
+        ]
+        self.is_emergency, self.is_incident = emergency, incident
+        self.data.flags.emergency, self.data.flags.incident = emergency, incident
+        return changed
+
+    def append(self, appendix: Appendix) -> list[str]:
+        """«Дополнение» (Shift+F2): только пустые поля, дописать описание, пострадавшие (docs/brief/03 §2.12)."""
+        self._ensure_saved()
+        if self.status is CardStatus.CHECKED:
+            raise DomainError("Проверенная карточка не дополняется", code="card_checked")
+        changed: list[str] = []
+        for key, value in appendix.fields.items():
+            if key not in APPENDABLE_FIELDS:
+                raise DomainError(f"Поле «{key}» нельзя дополнить", code="field_not_appendable")
+            value = value.strip()
+            if not value:
+                continue
+            group, name = key.split(".")
+            target = getattr(self.data, group)
+            if getattr(target, name):
+                raise DomainError(f"Поле «{APPENDABLE_FIELDS[key]}» уже заполнено", code="field_not_empty")
+            setattr(target, name, value)
+            changed.append(APPENDABLE_FIELDS[key])
+        if appendix.description_add.strip():
+            text = self.data.description
+            text = f"{text}\n{appendix.description_add.strip()}" if text else appendix.description_add.strip()
+            if len(text) > DESCRIPTION_MAX:
+                raise DomainError(f"Описание длиннее {DESCRIPTION_MAX} символов", code="description_too_long")
+            self.data.description = text
+            changed.append("описание")
+        if appendix.victims_count is not None and appendix.victims_count != self.data.victims.count:
+            if appendix.victims_count < 0:
+                raise DomainError("Количество пострадавших не может быть отрицательным", code="bad_victims")
+            self.data.victims.has = appendix.victims_count > 0
+            self.data.victims.count = appendix.victims_count
+            changed.append("пострадавшие")
+        return changed
+
+
+APPENDABLE_FIELDS: dict[str, str] = {
+    "applicant.name": "ФИО заявителя",
+    "phones.provided": "предоставленный номер",
+    "phones.on_site": "телефон на место",
+    "address.object": "объект",
+    "address.flat": "квартира/офис",
+    "address.entrance": "подъезд",
+    "address.floor": "этаж",
+    "address.code": "код",
+    "address.descriptive": "описательный адрес",
+}
+
+
+@dataclass(frozen=True, kw_only=True)
+class Appendix:
+    fields: dict[str, str] = field(default_factory=dict)
+    description_add: str = ""
+    victims_count: int | None = None
+
+
+@dataclass(eq=False, kw_only=True)
+class Workout(Entity):
+    """Отработка (`image70`): звонок оператора после сохранения карточки — в службу или другому адресату."""
+
+    card_id: UUID
+    author_id: UUID
+    at: datetime
+    operator_number: str | None = None
+    service_code: str | None = None  # служба из справочника; None — свободный адресат («экипаж», «заявитель»)
+    target: str = ""  # название адресата, как в колонке «Служба»
+    called_to: str = ""  # «Куда звонили»: дежурный, приёмная…
+    phone: str = ""
+    receiver: str = ""  # ФИО принявшего
+    message: str = ""  # «Суть сообщения»
+
+    def __post_init__(self) -> None:
+        if not (self.service_code or self.target.strip()):
+            raise DomainError("Укажите службу или адресата звонка", code="bad_workout")
+        if not self.message.strip():
+            raise DomainError("Укажите суть сообщения", code="bad_workout")
+        if len(self.message) > 1000:
+            raise DomainError("Суть сообщения — до 1000 символов", code="bad_workout")

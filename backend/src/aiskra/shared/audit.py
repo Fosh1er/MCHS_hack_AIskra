@@ -34,6 +34,13 @@ class AuditEvent(StrEnum):
     DICTIONARIES_IMPORTED = "dictionaries.imported"
     CARD_CREATED = "card.created"
     CARD_SAVED = "card.saved"
+    CARD_VIEWED = "card.viewed"
+    CARD_WORKED = "card.worked"
+    CARD_CHECKED = "card.checked"
+    CARD_RETURNED = "card.returned"
+    CARD_FLAGS = "card.flags"
+    CARD_APPENDED = "card.appended"
+    WORKOUT_ADDED = "card.workout_added"
 
     @property
     def label(self) -> str:
@@ -54,6 +61,13 @@ AUDIT_EVENT_TITLES: Mapping[AuditEvent, str] = {
     AuditEvent.DICTIONARIES_IMPORTED: "Импорт справочников",
     AuditEvent.CARD_CREATED: "Создание карточки происшествия",
     AuditEvent.CARD_SAVED: "Сохранение карточки происшествия",
+    AuditEvent.CARD_VIEWED: "Просмотр карточки",
+    AuditEvent.CARD_WORKED: "Переход в Отработана",
+    AuditEvent.CARD_CHECKED: "Переход в Проверена",
+    AuditEvent.CARD_RETURNED: "Возврат на доработку",
+    AuditEvent.CARD_FLAGS: "Изменение признаков ЧС / ЧП",
+    AuditEvent.CARD_APPENDED: "Дополнение карточки",
+    AuditEvent.WORKOUT_ADDED: "Отработка",
 }
 
 
