@@ -74,10 +74,24 @@ class SqlScenarioRepository:
             approved_by=row.approved_by,
         )
 
-    async def page(self, *, status: str | None, limit: int, offset: int) -> tuple[list[ScenarioRow], int]:
+    async def page(
+        self,
+        *,
+        status: str | None,
+        difficulty: int | None,
+        card_type: str | None,
+        source: str | None,
+        limit: int,
+        offset: int,
+    ) -> tuple[list[ScenarioRow], int]:
         stmt = select(ScenarioModel)
-        if status:
-            stmt = stmt.where(ScenarioModel.status == status)
+        stmt = stmt.where(ScenarioModel.status == status if status else ScenarioModel.status != "archived")
+        if difficulty:
+            stmt = stmt.where(ScenarioModel.difficulty == difficulty)
+        if card_type:
+            stmt = stmt.where(ScenarioModel.card_type_code == card_type)
+        if source:
+            stmt = stmt.where(ScenarioModel.source == source)
         total = int((await self._s.execute(select(func.count()).select_from(stmt.subquery()))).scalar_one())
         rows = (
             await self._s.execute(stmt.order_by(ScenarioModel.created_at.desc()).limit(limit).offset(offset))

@@ -79,6 +79,8 @@ class IncidentCard(Entity):
     checked_at: datetime | None = None
     checked_by: UUID | None = None
     scenario_id: UUID | None = None  # сценарий входящего вызова (п. 1.4) — эталон для оценки (3.4)
+    session_id: UUID | None = None  # занятие (п. 4.2)
+    origin: str = "student"  # student | scenario | system
 
     @property
     def processing_ms(self) -> int | None:

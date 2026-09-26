@@ -87,6 +87,7 @@ class OpenCardIn(_Strict):
     aon: str = Field(default="", max_length=32)
     channel: str | None = Field(default=None, max_length=32)
     scenario_id: UUID | None = Field(default=None, description="Сценарий учебного входящего вызова (п. 1.4)")
+    session_id: UUID | None = Field(default=None, description="Занятие (п. 4.2)")
 
 
 class CardOpenedOut(BaseModel):

@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from aiskra.modules.assessment.application.ports.attempts import AssessmentRecord
-from aiskra.modules.assessment.infrastructure.models import AssessmentModel
+from aiskra.modules.assessment.infrastructure.models import AssessmentModel, ExpertOverrideModel
 from aiskra.platform.types import as_utc
 
 
@@ -72,3 +72,31 @@ class SqlAssessmentRepository:
             await self._s.execute(select(AssessmentModel).order_by(AssessmentModel.created_at.desc()).limit(limit))
         ).scalars()
         return [_record(r) for r in rows]
+
+    async def get(self, assessment_id: UUID) -> AssessmentRecord | None:
+        row = await self._s.get(AssessmentModel, assessment_id)
+        return _record(row) if row else None
+
+    async def override(
+        self, assessment_id: UUID, *, teacher_id: UUID, score: float, passed: bool, comment: str, before: float
+    ) -> None:
+        row = await self._s.get(AssessmentModel, assessment_id)
+        if row is None:
+            raise LookupError(f"Оценка {assessment_id} не найдена")
+        self._s.add(
+            ExpertOverrideModel(
+                assessment_id=assessment_id,
+                teacher_id=teacher_id,
+                reason=comment,
+                changes={"score": [before, score], "passed": passed},
+            )
+        )
+        row.score = score
+        row.grader = "expert"
+        row.status = "final"
+        row.details = {
+            **(row.details or {}),
+            "passed": passed,
+            "expert": {"score": score, "comment": comment, "teacher_id": str(teacher_id), "auto_score": before},
+        }
+        await self._s.flush()
