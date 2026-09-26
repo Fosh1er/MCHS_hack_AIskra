@@ -99,7 +99,7 @@ export const useStudents = () => useQuery({ queryKey: ['students'], queryFn: () 
 export const useSessions = () =>
   useQuery({ queryKey: ['sessions'], queryFn: () => http<{ items: SessionView[]; total: number }>(`${T}/sessions?page_size=100`) });
 export const useMonitor = (id: string) =>
-  useQuery({ queryKey: ['monitor', id], queryFn: () => http<MonitorView>(`${T}/sessions/${id}/monitor`), refetchInterval: 5_000 });
+  useQuery({ queryKey: ['monitor', id], queryFn: () => http<MonitorView>(`${T}/sessions/${id}/monitor`), refetchInterval: 5_000, staleTime: 0 });
 export const useCreateSession = () => useInvalidating((b: CreateSessionBody) => post<{ id: string }>('/sessions', b), [['sessions']]);
 export const useSessionState = (id: string) =>
   useInvalidating((start: boolean) => post<{ status: string }>(`/sessions/${id}/${start ? 'start' : 'finish'}`), [['sessions'], ['monitor', id]]);

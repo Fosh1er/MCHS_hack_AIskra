@@ -9,6 +9,7 @@ uv run python -m aiskra.cli create-user --login ivanov --role student --full-nam
 uv run python -m aiskra.cli ensure-admin             # администратор из AISKRA_BOOTSTRAP_ADMIN_* (п. 0.3);
                                                      # без пароля в окружении ничего не делает
 uv run python -m aiskra.cli create-schema            # создать таблицы без Alembic (только для SQLite-демо)
+uv run python -m aiskra.cli demo-seed [--materials DIR]  # стенд одной командой (M6); пароль — AISKRA_DEMO_PASSWORD
 uv run python -m aiskra.cli import-materials FILE... --kind instruction --as admin --prompts
                                                      # учебные материалы (п. 4.4) от имени пользователя
 """
@@ -209,6 +210,9 @@ def main() -> None:
     user.add_argument("--password-env", help="имя переменной окружения с паролем (иначе — интерактивный ввод)")
     sub.add_parser("ensure-admin", help="создать администратора из AISKRA_BOOTSTRAP_ADMIN_*, если его нет")
     sub.add_parser("create-schema", help="создать таблицы напрямую (SQLite/демо; в PostgreSQL — alembic)")
+    demo = sub.add_parser("demo-seed", help="подготовить стенд: справочники, сценарии, учётки ролей, группа (M6)")
+    demo.add_argument("--scenarios", type=int, default=30, help="сколько утверждённых сценариев должно быть в банке")
+    demo.add_argument("--materials", help="каталог с учебными материалами (DOCX, PDF, XLSX, TXT)")
     mat = sub.add_parser("import-materials", help="загрузить учебные материалы: PDF, DOCX, XLSX, TXT (п. 4.4)")
     mat.add_argument("files", nargs="+")
     mat.add_argument("--kind", default="other", choices=["instruction", "memo", "classifier", "regulation", "other"])
@@ -244,6 +248,13 @@ def main() -> None:
             asyncio.run(ensure_admin(settings))
         elif args.cmd == "create-schema":
             asyncio.run(create_schema(settings))
+        elif args.cmd == "demo-seed":
+            from aiskra.demo_seed import seed
+
+            password = os.environ.get("AISKRA_DEMO_PASSWORD", "")
+            if len(password) < 8:
+                sys.exit("Задайте пароль демо-учёток: AISKRA_DEMO_PASSWORD (не короче 8 символов)")
+            asyncio.run(seed(settings, password=password, scenarios=args.scenarios, materials_dir=args.materials))
         elif args.cmd == "import-materials":
             asyncio.run(
                 import_materials(

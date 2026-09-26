@@ -3,9 +3,12 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Icon } from '@smena112/ui-kit';
 import { MODE_TITLE, type MySession } from '../api/training';
+import { useServices } from '../api/dictionaries';
 
 export function SessionBanner({ s, here, extra }: { s: MySession; here: '112' | 'dds'; extra?: string }) {
-  const role = s.role === '112' ? 'оператор 112' : `диспетчер ДДС ${s.dds_service_code}`;
+  const services = useServices();
+  const svc = services.data?.find((x) => x.code === s.dds_service_code)?.short ?? s.dds_service_code;
+  const role = s.role === '112' ? 'оператор 112' : `диспетчер ДДС «${svc}»`;
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
   const sec = s.started_at ? Math.max(0, Math.floor((now - new Date(s.started_at).getTime()) / 1000)) : null;

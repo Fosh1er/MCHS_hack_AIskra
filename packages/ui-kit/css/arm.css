@@ -1055,6 +1055,8 @@
 .dds-pick__item:hover, .dds-pick__item:focus-visible { background: var(--accent); }
 .dds-waiting { margin-left: 14px; padding: 2px 10px; background: var(--accent-112); font-size: var(--fs-sm); font-weight: var(--fw-medium); }
 .dds-editor { position: absolute; left: 90px; right: auto; bottom: calc(100% + 4px); z-index: var(--z-popover); min-width: 820px; flex-wrap: wrap; }
+/* пока открыт редактор статуса, IP-телефон сворачивается до заголовка — иначе на узком экране он закрывает поля */
+body:has(.dds-editor) .ipphone > .arm-dock__section:not(.ipphone__screen) { display: none; }
 .dds-editor__err { flex-basis: 100%; color: #c0461f; font-size: var(--fs-xs); }
 
 /* ==========================================================================
