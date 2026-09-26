@@ -72,13 +72,15 @@ class ParticipantBody(_Strict):
 
 
 class SessionSettingsIn(_Strict):
-    norm_112: float = Field(default=80, ge=5, le=3600)
-    norm_dds: float = Field(default=30, ge=5, le=3600)
-    threshold: float = Field(default=70, ge=0, le=100)
-    difficulty: int = Field(default=2, ge=1, le=5)
-    call_interval_s: float = Field(default=40, ge=5, le=3600)
-    feed_interval_s: float = Field(default=45, ge=5, le=3600)
-    max_waiting: int = Field(default=3, ge=1, le=10)
+    """Пустое поле — значение по умолчанию из настроек администратора (GET /training/session-defaults)."""
+
+    norm_112: float | None = Field(default=None, ge=5, le=3600)
+    norm_dds: float | None = Field(default=None, ge=5, le=3600)
+    threshold: float | None = Field(default=None, ge=0, le=100)
+    difficulty: int | None = Field(default=None, ge=1, le=5)
+    call_interval_s: float | None = Field(default=None, ge=5, le=3600)
+    feed_interval_s: float | None = Field(default=None, ge=5, le=3600)
+    max_waiting: int | None = Field(default=None, ge=1, le=10)
 
 
 class CreateSessionIn(_Strict):

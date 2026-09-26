@@ -1,25 +1,18 @@
 /** «Мои результаты» (п. 4.3, ТЗ «визуализация прогресса обучающихся»): динамика баллов, слабые места, последние
  *  замечания и экспертные комментарии преподавателя. */
 import { Card, LineChart, StatTile } from '@smena112/ui-kit';
-import { useMe } from '../../shared/api/auth';
 import { useMyProgress } from '../../shared/api/assessment';
-import { ArmTopBar } from '../../shared/ui/ArmTopBar';
-import { ARM_MENU } from '../../shared/ui/armMenu';
+import { CabinetShell } from '../../shared/ui/CabinetShell';
 
 export function ProgressPage() {
-  const me = useMe().data!;
   const q = useMyProgress();
   const d = q.data;
   const passed = d ? d.points.filter((p) => p.passed).length : 0;
   return (
-    <div className="arm-journal" style={{ minHeight: '100vh' }}>
-      <div className="arm-search">
-        <div className="arm-search__main"><h1 className="cab-title" style={{ margin: 0 }}>Мои результаты</h1><p style={{ marginTop: 8 }}>{me.full_name}</p></div>
-        <ArmTopBar me={me} menu={ARM_MENU} />
-      </div>
-      <div className="arm-list progress-page">
-        {q.isError && <div className="arm-empty">Не удалось загрузить результаты: {q.error.message}</div>}
-        {d && !d.points.length && <div className="arm-empty">Оценок пока нет — они появятся после проверки ваших карточек.</div>}
+    <CabinetShell kind="student" active="progress" title="Мои результаты">
+      <div className="progress-page">
+        {q.isError && <div className="c-slate">Не удалось загрузить результаты: {q.error.message}</div>}
+        {d && !d.points.length && <div className="c-slate">Оценок пока нет — они появятся после проверки ваших карточек.</div>}
         {d && d.points.length > 0 && (
           <>
             <section className="cab-kpis">
@@ -61,6 +54,6 @@ export function ProgressPage() {
           </>
         )}
       </div>
-    </div>
+    </CabinetShell>
   );
 }

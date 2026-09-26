@@ -106,3 +106,18 @@ export const useDistrictShapes = () =>
 export interface IncidentGroup { id: number; title: string }
 export const useIncidentGroups = () =>
   useQuery({ queryKey: ['dict', 'incident-groups'], queryFn: () => http<IncidentGroup[]>(`${D}/incident-groups`), ...forever });
+
+export interface IncidentTypeRow {
+  code: string; group_id: number; group_title: string; sign1: string | null; sign2: string | null; sign3: string | null;
+  final_type: string | null; ekp_type: string | null; response_scenario: string | null; main_services: string[];
+  visible_to_112: boolean; operator_hint: string | null;
+}
+export const useIncidentTypeSearch = (q: string, group: number | null) =>
+  useQuery({
+    queryKey: ['dict', 'incident-types', q, group],
+    queryFn: () => {
+      const p = new URLSearchParams({ q, limit: '30' });
+      if (group) p.set('group', String(group));
+      return http<{ items: IncidentTypeRow[]; total: number }>(`${D}/incident-types?${p}`);
+    },
+  });

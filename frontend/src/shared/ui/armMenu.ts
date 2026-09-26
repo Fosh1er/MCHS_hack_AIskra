@@ -6,6 +6,6 @@ import type { MenuItem } from './ArmTopBar';
 export const ARM_MENU: MenuItem[] = [
   { to: '/arm/112/journal', label: 'журнал 112', icon: 'table' },
   { to: '/arm/dds', label: 'АРМ ДДС', icon: 'headset' },
-  { to: '/student/progress', label: 'мои результаты', icon: 'bar_chart', permission: PERMISSIONS.trainingParticipate },
+  { to: '/student', label: 'кабинет', icon: 'person', permission: PERMISSIONS.trainingParticipate },
   { to: '/teacher', label: 'пульт преподавателя', icon: 'school', permission: PERMISSIONS.lessonsConduct },
 ];

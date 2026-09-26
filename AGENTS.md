@@ -121,6 +121,14 @@ cd backend && uv run python -m aiskra.cli create-user --login admin --full-name 
 - **Мониторинг** — `GET /training/sessions/{id}/monitor` (`SessionProgress`), **отчёт** — `GET /assessment/sessions/{id}/report` и `report.csv` (факты — `SessionFactsReader`), **правка** — `POST /assessment/{id}/override`, **прогресс** — `GET /assessment/my/progress`.
 - **Обучающийся** — `GET /training/sessions/my` (для всех ролей, `null` вне занятия); баннер — `shared/ui/SessionBanner.tsx`.
 
+## Кабинеты обучающегося и администратора (п. 5.1, 5.2) — что уже есть
+- **Каркас** всех кабинетов — `shared/ui/CabinetShell.tsx` (разделы ролей в `NAV`); `TeacherShell` — обёртка над ним.
+- **Обучающийся:** `/student` (занятия, вход в эмулятор `armFor()`, история), `/student/sessions/:id` (`GET /assessment/sessions/{id}/mine`), `/student/progress`, `/student/reference`. Рекомендации — `assessment/domain/recommendations.py`. Комментарий возврата — `CardView.rework` (из аудита).
+- **Администратор:** `/admin` (состояние `GET /system/status`, импорт), `/admin/users`, `/admin/groups` (`/groups`, читать может и преподаватель), `/admin/settings` (`system_settings`, копии `platform/backup.py`), `/admin/logs` (`platform/logbuffer.py`).
+- **Настройки по умолчанию** для занятий — порт `SessionDefaults` (адаптер `integration/system_sources.py`); новый раздел настроек — ключ в `LIMITS` (`system/application/commands/settings.py`).
+- **Резервная копия** выгружает все таблицы из `models_registry`, кроме `dict_*` и `auth_sessions`: новая таблица попадает в копию сама.
+- `require(Permission.A, Permission.B)` — «любое из прав».
+
 ## Рецепты
 **Новая команда** (пример: `SaveCard` в `incidents`):
 1. `modules/incidents/application/commands/save_card.py` — `@dataclass(frozen=True, kw_only=True) class SaveCard(Command)` и `class SaveCardHandler` с зависимостями-портами в `__init__` и `async __call__(cmd) -> Result`.

@@ -9,12 +9,13 @@ from uuid import UUID
 
 from aiskra.modules.training.application.ports.sessions import (
     ParticipantProgress,
+    SessionDefaults,
     SessionMonitorSource,
     SessionRepository,
     StudentDirectory,
     StudentRow,
 )
-from aiskra.modules.training.domain.session import TrainingSession
+from aiskra.modules.training.domain.session import DEFAULT_SETTINGS, TrainingSession
 from aiskra.shared.application import Query
 from aiskra.shared.errors import NotFoundError
 from aiskra.shared.security import Principal
@@ -203,3 +204,63 @@ class ListStudentsHandler:
 
     async def __call__(self, q: ListStudents) -> list[StudentRow]:
         return await self._students.students()
+
+
+@dataclass(frozen=True, kw_only=True)
+class GetSessionDefaults(Query):
+    pass
+
+
+class GetSessionDefaultsHandler:
+    def __init__(self, defaults: SessionDefaults) -> None:
+        self._defaults = defaults
+
+    async def __call__(self, q: GetSessionDefaults) -> dict[str, Any]:
+        return {**DEFAULT_SETTINGS, **await self._defaults.get()}
+
+
+@dataclass(frozen=True, kw_only=True)
+class MySessions(Query):
+    actor: Principal
+
+
+@dataclass(frozen=True)
+class MySessionRow:
+    session_id: UUID
+    title: str
+    mode: str
+    status: str
+    role: str
+    dds_service_code: str | None
+    started_at: datetime | None
+    finished_at: datetime | None
+    settings: dict[str, Any]
+
+
+class MySessionsHandler:
+    """Назначенные занятия обучающегося (п. 5.1): запланированные, идущее, прошедшие — с его ролью."""
+
+    def __init__(self, repo: SessionRepository) -> None:
+        self._repo = repo
+
+    async def __call__(self, q: MySessions) -> list[MySessionRow]:
+        out = []
+        for s in await self._repo.for_student(q.actor.user_id):
+            p = s.participant(q.actor.user_id)
+            if p is None:
+                continue
+            out.append(
+                MySessionRow(
+                    session_id=s.id,
+                    title=s.title,
+                    mode=s.mode.value,
+                    status=s.status.value,
+                    role=p.role,
+                    dds_service_code=p.dds_service_code,
+                    started_at=s.started_at,
+                    finished_at=s.finished_at,
+                    settings=dict(s.settings),
+                )
+            )
+        order = {"running": 0, "planned": 1, "finished": 2}
+        return sorted(out, key=lambda r: order.get(r.status, 3))

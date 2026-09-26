@@ -13,7 +13,7 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import ColumnElement, and_, case, column, exists, func, or_, select, table
+from sqlalchemy import ColumnElement, DateTime, and_, case, column, exists, func, or_, select, table
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from aiskra.modules.incidents.application.ports.cards import (
@@ -22,6 +22,7 @@ from aiskra.modules.incidents.application.ports.cards import (
     IncidentTypeInfo,
     JournalFilter,
     JournalRow,
+    ReworkNote,
     StatusHistoryItem,
     WorkoutView,
 )
@@ -37,6 +38,16 @@ _users = table("users", column("id"), column("full_name"), column("search_key"),
 _okrugs = table("dict_okrugs", column("code"), column("short"))
 _districts = table("dict_districts", column("code"), column("name"))
 _types = table("dict_incident_types", column("code"), column("final_type"), column("ekp_type"))
+# журнал аудита — источник комментария «Вернуть на доработку» (1.3 → 5.1): отдельного поля у карточки нет
+_audit = table(
+    "audit_log",
+    column("id"),
+    column("at", DateTime(timezone=True)),
+    column("card_number"),
+    column("event"),
+    column("description"),
+    column("actor_name"),
+)
 
 _unnotified = exists(
     select(1)
@@ -200,7 +211,20 @@ class SqlCardReader:
             stmt = select(_types.c.code, _types.c.final_type, _types.c.ekp_type).where(_types.c.code.in_(type_codes))
             for code, final, ekp in (await self._s.execute(stmt)).all():
                 types[code] = IncidentTypeInfo(code=code, final_type=final, ekp_type=ekp)
+        rework = None
+        if card.status == "registered":
+            last = (
+                await self._s.execute(
+                    select(_audit.c.event, _audit.c.description, _audit.c.at, _audit.c.actor_name)
+                    .where(_audit.c.card_number == card.number, _audit.c.event.in_(("card.returned", "card.worked")))
+                    .order_by(_audit.c.id.desc())
+                    .limit(1)
+                )
+            ).first()
+            if last is not None and last[0] == "card.returned":
+                rework = ReworkNote(comment=last[1] or "", at=as_utc(last[2]), by=last[3])
         return CardView(
+            rework=rework,
             id=card.id,
             number=card.number,
             status=card.status,

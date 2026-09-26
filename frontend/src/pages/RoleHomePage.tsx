@@ -1,19 +1,9 @@
-/** Стартовые разделы преподавателя и обучающегося. Наполнение — пункты 4.x (преподаватель) и 1.x, 5.1 (обучающийся). */
-import { useEffect } from 'react';
+/** Пульт преподавателя (п. 4.x): занятия и инсайты по группе. */
 import { useNavigate } from 'react-router-dom';
-import { PERMISSIONS, useMe } from '../shared/api/auth';
-import { keyCode } from './card112/useHotkeys';
-import { ArmTopBar } from '../shared/ui/ArmTopBar';
-import { ARM_MENU } from '../shared/ui/armMenu';
 import { useInsights } from '../shared/api/assessment';
 import { Button, Card, StatusPill } from '@smena112/ui-kit';
-import { MODE_TITLE, SESSION_STATUS, useMySession, useSessions } from '../shared/api/training';
-import { SessionBanner } from '../shared/ui/SessionBanner';
+import { MODE_TITLE, SESSION_STATUS, useSessions } from '../shared/api/training';
 import { TeacherShell } from '../shared/ui/TeacherShell';
-
-const NEXT: Record<string, string> = {
-  student: 'Кабинет обучающегося: назначенное занятие, эмулятор АРМ-112 и АРМ ДДС, мои результаты.',
-};
 
 /** Пульт преподавателя (п. 4.x): идущие и последние занятия, переходы, инсайты по группе. */
 function TeacherHome() {
@@ -80,37 +70,7 @@ function GroupInsights() {
   );
 }
 
+/** Главная преподавателя (/teacher). Кабинет обучающегося — pages/student/StudentHomePage. */
 export function RoleHomePage() {
-  const me = useMe().data!;
-  return me.role === 'teacher' ? <TeacherHome /> : <StudentHome />;
-}
-
-function StudentHome() {
-  const me = useMe().data!;
-  const navigate = useNavigate();
-  const canCreate = me.permissions.includes(PERMISSIONS.trainingParticipate);
-  const session = useMySession(canCreate).data ?? null;
-  useEffect(() => {
-    if (!canCreate) return;
-    const onKey = (e: KeyboardEvent) => { if (keyCode(e) === 'Insert') navigate('/arm/112'); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [canCreate, navigate]);
-  return (
-    <div className="arm-journal" style={{ minHeight: '100vh' }}>
-      <div className="arm-search">
-        <div className="arm-search__main">
-          <h1 className="cab-title" style={{ margin: 0 }}>{me.role_title}</h1>
-          <p style={{ marginTop: 8 }}>{NEXT[me.role] ?? ''}</p>
-          {canCreate && (
-            <button type="button" className="arm-bigbtn arm-bigbtn--alert" style={{ marginTop: 12 }} onClick={() => navigate('/arm/112')}>
-              создать новую карточку (Insert)
-            </button>
-          )}
-        </div>
-        <ArmTopBar me={me} menu={ARM_MENU} />
-      </div>
-      {session && <SessionBanner s={session} here={session.role === 'dds' ? '112' : 'dds'} />}
-    </div>
-  );
+  return <TeacherHome />;
 }

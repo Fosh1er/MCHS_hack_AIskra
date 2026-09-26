@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Protocol
+from typing import Any, Protocol
 from uuid import UUID
 
 from aiskra.modules.training.domain.scenario import Scenario
@@ -22,6 +22,8 @@ class SessionRepository(Protocol):
     async def page(self, *, teacher_id: UUID | None, limit: int, offset: int) -> tuple[list[TrainingSession], int]: ...
 
     async def running_for_student(self, student_id: UUID) -> TrainingSession | None: ...
+
+    async def for_student(self, student_id: UUID) -> list[TrainingSession]: ...
 
 
 @dataclass(frozen=True)
@@ -65,3 +67,9 @@ class ParticipantProgress:
 
 class SessionMonitorSource(Protocol):
     async def progress(self, session: TrainingSession) -> list[ParticipantProgress]: ...
+
+
+class SessionDefaults(Protocol):
+    """Тайминг и пороги занятия по умолчанию — из настроек администратора (п. 5.2)."""
+
+    async def get(self) -> dict[str, Any]: ...

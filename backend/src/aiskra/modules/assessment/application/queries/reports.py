@@ -16,7 +16,13 @@ from typing import Any
 from uuid import UUID
 
 from aiskra.modules.assessment.application.ports.attempts import AssessmentRecord, AssessmentRepository
-from aiskra.modules.assessment.application.ports.reports import ReportCard, ReportParticipant, SessionFactsSource
+from aiskra.modules.assessment.application.ports.reports import (
+    ReportCard,
+    ReportParticipant,
+    SessionFacts,
+    SessionFactsSource,
+)
+from aiskra.modules.assessment.domain.recommendations import recommend
 from aiskra.modules.assessment.domain.scoring import CARD_NORM_SECONDS, DDS_NORM_SECONDS, TITLES
 from aiskra.shared.application import Query
 from aiskra.shared.errors import NotFoundError
@@ -130,68 +136,73 @@ class GetSessionReportHandler:
         facts = await self._source.session(q.session_id)
         if facts is None or facts.teacher_id != q.actor.user_id:
             raise NotFoundError("Занятие не найдено", code="session_not_found")
-        norm112 = float(facts.settings.get("norm_112", CARD_NORM_SECONDS))
-        norm_dds = float(facts.settings.get("norm_dds", DDS_NORM_SECONDS))
-        students, heat_rows, all_scores, all_passed, times, series = [], [], [], [], [], []
-        keys: dict[str, str] = {}
-        for p in facts.participants:
-            results = []
-            for card in cards_of(p, facts.cards):
-                rec = await self._repo.latest(card.card_id, p.role, p.service_code if p.role == "dds" else None)
-                results.append(_result(card, rec, norm112 if p.role == "112" else norm_dds, p.role))
-                if rec:
-                    series.append(
-                        {"t": card.saved_at.isoformat() if card.saved_at else "", "v": rec.score, "who": p.full_name}
-                    )
-            scores = [r.score for r in results if r.score is not None]
-            passed = [bool(r.passed) for r in results if r.passed is not None]
-            ptimes = [r.processing_s for r in results if r.processing_s is not None]
-            all_scores += scores
-            all_passed += passed
-            times += ptimes
-            per_key: dict[str, list[float]] = defaultdict(list)
-            for r in results:
-                for k, v in r.criteria.items():
-                    keys.setdefault(k, TITLES.get(k, k))
-                    if v is not None:
-                        per_key[k].append(float(v))
-            heat_rows.append(
-                {
-                    "student": p.full_name,
-                    "role": p.role,
-                    "values": {k: round(sum(v) / len(v), 2) for k, v in per_key.items()},
-                }
-            )
-            students.append(
-                StudentReport(
-                    student_id=p.student_id,
-                    full_name=p.full_name,
-                    role=p.role,
-                    service_code=p.service_code,
-                    cards=results,
-                    avg_score=_avg(scores),
-                    passed_share=round(sum(passed) / len(passed), 3) if passed else None,
-                    avg_time_s=_avg(ptimes),
-                    not_assessed=sum(1 for r in results if r.score is None),
+        return await build_report(facts, self._repo)
+
+
+async def build_report(facts: SessionFacts, repo: AssessmentRepository, only: UUID | None = None) -> SessionReport:
+    """Отчёт по фактам занятия; `only` — только этот обучающийся (его кабинет, п. 5.1)."""
+    norm112 = float(facts.settings.get("norm_112", CARD_NORM_SECONDS))
+    norm_dds = float(facts.settings.get("norm_dds", DDS_NORM_SECONDS))
+    students, heat_rows, all_scores, all_passed, times, series = [], [], [], [], [], []
+    keys: dict[str, str] = {}
+    for p in [x for x in facts.participants if only is None or x.student_id == only]:
+        results = []
+        for card in cards_of(p, facts.cards):
+            rec = await repo.latest(card.card_id, p.role, p.service_code if p.role == "dds" else None)
+            results.append(_result(card, rec, norm112 if p.role == "112" else norm_dds, p.role))
+            if rec:
+                series.append(
+                    {"t": card.saved_at.isoformat() if card.saved_at else "", "v": rec.score, "who": p.full_name}
                 )
-            )
-        buckets = [{"label": label, "count": sum(1 for t in times if lo <= t < hi)} for lo, hi, label in TIME_BUCKETS]
-        return SessionReport(
-            session_id=facts.session_id,
-            title=facts.title,
-            mode=facts.mode,
-            status=facts.status,
-            started_at=facts.started_at,
-            finished_at=facts.finished_at,
-            settings=facts.settings,
-            students=students,
-            avg_score=_avg(all_scores),
-            passed_share=round(sum(all_passed) / len(all_passed), 3) if all_passed else None,
-            cards_count=sum(len(s.cards) for s in students),
-            heatmap=Heatmap(criteria=[{"key": k, "title": t} for k, t in keys.items()], rows=heat_rows),
-            time_buckets=buckets,
-            score_series=sorted(series, key=lambda x: x["t"]),
+        scores = [r.score for r in results if r.score is not None]
+        passed = [bool(r.passed) for r in results if r.passed is not None]
+        ptimes = [r.processing_s for r in results if r.processing_s is not None]
+        all_scores += scores
+        all_passed += passed
+        times += ptimes
+        per_key: dict[str, list[float]] = defaultdict(list)
+        for r in results:
+            for k, v in r.criteria.items():
+                keys.setdefault(k, TITLES.get(k, k))
+                if v is not None:
+                    per_key[k].append(float(v))
+        heat_rows.append(
+            {
+                "student": p.full_name,
+                "role": p.role,
+                "values": {k: round(sum(v) / len(v), 2) for k, v in per_key.items()},
+            }
         )
+        students.append(
+            StudentReport(
+                student_id=p.student_id,
+                full_name=p.full_name,
+                role=p.role,
+                service_code=p.service_code,
+                cards=results,
+                avg_score=_avg(scores),
+                passed_share=round(sum(passed) / len(passed), 3) if passed else None,
+                avg_time_s=_avg(ptimes),
+                not_assessed=sum(1 for r in results if r.score is None),
+            )
+        )
+    buckets = [{"label": label, "count": sum(1 for t in times if lo <= t < hi)} for lo, hi, label in TIME_BUCKETS]
+    return SessionReport(
+        session_id=facts.session_id,
+        title=facts.title,
+        mode=facts.mode,
+        status=facts.status,
+        started_at=facts.started_at,
+        finished_at=facts.finished_at,
+        settings=facts.settings,
+        students=students,
+        avg_score=_avg(all_scores),
+        passed_share=round(sum(all_passed) / len(all_passed), 3) if all_passed else None,
+        cards_count=sum(len(s.cards) for s in students),
+        heatmap=Heatmap(criteria=[{"key": k, "title": t} for k, t in keys.items()], rows=heat_rows),
+        time_buckets=buckets,
+        score_series=sorted(series, key=lambda x: x["t"]),
+    )
 
 
 def report_csv(r: SessionReport) -> str:
@@ -253,6 +264,7 @@ class ProgressView:
     weakest: list[dict[str, Any]]  # [{key, title, average}]
     recent_errors: list[str]
     expert_comments: list[dict[str, Any]] = field(default_factory=list)  # [{card_number, score, comment}]
+    recommendations: list[dict[str, Any]] = field(default_factory=list)  # [{key, average, text}]
 
 
 class MyProgressHandler:
@@ -272,7 +284,9 @@ class MyProgressHandler:
                     per_key[c["key"]].append(float(c["score"]))
         averages = sorted((round(sum(v) / len(v), 2), k) for k, v in per_key.items())[:4]
         weakest: list[dict[str, Any]] = [{"key": k, "title": TITLES.get(k, k), "average": a} for a, k in averages]
+        recs = recommend({k: sum(v) / len(v) for k, v in per_key.items()})
         return ProgressView(
+            recommendations=recs,
             points=[
                 {
                     "t": r.created_at.isoformat() if r.created_at else "",
@@ -296,3 +310,31 @@ class MyProgressHandler:
                 if r.details.get("expert")
             ][:5],
         )
+
+
+@dataclass(frozen=True, kw_only=True)
+class GetMySessionReport(Query):
+    actor: Principal
+    session_id: UUID
+
+
+@dataclass(frozen=True)
+class MySessionReport:
+    report: SessionReport
+    recommendations: list[dict[str, Any]]
+
+
+class GetMySessionReportHandler:
+    """Свои результаты по занятию (п. 5.1): только участнику и только его карточки."""
+
+    def __init__(self, source: SessionFactsSource, repo: AssessmentRepository) -> None:
+        self._source = source
+        self._repo = repo
+
+    async def __call__(self, q: GetMySessionReport) -> MySessionReport:
+        facts = await self._source.session(q.session_id)
+        if facts is None or all(p.student_id != q.actor.user_id for p in facts.participants):
+            raise NotFoundError("Занятие не найдено", code="session_not_found")
+        report = await build_report(facts, self._repo, only=q.actor.user_id)
+        row = report.heatmap.rows[0]["values"] if report.heatmap.rows else {}
+        return MySessionReport(report=report, recommendations=recommend(row))

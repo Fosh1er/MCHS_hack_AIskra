@@ -483,3 +483,13 @@
 .tch-expert { margin-top: 6px; padding: 4px 8px; font-size: var(--fs-sm); background: var(--c-blue-100); border-left: 3px solid var(--accent); }
 .tch-heat thead th { height: 160px; }
 .tch-heat thead th span { max-height: 160px; }
+
+/* ---- Кабинеты администратора и обучающегося (п. 5.1, 5.2) -------------------------------------- */
+.adm-note { margin: 4px 0 0; font-size: var(--fs-sm); color: var(--text-muted-canvas); }
+.adm-logs td { font-size: var(--fs-sm); vertical-align: top; }
+.adm-log--warning td { background: #fff6e0; }
+.adm-log--error td, .adm-log--critical td { background: #fbe4e4; }
+.stu-recs { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: var(--fs-md); }
+.stu-recs b { font-variant-numeric: tabular-nums; margin-right: 4px; }
+.stu-card + .stu-card { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-subtle); }
+.stu-hint { font-size: var(--fs-sm); color: var(--text-muted); margin-top: 2px; }

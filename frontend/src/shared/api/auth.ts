@@ -67,6 +67,7 @@ export const useLogout = () => {
 
 /** Стартовый раздел роли после входа. */
 export function homeFor(me: Me): string {
+  if (me.permissions.includes(PERMISSIONS.systemManage)) return '/admin';
   if (me.permissions.includes(PERMISSIONS.auditRead)) return '/admin/audit';
   if (me.role === 'teacher') return '/teacher';
   // обучающийся сразу попадает в «Список происшествий», как оператор в АРМ-112 (п. 1.3)

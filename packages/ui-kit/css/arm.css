@@ -1124,3 +1124,6 @@
 .progress-page { display: flex; flex-direction: column; gap: 12px; }
 .assess__expert { margin: 6px 0; padding: 6px 10px; font-size: 13px; background: var(--c-blue-100); border-left: 3px solid var(--accent); }
 .progress-page .cab-card, .progress-page .cab-stat { color: var(--text); }
+.session-banner__clock { font-variant-numeric: tabular-nums; font-weight: 500; }
+/* комментарий «Вернуть на доработку» автору карточки (1.3 → 5.1) */
+.arm112-rework { margin: 6px 16px; padding: 8px 12px; font-size: 14px; background: var(--c-orange-100); border-left: 4px solid var(--accent-112); color: var(--text-strong); }

@@ -103,6 +103,22 @@ class SqlSessionRepository:
         )
         return [await self._entity(r) for r in rows], total
 
+    async def for_student(self, student_id: UUID) -> list[TrainingSession]:
+        rows = (
+            (
+                await self._s.execute(
+                    select(TrainingSessionModel)
+                    .join(AssignmentModel, AssignmentModel.session_id == TrainingSessionModel.id)
+                    .where(AssignmentModel.student_id == student_id)
+                    .order_by(TrainingSessionModel.created_at.desc())
+                    .limit(100)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        return [await self._entity(r) for r in rows]
+
     async def running_for_student(self, student_id: UUID) -> TrainingSession | None:
         row = (
             (
