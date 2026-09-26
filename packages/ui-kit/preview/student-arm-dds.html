@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Происшествие 36814845 — АРМ-ДДС · тренажёр</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../tokens/tokens.css">
+  <link rel="stylesheet" href="../css/base.css">
+  <link rel="stylesheet" href="../css/arm.css">
+</head>
+<body>
+<script src="../icons/icons.js"></script>
+
+<div class="arm-app">
+
+  <!-- Учебная надстройка (в реальном АРМ её нет) -->
+  <header class="arm-trainbar">
+    <span class="arm-trainbar__badge">Тренажёр</span>
+    <span class="arm-trainbar__meta">Занятие: <b>Гр. ДДС-3 · «Статусы реагирования»</b></span>
+    <span class="arm-trainbar__meta">Роль: <b>ДДС · Поселение Вороновское</b></span>
+    <span class="arm-trainbar__meta">Карточка <b>3 из 10</b></span>
+    <span class="u-grow"></span>
+    <span class="arm-trainbar__meta">Учебное время</span>
+    <span class="arm-trainbar__clock">11:24<span class="t-sec">26</span><span class="arm-trainbar__speed">×10</span></span>
+    <button class="arm-trainbar__btn"><svg class="i i--sm"><use href="#i-description"/></svg>Справка F1</button>
+    <button class="arm-trainbar__btn"><svg class="i i--sm"><use href="#i-help"/></svg>Подсказка</button>
+  </header>
+
+  <div class="arm-body">
+
+    <!-- ============ Карточка происшествия ДДС (копия реального АРМ) ============ -->
+    <main class="arm-card">
+      <div class="arm-card__body">
+
+        <!-- Полоса: вызов · телефоны · номер карточки -->
+        <div class="arm-strip">
+          <div class="arm-callctl">
+            <div class="arm-callctl__hang"><svg class="i i--lg"><use href="#i-call_end"/></svg></div>
+            <div class="arm-callctl__main">
+              <div class="arm-callctl__title">Отключение</div>
+              <div class="arm-callctl__btns">
+                <button class="arm-minibtn arm-minibtn--disabled">записи звонков</button>
+                <button class="arm-minibtn">список SMS</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="arm-phone">
+            <div class="arm-phone__icons">
+              <button title="Позвонить на АОН"><svg class="i i--sm"><use href="#i-phone"/></svg></button>
+              <button title="SMS"><svg class="i i--sm"><use href="#i-sms"/></svg></button>
+            </div>
+            <div class="arm-phone__field">
+              <div class="arm-phone__label">АОН</div>
+              <div class="arm-phone__value">+7 (999) 000-12-34</div>
+            </div>
+          </div>
+          <div class="arm-phone">
+            <div class="arm-phone__icons">
+              <button><svg class="i i--sm"><use href="#i-phone"/></svg></button>
+              <button><svg class="i i--sm"><use href="#i-sms"/></svg></button>
+            </div>
+            <div class="arm-phone__field">
+              <div class="arm-phone__label">предоставленный</div>
+              <div class="arm-phone__value arm-phone__value--empty">—</div>
+            </div>
+          </div>
+          <div class="arm-phone">
+            <div class="arm-phone__icons">
+              <button><svg class="i i--sm"><use href="#i-phone"/></svg></button>
+              <button><svg class="i i--sm"><use href="#i-sms"/></svg></button>
+            </div>
+            <div class="arm-phone__field">
+              <div class="arm-phone__label">телефон на место</div>
+              <div class="arm-phone__value arm-phone__value--empty">—</div>
+            </div>
+          </div>
+
+          <div class="arm-idbox">
+            <div class="arm-idbox__title">Происшествие 36814845</div>
+            <div class="arm-idbox__meta">Сохр. 02.10.2026 в 11:12:43<br>Опер. Смирнова Е., АРМ 4, УМЦ</div>
+          </div>
+          <div class="arm-idbtns">
+            <button class="arm-idbtn arm-idbtn--view">просмотр</button>
+            <button class="arm-idbtn">дополнение</button>
+          </div>
+        </div>
+
+        <!-- Строка 2: заявитель | флаги -->
+        <div class="arm-panel">
+          <div class="arm-panel__label">ФИО заявителя</div>
+          <div>Колесникова Зинаида Петровна · очевидец</div>
+        </div>
+        <div class="arm-flags">
+          <div class="arm-panel arm-flags__text">
+            <span>Пострадавшие: нет</span><span>Отказ от скорой: нет</span><span>Заблокированные: нет</span>
+          </div>
+          <div class="arm-panel arm-flags__btns">
+            <span class="arm-flagbtn">ЧС <svg class="i i--sm"><use href="#i-bolt"/></svg></span>
+            <span class="arm-flagbtn arm-flagbtn--chp">ЧП <svg class="i i--sm"><use href="#i-warning"/></svg></span>
+            <button class="arm-roundbtn" aria-label="Редактировать"><svg class="i i--sm"><use href="#i-edit"/></svg></button>
+          </div>
+        </div>
+
+        <!-- Строка 3: адрес + описание | тип происшествия -->
+        <div class="arm-col">
+          <div class="arm-panel arm-address">
+            <div>
+              <div class="arm-address__main">Россия, Москва, (ТАО, Вороновское), д. 12, кв. 34</div>
+              <div class="arm-address__sub">Троицкий административный округ · подъезд 1, этаж 3</div>
+            </div>
+            <svg class="i i--sm"><use href="#i-place"/></svg>
+          </div>
+          <div class="arm-panel arm-panel--fill">
+            <div class="arm-desc__item">
+              <div class="arm-desc__meta">02.10.2026 11:13:19 <span>Оператор 112 · Смирнова Е.</span></div>
+              <div>Дым из-под двери кв. 34, в квартире возможно пожилой мужчина, дом газифицирован. Заявитель — соседка с 3 этажа.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="arm-col">
+          <div>
+            <div class="arm-type__head"><span>Происшествие 101</span></div>
+            <div class="arm-type__tags">Дом . Открытое пламя / Дым (дом), Запах гари (дом) . Дом многоквартирный . квартира . Есть угроза людям . Есть газификация .</div>
+          </div>
+          <div class="arm-line">Класс.: <b>пожар: квартира ;</b></div>
+          <div class="arm-line">[ВИС] Класс.:</div>
+        </div>
+      </div>
+
+      <!-- ============ Нижняя панель служб ============ -->
+      <footer class="arm-svcbar">
+        <!-- История статусов своей службы -->
+        <div class="arm-history" style="left: 274px; bottom: calc(100% + var(--arm-svcbar-h));">
+          <div class="arm-history__head">
+            <span>Поселение Вороновское</span>
+            <button aria-label="Закрыть"><svg class="i i--sm"><use href="#i-close"/></svg></button>
+          </div>
+          <div class="arm-history__rows">
+            <div class="arm-history__row">
+              <span class="arm-history__op">оп. 0</span><svg class="i i--xs"><use href="#i-chevron_right"/></svg>
+              <span class="arm-history__status">02.10.2026 11:14:04 <b>Добавлена</b></span><span></span><span></span>
+            </div>
+            <div class="arm-history__row">
+              <span class="arm-history__op">оп. 0</span><svg class="i i--xs"><use href="#i-chevron_right"/></svg>
+              <span class="arm-history__status">02.10.2026 11:19:24 <b>Получена службой</b></span><span></span><span></span>
+            </div>
+            <div class="arm-history__row">
+              <span class="arm-history__op">оп. 0</span><svg class="i i--xs"><use href="#i-chevron_right"/></svg>
+              <span class="arm-history__status">02.10.2026 11:23:21 <b>Принята</b></span>
+              <svg class="i i--xs"><use href="#i-chevron_right"/></svg>
+              <span>Наряд 23. Направлена бригада №23 (ст. Петров А. В.)</span>
+            </div>
+            <div class="arm-history__row">
+              <span class="arm-history__op">оп. 0</span><svg class="i i--xs"><use href="#i-chevron_right"/></svg>
+              <span class="arm-history__status">02.10.2026 11:24:02 <b>Начало реагирования</b></span>
+              <svg class="i i--xs"><use href="#i-chevron_right"/></svg>
+              <span>Бригада выехала, прибытие ~10 мин</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Второй ряд (развёрнут кнопкой ⇕) -->
+        <div class="arm-svcstack">
+          <button class="arm-svc">
+            <svg class="i i--xs arm-svc__caret"><use href="#i-expand_less"/></svg>
+            <span class="arm-svc__name u-ellipsis">ОАТИ</span>
+            <span class="arm-svc__status">11:14 Добавлена</span>
+          </button>
+          <button class="arm-svc">
+            <svg class="i i--xs arm-svc__caret"><use href="#i-expand_less"/></svg>
+            <span class="arm-svc__name u-ellipsis">Поселение Тиновское</span>
+            <span class="arm-svc__status">11:14 Добавлена</span>
+          </button>
+          <div class="arm-svc arm-svc--mine">
+            <span class="arm-svc__tools">
+              <span class="arm-svc__toggle"><svg class="i i--xs"><use href="#i-expand_more"/></svg></span>
+              <button aria-label="Изменить статус"><svg class="i i--xs"><use href="#i-edit"/></svg></button>
+            </span>
+            <span class="arm-svc__name u-ellipsis" style="margin-top: 14px;">Поселение Вороновское</span>
+            <span class="arm-svc__status">11:24 Начало реаг…</span>
+          </div>
+        </div>
+
+        <div class="arm-svcbar__label" style="width: 66px;">Службы:</div>
+        <div class="arm-svcbar__tabs">
+          <button class="arm-svc arm-svc--main">
+            <svg class="i i--xs arm-svc__caret"><use href="#i-expand_less"/></svg>
+            <span class="arm-svc__name">Служба 101</span>
+            <span class="arm-svc__status">11:14 Добавлена</span>
+          </button>
+          <button class="arm-svc">
+            <svg class="i i--xs arm-svc__caret"><use href="#i-expand_less"/></svg>
+            <span class="arm-svc__name">Служба 104</span>
+            <span class="arm-svc__status">11:14 Добавлена</span>
+          </button>
+          <button class="arm-svc">
+            <svg class="i i--xs arm-svc__caret"><use href="#i-expand_less"/></svg>
+            <span class="arm-svc__name">Служба 102</span>
+            <span class="arm-svc__status">11:14 Добавлена</span>
+          </button>
+          <button class="arm-svc arm-svc--nointegr">
+            <svg class="i i--xs arm-svc__caret"><use href="#i-expand_less"/></svg>
+            <span class="arm-svc__name">Деп. ЖКХ</span>
+            <span class="arm-svc__status">11:14 Добавлена</span>
+          </button>
+          <button class="arm-svc">
+            <svg class="i i--xs arm-svc__caret"><use href="#i-expand_less"/></svg>
+            <span class="arm-svc__name">ЦЭМП</span>
+            <span class="arm-svc__status">11:14 Добавлена</span>
+          </button>
+          <button class="arm-svc">
+            <svg class="i i--xs arm-svc__caret"><use href="#i-expand_less"/></svg>
+            <span class="arm-svc__name">ЦОДД</span>
+            <span class="arm-svc__status">11:14 Добавлена</span>
+          </button>
+          <button class="arm-svc">
+            <svg class="i i--xs arm-svc__caret"><use href="#i-expand_less"/></svg>
+            <span class="arm-svc__name">Мос.Без.</span>
+            <span class="arm-svc__status">11:14 Добавлена</span>
+          </button>
+          <button class="arm-svc">
+            <svg class="i i--xs arm-svc__caret"><use href="#i-expand_less"/></svg>
+            <span class="arm-svc__name">Мослифт</span>
+            <span class="arm-svc__status">11:14 Добавлена</span>
+          </button>
+          <div style="display:flex; align-items:center; padding-left: 16px;">
+            <button class="arm-sqbtn" aria-label="Свернуть ряд служб"><svg class="i"><use href="#i-unfold_less"/></svg></button>
+          </div>
+        </div>
+        <div class="arm-svcbar__end">
+          <button class="arm-sqbtn" aria-label="Сообщить о проблеме"><svg class="i"><use href="#i-report"/></svg></button>
+          <button class="arm-sqbtn" aria-label="Закрыть карточку"><svg class="i"><use href="#i-close"/></svg></button>
+        </div>
+      </footer>
+    </main>
+
+    <!-- ============ Учебный док: IP-телефон и очередь ============ -->
+    <aside class="arm-dock" aria-label="IP-телефон и очередь карточек">
+      <div class="arm-ring" role="alert">
+        <svg class="i i--lg arm-ring__icon"><use href="#i-phone"/></svg>
+        <div class="u-grow">
+          <div class="arm-ring__who">Старший бригады №23</div>
+          <div class="arm-ring__sub">Входящий вызов · Петров А. В.</div>
+        </div>
+        <button class="arm-ring__btn">Ответить</button>
+        <button class="arm-ring__btn arm-ring__btn--ghost" aria-label="Отклонить"><svg class="i i--sm"><use href="#i-close"/></svg></button>
+      </div>
+
+      <div class="arm-dock__section">
+        <div class="arm-dock__title"><span>IP-телефон · РТУ Т16Р</span><span>доб. 2407</span></div>
+        <div class="arm-linekeys">
+          <button class="arm-linekey arm-linekey--busy"><span class="arm-linekey__led"></span>Линия 1 · вызов</button>
+          <button class="arm-linekey"><span class="arm-linekey__led"></span>Линия 2 · свободна</button>
+        </div>
+      </div>
+
+      <div class="arm-dock__section arm-dock__section--grow">
+        <div class="arm-call__bar"><span>Последний разговор: <b>Старший бригады №23</b></span><span>00:41</span></div>
+        <div class="arm-transcript u-scroll">
+          <div class="arm-msg arm-msg--sys">11:23:40 · исходящий вызов · соединено</div>
+          <div class="arm-msg arm-msg--me"><span class="arm-msg__who">Вы</span>Бригада 23, пожар в квартире: пос. Вороновское, д. 12, кв. 34, 3 этаж. Дым из-под двери, внутри может быть пожилой мужчина, дом газифицирован. Заявитель +7 999 000-12-34.</div>
+          <div class="arm-msg arm-msg--them"><span class="arm-msg__who">Старший бригады №23</span>Принял. Выезжаем, будем минут через десять. Код домофона есть?</div>
+          <div class="arm-msg arm-msg--me"><span class="arm-msg__who">Вы</span>Кода нет, заявитель встретит у подъезда.</div>
+          <div class="arm-msg arm-msg--them"><span class="arm-msg__who">Старший бригады №23</span>Понял, доложу по прибытии.</div>
+          <div class="arm-msg arm-msg--sys">11:24:21 · вызов завершён</div>
+        </div>
+        <div class="arm-composer">
+          <input type="text" placeholder="Что вы говорите в трубку…" aria-label="Реплика">
+          <button class="arm-contact__call" aria-label="Отправить"><svg class="i i--sm"><use href="#i-send"/></svg></button>
+        </div>
+        <div class="arm-callbtns">
+          <button class="arm-callbtn"><svg class="i i--sm"><use href="#i-pause"/></svg>Удержание</button>
+          <button class="arm-callbtn"><svg class="i i--sm"><use href="#i-group"/></svg>Конференция</button>
+          <button class="arm-callbtn arm-callbtn--end"><svg class="i i--sm"><use href="#i-call_end"/></svg>Завершить</button>
+        </div>
+      </div>
+
+      <div class="arm-dock__section">
+        <div class="arm-dock__title"><span>Очередь карточек</span><span>3</span></div>
+        <div class="arm-queue__item">
+          <span class="arm-queue__title">36814848 · ДТП</span>
+          <span class="arm-pill arm-pill--critical"><svg class="i"><use href="#i-error"/></svg>0:47 · сверх нормы</span>
+          <span class="arm-queue__sub">Есть пострадавшие · Добавлена · ждёт реакции</span>
+        </div>
+        <div class="arm-queue__item arm-queue__item--active">
+          <span class="arm-queue__title">36814845 · 101</span>
+          <span class="arm-pill arm-pill--ok"><svg class="i"><use href="#i-check_circle"/></svg>в работе</span>
+          <span class="arm-queue__sub">Начало реагирования · открыта</span>
+        </div>
+        <div class="arm-queue__item">
+          <span class="arm-queue__title">36814851 · Скопление воды</span>
+          <span class="arm-pill arm-pill--warn"><svg class="i"><use href="#i-warning"/></svg>0:21 · скоро норма</span>
+          <span class="arm-queue__sub">Добавлена · ждёт реакции</span>
+        </div>
+      </div>
+
+      <div class="arm-dock__section">
+        <div class="arm-dock__title"><span>Телефонная книга</span><svg class="i i--sm"><use href="#i-search"/></svg></div>
+        <div class="arm-contact">
+          <div><div class="arm-contact__name">Старший бригады №23</div><div class="arm-contact__sub">Петров А. В. · на выезде</div></div>
+          <button class="arm-contact__call" aria-label="Позвонить"><svg class="i i--sm"><use href="#i-phone"/></svg></button>
+        </div>
+        <div class="arm-contact">
+          <div><div class="arm-contact__name">Старший бригады №17</div><div class="arm-contact__sub">Сидоров К. П. · свободна</div></div>
+          <button class="arm-contact__call" aria-label="Позвонить"><svg class="i i--sm"><use href="#i-phone"/></svg></button>
+        </div>
+        <div class="arm-contact">
+          <div><div class="arm-contact__name">Заявитель · карт. 36814845</div><div class="arm-contact__sub">+7 999 000-12-34</div></div>
+          <button class="arm-contact__call" aria-label="Позвонить"><svg class="i i--sm"><use href="#i-phone"/></svg></button>
+        </div>
+      </div>
+    </aside>
+
+  </div>
+</div>
+</body>
+</html>

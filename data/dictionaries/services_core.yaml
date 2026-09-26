@@ -1,0 +1,61 @@
+# Городские, федеральные и экстренные службы (не территориальные ДДС).
+# short — как на плашке службы в АРМ; full — расшифровка из справочника «Добавьте службы» (СЛУЖБЫ 112.docx).
+# confirmed: false — названия нет на скриншотах, расшифровка наша.
+# main_codes — коды «Главной службы» классификатора (колонка 14), соответствующие службе.
+# Телефоны генерируются импортом детерминированно и помечаются как синтетические (учебные данные, 152-ФЗ).
+services:
+  - {code: S101, short: Служба 101, full: "ГУ МЧС России по г. Москве, ГКУ «Пожарно-спасательный центр» ОДС", kind: emergency, main_codes: [MCHS]}
+  - {code: S102, short: Служба 102, full: "Дежурная часть ГУ МВД России по г. Москве", kind: emergency, main_codes: [Police]}
+  - {code: S103, short: Служба 103, full: "ГБУ города Москвы «Станция скорой и неотложной медицинской помощи им. А.С. Пучкова»", kind: emergency, main_codes: [AMBULANCE]}
+  - {code: S104, short: Служба 104, full: "АО «МОСГАЗ», диспетчерское управление", kind: emergency, main_codes: [MOSGAZ]}
+  - {code: CEMP, short: ЦЭМП, full: "Центр экстренной медицинской помощи", kind: emergency, main_codes: [ZEMP], confirmed: false}
+  - {code: MGPSS, short: МГПСС, full: "Московская городская поисково-спасательная служба на водных объектах", kind: emergency, confirmed: false}
+  - {code: FSB, short: ФСБ, full: "ФСБ", kind: federal}
+  - {code: ROSGVARDIA, short: Росгвардия, full: "ГУ Росгвардии по г. Москве", kind: federal, confirmed: false}
+  - {code: FSO, short: ФСО, full: "Федеральная служба охраны", kind: federal, confirmed: false}
+  - {code: MIL_COMMANDANT, short: Воен. комендатура, full: "Военная комендатура", kind: federal}
+  - {code: KANAL_MSK, short: Канал им. Москвы, full: "ФГБУ «Канал имени Москвы»", kind: federal}
+  - {code: CRVH, short: Центррегионводхоз, full: "Центррегионводхоз (Московско-Окское БВУ)", kind: federal}
+  - {code: RSVO, short: ФГУП РСВО, full: "Российские сети вещания и оповещения", kind: federal}
+  - {code: MZD, short: МЖД, full: "Московская железная дорога", kind: transport, main_codes: [MZD]}
+  - {code: METRO, short: Метро, full: "ГУП «Московский метрополитен»", kind: transport, main_codes: [METRO], confirmed: false}
+  - {code: MOSGORTRANS, short: Мосгортранс, full: "ГУП «Мосгортранс»", kind: transport, main_codes: [MOSGORTRANS], confirmed: false}
+  - {code: CODD, short: ЦОДД, full: "ГКУ «Центр организации дорожного движения»", kind: city, main_codes: [ZODD]}
+  - {code: AUTOROADS, short: Автодороги, full: "ГБУ «Автомобильные дороги»", kind: city, main_codes: [AUTOROADS]}
+  - {code: GORMOST, short: Гормост, full: "ГБУ «Гормост»", kind: city, main_codes: [GORMOST]}
+  - {code: GORHOZ, short: Гор. хозяйство, full: "Городское хозяйство (колонка классификатора «Гор. Хозяйство»)", kind: city, confirmed: false}
+  - {code: MOSVODOKANAL, short: Мосводоканал, full: "АО «Мосводоканал»", kind: utility, main_codes: [MOSVODOCANAL]}
+  - {code: MOSVODOSTOK, short: Мосводосток, full: "ГУП «Мосводосток»", kind: utility, main_codes: [MOSVODOSTOK]}
+  - {code: MOSCOLLECTOR, short: Москоллектор, full: "ГУП «Москоллектор»", kind: utility, main_codes: [MOSCOLLECTOR]}
+  - {code: MOEK, short: МОЭК, full: "ПАО «МОЭК»", kind: utility, main_codes: [MOEK]}
+  - {code: MOESK, short: МОЭСК, full: "ПАО «Россети Московский регион»", kind: utility, main_codes: [MOESK]}
+  - {code: OEK, short: ОЭК, full: "Объединенная энергетическая компания", kind: utility, main_codes: [OEK]}
+  - {code: MOSLIFT, short: Мослифт, full: "Лифт МСК", kind: utility, main_codes: [MOSLIFT]}
+  - {code: MGTS, short: МГТС, full: "Московская городская телефонная сеть", kind: utility, main_codes: [MGTS]}
+  - {code: MOSOBLGAZ, short: Мособлгаз, full: "Мособлгаз", kind: utility}
+  - {code: DEP_GKH, short: Деп. ЖКХ, full: "Департамент ЖКХ", kind: department, main_codes: [GKH]}
+  - {code: DEP_EDU, short: Деп. Обр., full: "Московский Департамент Образования", kind: department}
+  - {code: DEP_ECO, short: Деп. природопользования, full: "Департамент природопользования и охраны окружающей среды города Москвы", kind: department, main_codes: [DepEco]}
+  - {code: DEP_TSZN, short: Деп. труда и соц.защиты, full: "Департамент труда и социальной защиты населения города Москвы", kind: department, main_codes: [Dep.tszn]}
+  - {code: DEP_BUILD, short: Департамент строительства, full: "Департамент строительства", kind: department}
+  - {code: DEP_CULTURE, short: Департамент культуры города Москвы, full: "Департамент культуры города Москвы", kind: department}
+  - {code: DGP, short: ДГП, full: "Департамент градостроительной политики", kind: department, confirmed: false}
+  - {code: DTU, short: ДТУ, full: "Департамент торговли и услуг города Москвы", kind: department, confirmed: false}
+  - {code: DTU_R, short: ДТУ (Ритуал), full: "ГБУ «Ритуал»", kind: city, confirmed: false}
+  - {code: MOSBEZ, short: Мос.Без., full: "Московская Безопасность (Департамент РБиПК)", kind: city}
+  - {code: MAYOR_OFFICE, short: Аппарат Мэра, full: "Аппарат Мэра и Правительства Москвы", kind: government, confirmed: false}
+  - {code: OATI, short: ОАТИ, full: "Объединение Административно-Технических Инспекций города Москвы", kind: city}
+  - {code: MZHI, short: Мосжилинспекция, full: "Государственная жилищная инспекция города Москвы", kind: city}
+  - {code: EVAZHD, short: ЭВАЖД, full: "ГБУ «Учреждение по эксплуатации высотных административных и жилых домов»", kind: city}
+  - {code: MSPPN, short: ГБУ МСППН, full: "Московская служба психологической помощи населению ГБУ города Москвы", kind: city, main_codes: [MSPPN]}
+  - {code: GKU_CSA, short: ГКУ ЦСА, full: "Центр социальной помощи (им. Е.П. Глинки)", kind: city}
+  - {code: GKU_NTU, short: ГКУ НТУ, full: "ГКУ «Новые технологии управления»", kind: city, confirmed: false}
+  - {code: GUP_MSR, short: ГУП МСР, full: "ГУП «Московский социальный регистр» (КУБ)", kind: city, confirmed: false}
+  - {code: MOSTOURISM, short: Мостуризм, full: "Комитет по туризму города Москвы", kind: city}
+  - {code: VET, short: Комитет ветеринарии, full: "Комитет ветеринарии города Москвы", kind: city}
+  # Есть в справочнике стенда, но нет в матрице классификатора (добавляются оператором вручную):
+  - {code: OGDC, short: ОГДЦ, full: "ОГДЦ", kind: other}
+  - {code: ASU_NS, short: АСУ НС, full: "Автоматизированная система управления", kind: other}
+  - {code: DDS_GENERIC, short: Дежурно-диспетчерская служба, full: "Дежурно-диспетчерская служба", kind: other}
+  - {code: SYS112_MO, short: 112 Мос. обл., full: "112 Московской области", kind: other}
+  - {code: SYS112_KALUGA, short: 112 Кал. обл., full: "112 Калужская область", kind: other}

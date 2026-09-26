@@ -1,0 +1,56 @@
+# Типы «Что случилось?» в карточке 112 (КАРТОЧКА 112.docx, 51 тип) и их связь с классификатором.
+# group — номер группы классификатора; sign1 — фильтр по «112-Признак.1» (если тип покрывает часть группы).
+# kind: incident — реагирование по классификатору; service — служебный тип без выезда служб.
+# quick — плашка частых типов (скриншот стенда 17.09.2026); significant — «значимые типы» (инструкция image23).
+card_types:
+  - {code: "101", title: "101", kind: incident, group: 1, synonyms: [пожар, дым, возгорание, горит, задымление]}
+  - {code: "102", title: "102", kind: incident, group: 15, synonyms: [полиция, правонарушение, драка, кража, нападение]}
+  - {code: "103", title: "103", kind: incident, group: 22, synonyms: [скорая, вызов 03, "03", плохо, болит, медицинская помощь], significant: true}
+  - {code: "104", title: "104", kind: incident, group: 13, synonyms: [газ, запах газа, газовая служба], quick: true}
+  - {code: gh_accident, title: Аварии и происшествия в городском хозяйстве, kind: incident, group: 14, synonyms: [авария, прорыв трубы, лифт, колодец, люк, водоснабжение, отопление], significant: true}
+  - {code: transport_accident, title: Аварии и происшествия на транспортных объектах, kind: incident, group: 12, synonyms: [метро, мцк, поезд, электричка, самолет, судно], significant: true}
+  - {code: hydro_accident, title: Аварии на гидротехнических сооружениях, kind: incident, group: 9, synonyms: [плотина, дамба, шлюз]}
+  - {code: industrial_accident, title: Аварии на опасных и производственных объектах, kind: incident, group: 10, synonyms: [выброс, разлив, производство]}
+  - {code: gratitude, title: Благодарность службам, kind: incident, group: 23, sign1: [Благодарность], synonyms: [спасибо]}
+  - {code: uav, title: БПЛА, kind: incident, group: 24, synonyms: [беспилотник, дрон, коптер]}
+  - {code: explosion, title: Взрыв, kind: incident, group: 3, synonyms: [взрыв, хлопок, взорвалось]}
+  - {code: internal_call, title: Внутренний звонок (звонок от работников), kind: service}
+  - {code: foreign_language, title: Вызов на иностранном языке, kind: service, quick: true, synonyms: [иностранец, english]}
+  - {code: repeat_call, title: Дополнительный звонок от заявителя, kind: service, synonyms: [повторный звонок]}
+  - {code: road_hazard, title: Дорожные помехи, kind: incident, group: 16, synonyms: [яма, брошенная машина, снег на дороге]}
+  - {code: dtp, title: ДТП, kind: incident, group: 2, quick: true, synonyms: [авария, столкновение, сбил, наезд]}
+  - {code: complaint, title: Жалоба на действие или бездействие служб, kind: incident, group: 23, sign1: [Жалоба]}
+  - {code: animals, title: Животные, kind: incident, group: 21, synonyms: [собака, кошка, животное]}
+  - {code: consultation, title: Консультация, kind: service, quick: true, synonyms: [справка, вопрос]}
+  - {code: non_target, title: Нецелевой вызов, kind: service}
+  - {code: collapse, title: Обрушение, kind: incident, group: 5, synonyms: [обрушилось, рухнул]}
+  - {code: feedback_112, title: Отзыв о работе 112 Москва, kind: service}
+  - {code: call_cancel, title: Отмена вызова, kind: service, quick: true}
+  - {code: wrong_number, title: Ошибочно набран номер, kind: service, quick: true}
+  - {code: shift_handover, title: Передача дежурства, kind: service, quick: true}
+  - {code: services_help, title: Помощь службам, kind: incident, group: 23, sign1: [Помощь службам]}
+  - {code: natural_disaster, title: Природная стихия, kind: incident, group: 7, sign1: [Природная стихия], synonyms: [ураган, гроза, град, ветер]}
+  - {code: other_incident, title: Прочие происшествия, kind: incident, group: 23, sign1: [Прочие происшествия]}
+  - {code: radiation, title: Радиация, kind: incident, group: 10, sign1: [Радиация]}
+  - {code: thermometer, title: Разбитый градусник, kind: incident, group: 11, sign1: [Градусник], synonyms: [ртуть, градусник]}
+  - {code: child_danger, title: Ребенок в опасности, kind: incident, group: 18}
+  - {code: gathering, title: Сбор, kind: service}
+  - {code: water_accumulation, title: Скопление воды, kind: incident, group: 7, sign1: [Скопление воды], synonyms: [лужа, затопление, вода на дороге]}
+  - {code: death, title: Смертельный исход, kind: incident, group: 19, synonyms: [умер, труп, скончался]}
+  - {code: social_help, title: Социальная помощь, kind: incident, group: 20}
+  - {code: info_101, title: Справка 101, kind: service, quick: true}
+  - {code: info_102, title: Справка 102, kind: service}
+  - {code: info_103, title: Справка 103, kind: service}
+  - {code: info_104, title: Справка 104, kind: service}
+  - {code: info_gibdd, title: Справка ГИБДД, kind: service}
+  - {code: info_gh, title: Справка Городское хозяйство, kind: service}
+  - {code: info_mchs, title: Справка МЧС, kind: service}
+  - {code: test_call, title: Тестовый вызов, kind: service, quick: true}
+  - {code: tech_failure, title: Технический сбой (сбой в работе с оборудованием 112 Москва), kind: service}
+  - {code: training, title: Тренировка, kind: incident, group: 23, sign1: [Тренировка]}
+  - {code: emergency_notice, title: Уведомление о ЧС, kind: service}
+  - {code: terror_threat, title: Угроза взрыва/террористического акта, kind: incident, group: 4, synonyms: [бомба, заминировано, подозрительный предмет]}
+  - {code: hazmat_threat, title: Угроза выброса опасных веществ и радиации, kind: incident, group: 11, synonyms: [химия, неизвестный запах, опасное вещество]}
+  - {code: collapse_threat, title: Угроза обрушения, kind: incident, group: 6, synonyms: [трещина, может обрушиться]}
+  - {code: person_danger, title: Человек в опасности, kind: incident, group: 17, quick: true, synonyms: [суицид, пропал, в воде, закрыт]}
+  - {code: ecology, title: Экологическое происшествие, kind: incident, group: 8, significant: true, synonyms: [мусор, пятно, разлив нефтепродуктов]}

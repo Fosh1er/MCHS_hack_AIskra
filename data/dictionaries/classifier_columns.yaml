@@ -1,0 +1,85 @@
+# Метаданные колонок матрицы служб классификатора (Excel-колонки 15–90, нумерация с 1 — как в docs/brief/05).
+# service  — код службы (services.yaml) или территориальная мета-служба (territorial*).
+# flag     — признак карточки (enums.card_flag), при котором колонка применяется; null — базовая колонка службы.
+# base     — поведение базовой колонки: exclusive — «признак не выбран» (применяется, если не выбран ни один признак
+#            этой службы); always — применяется всегда (например, МГТС «реагирование всегда»).
+# audience — card: служба на панели карточки; monitoring — гипотеза: информационный подписчик (не показывается
+#            на панели служб стенда). Требует подтверждения заказчиком (см. specs/0.2 «Открытые вопросы»).
+# header   — ожидаемый текст заголовка группы колонок: импорт сверяет его с xlsx и падает при расхождении.
+columns:
+  - {col: 15, service: S101,  header: Классификатор МЧС, recipient: Служба 101, base: exclusive}
+  - {col: 16, service: S101,  header: Классификатор МЧС, recipient: Служба 101, flag: no_access}
+  - {col: 17, service: S101,  header: Классификатор МЧС, recipient: ОДС ПСЦ, base: exclusive}
+  - {col: 18, service: S101,  header: Классификатор МЧС, recipient: ОДС ПСЦ, flag: threat_to_people}
+  - {col: 19, service: S101,  header: Классификатор МЧС, recipient: ОДС ПСЦ, flag: victims}
+  - {col: 20, service: S101,  header: Классификатор МЧС, recipient: ОДС ПСЦ, flag: no_access}
+  - {col: 21, service: MGPSS, header: Классификатор МЧС, recipient: МГПСС, base: always}
+  - {col: 22, service: S102,  header: Классификатор МВД, base: exclusive}
+  - {col: 23, service: S102,  header: Классификатор МВД, flag: offense}
+  - {col: 24, service: S102,  header: Классификатор МВД, flag: victims}
+  - {col: 25, service: S103,  header: Классификатор СМП, base: exclusive}
+  - {col: 26, service: S103,  header: Классификатор СМП, flag: victims}
+  - {col: 27, service: S103,  header: Классификатор СМП, flag: victims_not_on_site}
+  - {col: 28, service: S104,  header: Классификатор МОСГАЗ, base: exclusive}
+  - {col: 29, service: S104,  header: Классификатор МОСГАЗ, flag: gasified}
+  - {col: 30, service: CEMP,  header: ЦЭМП, base: exclusive}
+  - {col: 31, service: CEMP,  header: ЦЭМП, flag: threat_to_people}
+  - {col: 32, service: CEMP,  header: ЦЭМП, flag: victims}
+  - {col: 33, service: CEMP,  header: ЦЭМП, flag: medical_help}
+  - {col: 34, service: CEMP,  header: ЦЭМП, flag: evacuation}
+  - {col: 35, service: FSB,   header: Классификатор ФСБ, base: exclusive}
+  - {col: 36, service: FSB,   header: Классификатор ФСБ, flag: mass_casualties}
+  - {col: 37, service: MOSOBLGAZ, header: Классификатор Мособлгаз, base: always}
+  - {col: 38, service: AUTOROADS, header: Автомобильные дороги, base: always}
+  - {col: 39, service: MOSGORTRANS, header: Мосгортранс, base: exclusive}
+  - {col: 40, service: MOSGORTRANS, header: Мосгортранс, flag: victims}
+  - {col: 41, service: MOSGORTRANS, header: Мосгортранс, flag: traffic_blocked}
+  - {col: 42, service: GORHOZ, header: Гор. Хозяйство, base: always}
+  - {col: 43, service: GORMOST, header: ГОРМОСТ, base: exclusive}
+  - {col: 44, service: GORMOST, header: ГОРМОСТ, flag: tunnel}
+  - {col: 45, service: GORMOST, header: ГОРМОСТ, flag: pedestrian_crossing}
+  - {col: 46, service: GORMOST, header: ГОРМОСТ, flag: road_structure}
+  - {col: 47, service: KANAL_MSK, header: Канал имени Москвы, base: always}
+  - {col: 48, service: MGTS, header: МГТС, base: always}
+  - {col: 49, service: MGTS, header: МГТС, flag: comm_object}
+  - {col: 50, service: METRO, header: Метро, base: always}
+  - {col: 51, service: MOSVODOKANAL, header: Мосводоканал, base: always}
+  - {col: 52, service: MOEK, header: МОЭК, base: always}
+  - {col: 53, service: MOESK, header: МОЭСК, base: always}
+  - {col: 54, service: OEK, header: ОЭК, base: always}
+  - {col: 55, service: MOSLIFT, header: Мослифт, base: always}
+  - {col: 56, service: CODD, header: ЦОДД, base: always}
+  - {col: 57, service: DEP_GKH, header: Деп. ЖКХ, base: always}
+  - {col: 58, service: MOSBEZ, header: Департамент РБиПК, recipient: Дежурная служба АРМ-112, base: always}
+  - {col: 59, service: MOSBEZ, header: Департамент РБиПК, recipient: "МКП, Аналитика", base: always, audience: monitoring}
+  - {col: 60, service: MAYOR_OFFICE, header: Аппарат МЭРА, base: always, audience: monitoring}
+  - {col: 61, service: MOSCOLLECTOR, header: Москоллектор, base: always}
+  - {col: 62, service: MZD, header: РЖД, base: always}
+  - {col: 63, service: DEP_EDU, header: Департамент образования, base: always}
+  - {col: 64, service: CRVH, header: Центррегионводхоз, base: always}
+  - {col: 65, service: MIL_COMMANDANT, header: Военная комендатура, base: always}
+  - {col: 66, service: OATI, header: ОАТИ, base: always}
+  - {col: 67, service: MOSVODOSTOK, header: Мосводосток, base: always}
+  - {col: 68, service: DEP_ECO, header: Департамент ППиООС, base: always}
+  - {col: 69, service: DEP_TSZN, header: ОД Департамент ТСЗН, base: always}
+  - {col: 70, service: RSVO, header: РСВО, base: always}
+  - {col: 71, service: EVAZHD, header: ЭВАЖД, base: always}
+  - {col: 72, service: MSPPN, header: МСППН, base: always}
+  - {col: 73, service: DTU_R, header: ДТУ_Р, base: always}
+  - {col: 74, service: DTU, header: ДТУ, base: always}
+  - {col: 75, service: ROSGVARDIA, header: Росгвардия, base: always}
+  - {col: 76, service: territorial, header: Территориальные ОИВ, base: always}
+  - {col: 77, service: territorial_tinao, header: Территориальные ОИВ    ТиНАО, base: always}
+  - {col: 78, service: territorial_roads, header: Автомобильные дороги АО г.Москвы, base: always}
+  - {col: 79, service: DEP_BUILD, header: Департамент строительства, base: exclusive}
+  - {col: 80, service: DEP_BUILD, header: Департамент строительства, flag: construction_site}
+  - {col: 81, service: VET, header: Комитет ветеринарии, base: always}
+  - {col: 82, service: MZHI, header: Мосжилинспекция, base: always}
+  - {col: 83, service: DEP_CULTURE, header: Департамент культуры, flag: culture_object}
+  - {col: 84, service: GKU_CSA, header: ГКУ ЦСА, base: always}
+  - {col: 85, service: GKU_NTU, header: ГКУ НТУ, base: always, audience: monitoring}
+  - {col: 86, service: FSO, header: ФСО, base: always, audience: monitoring}
+  - {col: 87, service: GUP_MSR, header: ГУП МСР, recipient: КУБ, base: always}
+  - {col: 88, service: MOSTOURISM, header: Комитет по туризму, base: always}
+  - {col: 89, service: DGP, header: ДГП, recipient: интеграция, base: always, audience: monitoring}
+  - {col: 90, service: DGP, header: ДГП, recipient: АРМ-112, base: always}

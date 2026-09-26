@@ -1,0 +1,66 @@
+/* ==========================================================================
+   СМЕНА-112 · Base
+   Сброс, типографика, иконки, утилиты. Подключается после tokens.css.
+   Шрифт Roboto: в React-приложении — пакет @fontsource/roboto (офлайн),
+   в превью-страницах — Google Fonts с фолбэком на системный sans.
+   ========================================================================== */
+
+*,
+*::before,
+*::after { box-sizing: border-box; }
+
+html, body { margin: 0; padding: 0; }
+
+body {
+  font-family: var(--font-sans);
+  font-size: var(--fs-base);
+  line-height: var(--lh-base);
+  color: var(--text);
+  background: var(--bg-canvas);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1, h2, h3, h4, p { margin: 0; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+a { color: var(--accent); }
+
+:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+
+/* ---- Иконки (Material Icons, Apache 2.0) — через спрайт icons.js --------- */
+.i {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  fill: currentColor;
+  vertical-align: middle;
+}
+.i--xs { width: 14px; height: 14px; }
+.i--sm { width: 16px; height: 16px; }
+.i--lg { width: 24px; height: 24px; }
+.i--xl { width: 32px; height: 32px; }
+
+/* ---- Утилиты ------------------------------------------------------------- */
+.u-num      { font-variant-numeric: tabular-nums; }   /* только для колонок чисел */
+.u-muted    { color: var(--text-muted); }
+.u-strong   { font-weight: var(--fw-bold); }
+.u-ellipsis { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.u-row      { display: flex; align-items: center; gap: var(--sp-2); }
+.u-grow     { flex: 1 1 auto; min-width: 0; }
+.u-sr-only  {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+/* Тонкие скроллбары как в АРМ */
+.u-scroll { overflow: auto; scrollbar-width: thin; scrollbar-color: #7c878e transparent; }
+.u-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+.u-scroll::-webkit-scrollbar-thumb { background: #7c878e; }
+
+/* Верхний индекс секунд: 11:16⁵³ */
+.t-sec { font-size: 0.62em; vertical-align: 0.55em; margin-left: 1px; font-weight: var(--fw-bold); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}

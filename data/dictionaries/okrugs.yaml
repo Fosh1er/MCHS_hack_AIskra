@@ -1,0 +1,16 @@
+# Административные округа Москвы в номенклатуре АРМ-112 (выпадающий список «Округ», инструкция image23).
+# НАО и ТАО обслуживает одна префектура ТиНАО. «МО» — Московская область (адрес вне Москвы).
+okrugs:
+  - {code: CAO,   short: ЦАО,   name: Центральный административный округ,     prefecture: PREF_CAO}
+  - {code: SAO,   short: САО,   name: Северный административный округ,        prefecture: PREF_SAO}
+  - {code: SVAO,  short: СВАО,  name: Северо-Восточный административный округ, prefecture: PREF_SVAO}
+  - {code: VAO,   short: ВАО,   name: Восточный административный округ,       prefecture: PREF_VAO}
+  - {code: YUVAO, short: ЮВАО,  name: Юго-Восточный административный округ,   prefecture: PREF_YUVAO}
+  - {code: YUAO,  short: ЮАО,   name: Южный административный округ,           prefecture: PREF_YUAO}
+  - {code: YUZAO, short: ЮЗАО,  name: Юго-Западный административный округ,    prefecture: PREF_YUZAO}
+  - {code: ZAO,   short: ЗАО,   name: Западный административный округ,        prefecture: PREF_ZAO}
+  - {code: SZAO,  short: СЗАО,  name: Северо-Западный административный округ, prefecture: PREF_SZAO}
+  - {code: ZELAO, short: ЗелАО, name: Зеленоградский административный округ,  prefecture: PREF_ZELAO}
+  - {code: NAO,   short: НАО,   name: Новомосковский административный округ,  prefecture: PREF_TINAO}
+  - {code: TAO,   short: ТАО,   name: Троицкий административный округ,        prefecture: PREF_TINAO}
+  - {code: MO,    short: МО,    name: Московская область,                     prefecture: null, outside_moscow: true}

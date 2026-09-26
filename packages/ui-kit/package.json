@@ -1,0 +1,33 @@
+{
+  "name": "@smena112/ui-kit",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Библиотека стилей и React-компонентов «СМЕНА-112»: копия интерфейса АРМ-112/АРМ-ДДС ГБУ «Система 112» и кабинеты в той же стилистике",
+  "type": "module",
+  "main": "react/index.ts",
+  "types": "react/index.ts",
+  "style": "index.css",
+  "sideEffects": [
+    "*.css"
+  ],
+  "files": [
+    "index.css",
+    "tokens",
+    "css",
+    "icons",
+    "react",
+    "js"
+  ],
+  "scripts": {
+    "icons": "node scripts/build-icons.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "react": ">=18"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.3",
+    "react": "^18.3.1",
+    "typescript": "^5.5.4"
+  }
+}

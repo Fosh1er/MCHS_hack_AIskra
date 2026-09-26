@@ -1,0 +1,109 @@
+# AGENTS.md — правила для кодинговых агентов (и людей)
+
+**АИскра** — учебный тренажёр оператора 112 и диспетчера ДДС с ИИ. Хакатон ЛЦТ-2026, задача №9 (ДГОЧСиПБ Москвы, ГБУ «Система 112»).
+Дедлайн сдачи: **29.09.2026 23:59 МСК**. После него — стоп-код: никаких коммитов в сданные ветки.
+
+Этот файл короткий. Подробнее:
+- **план** — [docs/brief/02_План_работ.md](docs/brief/02_План_работ.md) (источник истины по объёму работ);
+- **требования** — [docs/brief/01_Консолидированные_требования.md](docs/brief/01_Консолидированные_требования.md);
+- **решения** — [docs/adr/](docs/adr/README.md);
+- **правила** — [docs/rules/](docs/rules/);
+- **архитектура** — [docs/architecture/overview.md](docs/architecture/overview.md);
+- **спецификации пунктов плана с трассировкой «требование → код → тест»** — [specs/](specs/README.md).
+
+## Карта репозитория
+```
+backend/            FastAPI + SQLAlchemy 2 async + PostgreSQL (uv, Python 3.12)
+  src/aiskra/
+    shared/         ядро: Entity, ошибки, Command/Query, di.provider_stub, кеш, security (роли и права),
+                    audit (порт журнала), web (FastAPI: CurrentPrincipal, require), text (ключи поиска)
+    ai/             порты LLM/STT/TTS, ModelRouter, конфиг, adapters/ (openai_compatible, fake, caching)
+    platform/       настройки, БД, health, контейнер Services
+    modules/<m>/    domain · application/{commands,queries,ports} · infrastructure · api
+    bootstrap.py    composition root: порт → адаптер, wire() заглушек
+    main.py         FastAPI-приложение
+  migrations/       Alembic
+  tests/            unit/ (без БД) · integration/ (TestClient + SQLite)
+frontend/           React 18 + Vite + TS + TanStack Query (страницы, api-хуки)
+packages/ui-kit/    библиотека стилей и компонентов АРМ-112/ДДС (копия интерфейса заказчика)
+config/ai.yaml      назначение моделей на ИИ-задачи (по умолчанию офлайн: fake)
+data/               исходные данные заказчика и нормализованные справочники
+specs/              пункт плана → требования → реализация → тесты (трассировка)
+docs/               brief · adr · rules · architecture
+```
+
+## Команды
+```bash
+make be-install && make be-check     # uv sync; ruff + mypy --strict + import-linter + pytest
+make fe-install && make fe-build     # npm install; tsc + vite build
+docker compose up --build            # db + backend (:8000/docs) + frontend (:8080)
+cd backend && uv run alembic upgrade head && uv run python -m aiskra.cli import-dictionaries   # схема + справочники
+cd backend && uv run python -m aiskra.cli create-user --login admin --full-name "…" --role admin   # пользователь
+```
+**Перед каждым коммитом зелёными должны быть `make be-check` и `make fe-build`.**
+
+## Архитектура в 10 правилах
+1. **Модульный монолит.** Модули: `system`, `identity`, `dictionaries`, `incidents`, `training`, `assessment`, `audit`. Импорт модуль→модуль запрещён (import-linter). Если связь нужна — ADR и явное исключение.
+2. **Слои внутри модуля:** `api | infrastructure → application → domain`. `domain` — чистый Python: без FastAPI, SQLAlchemy, httpx и pydantic.
+3. **CQRS-lite (ADR-0002).**
+   - Команда (`application/commands/*.py`): dataclass `Command` + обработчик, меняет состояние через репозиторий и UoW.
+   - Запрос (`application/queries/*.py`): `Query` + DTO + обработчик/порт чтения, **ничего не меняет**.
+   - Шин нет, обработчик вызывается из API напрямую.
+4. **Порты и адаптеры (ADR-0003).**
+   - Внешний мир (БД-репозитории, модели, речь, часы) — только через `Protocol` в `application/ports` или `aiskra.ai.ports`.
+   - Адаптеры живут в `infrastructure/` или `aiskra/ai/adapters/`.
+5. **DI без фреймворка (ADR-0004).** В `api/deps.py` — `provider_stub(...)`. В `bootstrap.wire()` — `app.dependency_overrides[stub] = factory`. API не импортирует `bootstrap` и адаптеры.
+6. **ИИ только через `ModelRouter.for_task(AITask.X)`.** Никаких прямых HTTP-вызовов моделей и жёстко прописанных URL. Модель задачи задаётся в `config/ai.yaml`.
+7. **Кеш ИИ — декоратор (ADR-0006).** Режимы `exact` / `task` / `off` задаются в конфиге задачи. Детерминированные задачи (оценка) — `exact`, реплики актёров — `task` со `scope`, генерация — `off`.
+8. **Ошибки — исключения из `aiskra.shared.errors`.** HTTP-коды назначаются только в `main.py` (`DomainError` 422, `NotFoundError` 404, `PermissionDeniedError` 403, `ExternalServiceError` 503).
+9. **ORM-модели** — в `modules/<m>/infrastructure/models.py`, регистрируются в `platform/models_registry.py`. Схема меняется **только миграцией Alembic**.
+10. **Язык.** Интерфейс, сообщения об ошибках, докстринги и документация — по-русски. Идентификаторы в коде — по-английски.
+
+## Безопасность (п. 0.3, ADR-0010) — обязательно для каждого эндпоинта
+- **Всё под `/api/v1` требует входа по умолчанию** (подключение роутеров в `main.py`). Публичен только `POST /auth/login`.
+- **Право, а не роль:**
+  - `Depends(require(Permission.X))` на роутере или эндпоинте;
+  - нужен сам пользователь — `actor: Annotated[Principal, Depends(require(...))]` или `CurrentPrincipal`.
+  - Новое право — значение в `shared/security.py:Permission` и строка в `ROLE_PERMISSIONS`, плюс тест матрицы.
+- **Значимое действие → аудит.** Обработчик команды получает `AuditRecorder` в `__init__`, пишет `AuditEntry(event=AuditEvent.X, actor=cmd.actor, meta=cmd.meta, …)` до `uow.commit()`. Новое событие — значение в `shared/audit.py:AuditEvent` и название в `AUDIT_EVENT_TITLES`.
+- **Команда от имени пользователя** несёт `actor: Principal` и `meta: RequestMeta` (в API — зависимость `Meta` из `shared/web.py`).
+- **Поиск по тексту** — только по ключам `shared/text.py:search_key`, сохранённым при записи. Не используйте `func.lower()`: он зависит от локали PostgreSQL.
+- **Интеграционные тесты:** фикстуры `admin`, `client`, `app_client` и функция `login(client, "student")` в `tests/integration/conftest.py`. Пользователи трёх ролей создаются автоматически.
+
+## Справочники (п. 0.2) — что уже есть
+- **Типы происшествий:** `dict_incident_types` (1281, дерево признаков 1→2→3), `dict_card_types` (51 тип «что случилось?»).
+- **Матрица служб:** `dict_routing` + `dict_service_columns` (кто получает карточку при каких признаках).
+- **Службы:** `dict_services` (221, телефоны синтетические). **Территория:** `dict_okrugs`, `dict_districts`.
+- **Перечисления:** `dict_enums` (статусы, признаки, каналы).
+- **Структура карточки 112:** `modules/incidents/domain/card.py:IncidentCardData`.
+- **API:** `/api/v1/dictionaries/*` (см. [спецификацию 0.2](specs/0.2-data-model.md) §6). Таблицы остальных модулей уже созданы миграцией 0002 — используйте их, а не создавайте новые.
+
+## Рецепты
+**Новая команда** (пример: `SaveCard` в `incidents`):
+1. `modules/incidents/application/commands/save_card.py` — `@dataclass(frozen=True, kw_only=True) class SaveCard(Command)` и `class SaveCardHandler` с зависимостями-портами в `__init__` и `async __call__(cmd) -> Result`.
+2. Порты, если нужны новые: `application/ports/*.py` (`Protocol`). Реализации: `infrastructure/*.py`.
+3. `api/deps.py`: `provide_save_card_handler = provider_stub("incidents.SaveCardHandler")`. `api/router.py`: эндпоинт с `Depends(deps.provide_save_card_handler)`. `api/schemas.py`: pydantic-схемы.
+4. `bootstrap.wire()`: связать заглушку с фабрикой; для запроса с БД — фабрика с `Depends(get_session)`.
+5. Права и аудит — см. раздел «Безопасность» выше.
+6. Тесты: unit — обработчик с фейками портов; integration — эндпоинт через `TestClient` под нужной ролью, плюс 403 для чужой роли.
+
+**Новый запрос**: то же, но `Query` и без UoW. Чтение делайте простым SQL или ORM-выборкой прямо в DTO, агрегаты не собирайте.
+
+**Новая ИИ-задача:** значение в `ai/tasks.py:AITask` → запись в `config/ai.yaml` и `config/ai.example.yaml` → сервис в application модуля использует `router.for_task(...)`. Промпт хранится версионированно (`prompt_version` в конфиге задачи).
+
+**Новый провайдер модели:** класс в `ai/adapters/`, реализующий `LLMPort` → ветка в `ai/adapters/factory.build_llm` → значение `kind` в `ai/config.ProviderConfig`. Остальной код не меняется.
+
+## Definition of Done для задачи
+- Пункт плана закрыт по спецификации `specs/<пункт>-<кратко>.md`: создайте её по [шаблону](specs/_template.md) до начала работы. Трассировка (код, тесты, статусы) обновлена в том же коммите.
+- Тесты на новую логику, все проверки зелёные.
+- Нет секретов и реальных ПДн: только синтетические данные.
+- Интерфейс карточки и реестра — **визуально как АРМ заказчика** (ответы заказчика #679/#680). Используйте `packages/ui-kit`, новые цвета не изобретайте.
+- Обновлены документы, если меняется поведение: spec, ADR (для решений), README.
+
+## Нельзя
+- Хардкодить внешние адреса моделей, обходить `ModelRouter`, класть ключи и пароли в git.
+- Подключать роутер в `main.py` без `dependencies=signed_in` (кроме `/auth`). Проверять роль строкой вместо `Permission`.
+- Писать в журнал аудита мимо `AuditRecorder`, изменять или удалять записи аудита.
+- Импортировать `fastapi` / `sqlalchemy` / адаптеры в `domain` или `application`.
+- Менять схему БД без миграции, редактировать применённые миграции.
+- Коммитить в `main` напрямую. Работаем в ветках `feat/<пункт-плана>-<кратко>`, коммиты — [Conventional Commits](docs/rules/git.md) на русском.
