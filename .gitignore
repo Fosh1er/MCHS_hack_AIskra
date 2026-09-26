@@ -19,3 +19,9 @@ dist/
 # Сырые выгрузки OpenStreetMap (~80 МБ): генератор data/tools/build_addresses.py
 data/raw/osm/
 var/
+
+# локальные базы SQLite (разработка без Docker)
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
