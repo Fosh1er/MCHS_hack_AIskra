@@ -3,13 +3,20 @@
 import type { ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useMe } from '../api/auth';
+import { isTransient } from '../api/resilience';
 
 /** `permission` — нужное право; `anyOf` — достаточно любого из списка. */
 export function RequireAuth({ permission, anyOf, children }: { permission?: string; anyOf?: string[]; children: ReactNode }) {
   const me = useMe();
   const location = useLocation();
   if (me.isPending) return null;
-  if (me.isError) return <p className="arm-empty" style={{ padding: 24 }}>Сервер недоступен: {me.error.message}</p>;
+  if (me.isError) {
+    return (
+      <p className="arm-empty" style={{ padding: 24 }}>
+        {isTransient(me.error) ? 'Ждём связи с сервером — страница откроется сама.' : `Сервер недоступен: ${me.error.message}`}
+      </p>
+    );
+  }
   if (!me.data) return <Navigate to="/" replace state={{ from: location.pathname }} />;
   const denied = (permission && !me.data.permissions.includes(permission)) || (anyOf && !anyOf.some((p) => me.data!.permissions.includes(p)));
   if (denied) {

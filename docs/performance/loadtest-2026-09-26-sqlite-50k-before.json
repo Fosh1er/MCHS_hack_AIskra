@@ -1,0 +1,175 @@
+{
+  "users": 100,
+  "active_sessions": 20,
+  "duration_s": 64.2,
+  "login_all_s": 0.97,
+  "requests": 3421,
+  "rps": 53.3,
+  "p95_all_ms": 1556,
+  "errors": 1,
+  "write_ops_per_s": 198.5,
+  "write_errors": 0,
+  "report": {
+    "evaluated": {
+      "assessed": 129,
+      "skipped": 0
+    },
+    "cards": 129,
+    "seconds": 0.95
+  },
+  "ops": [
+    {
+      "op": "GET /dictionaries/addresses/suggest",
+      "n": 115,
+      "errors": 0,
+      "p50_ms": 354,
+      "p95_ms": 1206,
+      "p99_ms": 1842,
+      "max_ms": 1861
+    },
+    {
+      "op": "GET /dictionaries/card-types",
+      "n": 206,
+      "errors": 0,
+      "p50_ms": 269,
+      "p95_ms": 975,
+      "p99_ms": 1838,
+      "max_ms": 2209
+    },
+    {
+      "op": "GET /dictionaries/services",
+      "n": 155,
+      "errors": 0,
+      "p50_ms": 300,
+      "p95_ms": 1054,
+      "p99_ms": 2088,
+      "max_ms": 2341
+    },
+    {
+      "op": "GET /dictionaries/services/resolve",
+      "n": 129,
+      "errors": 0,
+      "p50_ms": 316,
+      "p95_ms": 1190,
+      "p99_ms": 2114,
+      "max_ms": 2238
+    },
+    {
+      "op": "GET /incidents/cards/{id}",
+      "n": 267,
+      "errors": 0,
+      "p50_ms": 356,
+      "p95_ms": 1130,
+      "p99_ms": 2047,
+      "max_ms": 2741
+    },
+    {
+      "op": "GET /incidents/dds/{svc}/journal",
+      "n": 419,
+      "errors": 0,
+      "p50_ms": 472,
+      "p95_ms": 1279,
+      "p99_ms": 2259,
+      "max_ms": 3460
+    },
+    {
+      "op": "GET /incidents/journal",
+      "n": 720,
+      "errors": 0,
+      "p50_ms": 435,
+      "p95_ms": 1594,
+      "p99_ms": 1973,
+      "max_ms": 2846
+    },
+    {
+      "op": "GET /training/sessions/my",
+      "n": 120,
+      "errors": 0,
+      "p50_ms": 316,
+      "p95_ms": 1272,
+      "p99_ms": 1821,
+      "max_ms": 1847
+    },
+    {
+      "op": "POST /auth/login",
+      "n": 100,
+      "errors": 0,
+      "p50_ms": 142,
+      "p95_ms": 297,
+      "p99_ms": 350,
+      "max_ms": 351
+    },
+    {
+      "op": "POST /incidents/cards",
+      "n": 129,
+      "errors": 0,
+      "p50_ms": 434,
+      "p95_ms": 2362,
+      "p99_ms": 3313,
+      "max_ms": 3439
+    },
+    {
+      "op": "POST /incidents/cards/{id}/save",
+      "n": 129,
+      "errors": 0,
+      "p50_ms": 419,
+      "p95_ms": 1970,
+      "p99_ms": 2336,
+      "max_ms": 2419
+    },
+    {
+      "op": "POST /incidents/dds/.../received",
+      "n": 129,
+      "errors": 0,
+      "p50_ms": 331,
+      "p95_ms": 1949,
+      "p99_ms": 3815,
+      "max_ms": 4505
+    },
+    {
+      "op": "POST /incidents/dds/.../status",
+      "n": 129,
+      "errors": 0,
+      "p50_ms": 299,
+      "p95_ms": 1772,
+      "p99_ms": 3305,
+      "max_ms": 3705
+    },
+    {
+      "op": "POST /training/calls/incoming",
+      "n": 129,
+      "errors": 0,
+      "p50_ms": 455,
+      "p95_ms": 2702,
+      "p99_ms": 3166,
+      "max_ms": 3177
+    },
+    {
+      "op": "POST /training/calls/{id}/answer",
+      "n": 129,
+      "errors": 0,
+      "p50_ms": 430,
+      "p95_ms": 2235,
+      "p99_ms": 2786,
+      "max_ms": 2873
+    },
+    {
+      "op": "POST /training/calls/{id}/end",
+      "n": 129,
+      "errors": 0,
+      "p50_ms": 344,
+      "p95_ms": 1349,
+      "p99_ms": 3197,
+      "max_ms": 3547
+    },
+    {
+      "op": "POST /training/calls/{id}/replicas",
+      "n": 387,
+      "errors": 1,
+      "p50_ms": 441,
+      "p95_ms": 2052,
+      "p99_ms": 4676,
+      "max_ms": 5402
+    }
+  ]
+}

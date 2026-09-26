@@ -60,7 +60,9 @@ GROUP = "Смена 1 (демо)"
 KIND_BY_EXT = {".docx": MaterialKind.INSTRUCTION, ".pdf": MaterialKind.REGULATION, ".xlsx": MaterialKind.CLASSIFIER}
 
 
-async def seed(settings: Settings, *, password: str, scenarios: int, materials_dir: str | None) -> None:
+async def seed(
+    settings: Settings, *, password: str, scenarios: int, materials_dir: str | None, load_users: int = 0
+) -> None:
     services = build_services(settings)
     engine = create_engine(settings.database_url)
     factory = create_session_factory(engine)
@@ -118,6 +120,30 @@ async def seed(settings: Settings, *, password: str, scenarios: int, materials_d
                 )
                 ids[u.login] = created.id
                 print(f"Учётка: {u.login} — {u.full_name} ({u.role.label})")
+
+        if load_users:  # учётки для нагрузочного теста (6.1): load001…loadNNN, обучающиеся
+            async with factory() as s:
+                have_logins = set(
+                    (await s.execute(select(UserModel.login).where(UserModel.login.like("load%")))).scalars()
+                )
+            made = 0
+            for i in range(1, load_users + 1):
+                login = f"load{i:03d}"
+                if login in have_logins:
+                    continue
+                async with factory() as s:
+                    await build_create_user_handler(build_identity_adapters(settings), s)(
+                        CreateUser(
+                            actor=None,
+                            login=login,
+                            full_name=f"Нагрузка Обучающийся {i:03d}",
+                            role=Role.STUDENT,
+                            password=password,
+                            operator_number=str(500 + i),
+                        )
+                    )
+                made += 1
+            print(f"Нагрузочные учётки: создано {made}, всего {load_users}")
 
         async with factory() as s:
             admin = (

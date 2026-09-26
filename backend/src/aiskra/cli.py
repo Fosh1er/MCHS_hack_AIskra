@@ -228,6 +228,7 @@ def main() -> None:
     demo = sub.add_parser("demo-seed", help="подготовить стенд: справочники, сценарии, учётки ролей, группа (M6)")
     demo.add_argument("--scenarios", type=int, default=30, help="сколько утверждённых сценариев должно быть в банке")
     demo.add_argument("--materials", help="каталог с учебными материалами (DOCX, PDF, XLSX, TXT)")
+    demo.add_argument("--load-users", type=int, default=0, help="учётки load001…loadNNN для нагрузочного теста (6.1)")
     purge = sub.add_parser("purge-audit", help="удалить записи журнала аудита старше срока хранения (п. 6.2)")
     purge.add_argument("--dry-run", action="store_true", help="только посчитать")
     mat = sub.add_parser("import-materials", help="загрузить учебные материалы: PDF, DOCX, XLSX, TXT (п. 4.4)")
@@ -271,7 +272,15 @@ def main() -> None:
             password = os.environ.get("AISKRA_DEMO_PASSWORD", "")
             if len(password) < 8:
                 sys.exit("Задайте пароль демо-учёток: AISKRA_DEMO_PASSWORD (не короче 8 символов)")
-            asyncio.run(seed(settings, password=password, scenarios=args.scenarios, materials_dir=args.materials))
+            asyncio.run(
+                seed(
+                    settings,
+                    password=password,
+                    scenarios=args.scenarios,
+                    materials_dir=args.materials,
+                    load_users=args.load_users,
+                )
+            )
         elif args.cmd == "purge-audit":
             asyncio.run(purge_audit(settings, dry_run=args.dry_run))
         elif args.cmd == "import-materials":

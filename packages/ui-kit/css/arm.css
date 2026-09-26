@@ -1129,3 +1129,11 @@ body:has(.dds-editor) .ipphone > .arm-dock__section:not(.ipphone__screen) { disp
 .session-banner__clock { font-variant-numeric: tabular-nums; font-weight: 500; }
 /* комментарий «Вернуть на доработку» автору карточки (1.3 → 5.1) */
 .arm112-rework { margin: 6px 16px; padding: 8px 12px; font-size: 14px; background: var(--c-orange-100); border-left: 4px solid var(--accent-112); color: var(--text-strong); }
+
+/* ---- Нет связи с сервером (п. 6.1) ------------------------------------------------------------- */
+.conn-banner {
+  position: fixed; z-index: 1000; top: 0; left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 8px; max-width: min(720px, calc(100vw - 32px));
+  padding: 8px 14px; font-size: 14px; background: #fff3cd; color: #5c4400; border: 1px solid #f0c36d;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .15);
+}

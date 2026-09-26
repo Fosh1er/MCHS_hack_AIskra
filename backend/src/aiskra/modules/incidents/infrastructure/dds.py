@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import ColumnElement, column, func, select, table, update
+from sqlalchemy import ColumnElement, column, func, select, table, tuple_, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from aiskra.modules.incidents.application.ports.dds import DdsFilter, DdsJournalRow, DdsServiceState
@@ -82,34 +82,51 @@ class SqlDdsReader:
         self._s = session
 
     async def search(self, flt: DdsFilter) -> tuple[list[DdsJournalRow], int]:
+        """Три шага (6.1): подсчёт без подзапросов; страница id по индексу saved_at; полные строки и «время
+        статуса» — только для строк страницы. Один общий запрос считал подзапрос времени по всем карточкам службы."""
+        # строки служб есть только у сохранённых карточек (создаются при сохранении) — черновики не попадают
+        conditions: list[ColumnElement[bool]] = [CS.service_code == flt.service_code]
+        if flt.statuses:
+            conditions.append(CS.current_status.in_(flt.statuses))
+        scope = select(CS.card_id).where(*conditions)
+        if flt.q:
+            scope = scope.join(C, C.id == CS.card_id).where(C.search_key.like(f"%{search_key(flt.q)}%"))
+        total = int((await self._s.execute(select(func.count()).select_from(scope.subquery()))).scalar_one())
+        page_ids = (
+            (
+                await self._s.execute(
+                    scope.order_by(CS.card_saved_at.desc(), CS.card_number.desc()).limit(flt.limit).offset(flt.offset)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        if not page_ids:
+            return [], total
         last_at = (
             select(func.max(H.at))
             .where(H.card_id == CS.card_id, H.service_code == CS.service_code)
             .correlate(CS)
             .scalar_subquery()
         )
-        conditions: list[ColumnElement[bool]] = [CS.service_code == flt.service_code, C.status != "draft"]
-        if flt.q:
-            conditions.append(C.search_key.like(f"%{search_key(flt.q)}%"))
-        if flt.statuses:
-            conditions.append(CS.current_status.in_(flt.statuses))
-        base = (
-            select(
-                C, CS.current_status, last_at.label("status_at"), _users.c.full_name, _okrugs.c.short, _districts.c.name
-            )
-            .select_from(CS)
-            .join(C, C.id == CS.card_id)
-            .outerjoin(_users, _users.c.id == C.author_id)
-            .outerjoin(_okrugs, _okrugs.c.code == C.okrug_code)
-            .outerjoin(_districts, _districts.c.code == C.district_code)
-            .where(*conditions)
-        )
-        total = int((await self._s.execute(select(func.count()).select_from(base.subquery()))).scalar_one())
         rows = (
             await self._s.execute(
-                base.order_by(func.coalesce(C.saved_at, C.opened_at).desc(), C.number.desc())
-                .limit(flt.limit)
-                .offset(flt.offset)
+                select(
+                    C,
+                    CS.current_status,
+                    last_at.label("status_at"),
+                    _users.c.full_name,
+                    _okrugs.c.short,
+                    _districts.c.name,
+                )
+                .select_from(CS)
+                .join(C, C.id == CS.card_id)
+                .outerjoin(_users, _users.c.id == C.author_id)
+                .outerjoin(_okrugs, _okrugs.c.code == C.okrug_code)
+                .outerjoin(_districts, _districts.c.code == C.district_code)
+                # пара (карточка, служба) = первичный ключ строки службы: поиск по ключу, а не перебор службы
+                .where(tuple_(CS.card_id, CS.service_code).in_([(i, flt.service_code) for i in page_ids]))
+                .order_by(CS.card_saved_at.desc(), CS.card_number.desc())
             )
         ).all()
         return [self._row(*r) for r in rows], total

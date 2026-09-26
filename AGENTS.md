@@ -137,6 +137,12 @@ cd backend && uv run python -m aiskra.cli create-user --login admin --full-name 
 - API `/training/materials` (загрузка multipart, список, текст, файл, правка, удаление); фронт — `pages/teacher/MaterialsPage.tsx`, `shared/ui/MaterialViewer.tsx`, вкладка в `student/ReferencePage.tsx`.
 - Выдержки в генерацию: порт `MaterialContext` → `ScenarioGenerator(..., materials=)`; только для материалов с `use_in_prompts`.
 
+## Производительность и устойчивость (п. 6.1) — что уже есть
+- **Нагрузка:** `backend/tools/loadtest.py` (учётки — `demo-seed --load-users 100`, объём — `tools/bulk_seed.py`); результаты — `docs/performance/`.
+- **Журнал ДДС** считает и сортирует по `card_services.card_saved_at`/`card_number` (копия при сохранении карточки): новый путь записи строк служб обязан их заполнять.
+- **Подсчёт `total`** — отдельным лёгким запросом, без вычисляемых столбцов страницы.
+- **Фронт:** запись — с `WRITE_RETRY` (`shared/api/resilience.ts`); ошибка «уже выполнено» при повторе = успех. Приложение считается всегда активным (`focusManager` в `main.tsx`).
+
 ## Рецепты
 **Новая команда** (пример: `SaveCard` в `incidents`):
 1. `modules/incidents/application/commands/save_card.py` — `@dataclass(frozen=True, kw_only=True) class SaveCard(Command)` и `class SaveCardHandler` с зависимостями-портами в `__init__` и `async __call__(cmd) -> Result`.

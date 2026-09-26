@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request, Response
 
 from aiskra.modules.dictionaries.api import deps
 from aiskra.modules.dictionaries.application.commands.import_addresses import (
@@ -64,8 +64,17 @@ from aiskra.modules.dictionaries.application.queries.resolve_services import (
 from aiskra.shared.security import Permission, Principal
 from aiskra.shared.web import Meta, require
 
+
+def _cacheable(request: Request, response: Response) -> None:
+    """Справочники не содержат ПДн и меняются только импортом: браузер может держать их 10 минут (6.1)."""
+    if request.method == "GET":
+        response.headers["Cache-Control"] = "private, max-age=600"
+
+
 router = APIRouter(
-    prefix="/dictionaries", tags=["dictionaries"], dependencies=[Depends(require(Permission.DICTIONARIES_READ))]
+    prefix="/dictionaries",
+    tags=["dictionaries"],
+    dependencies=[Depends(require(Permission.DICTIONARIES_READ)), Depends(_cacheable)],
 )
 
 

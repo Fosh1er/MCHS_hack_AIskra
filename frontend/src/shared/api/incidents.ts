@@ -1,6 +1,7 @@
 /** Модуль incidents: карточка происшествия 112 (п. 1.1), журнал и работа с сохранённой карточкой (п. 1.3). */
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { http } from './http';
+import { ApiError, http } from './http';
+import { WRITE_RETRY } from './resilience';
 
 export interface CardAddress {
   raw: string; country: string; region: string; city: string; object: string; okrug: string | null; district: string | null;
@@ -48,10 +49,19 @@ const I = '/api/v1/incidents/cards';
 export const useOpenCard = () =>
   useMutation({ mutationFn: (body: { aon?: string; channel?: string | null; scenario_id?: string | null; session_id?: string | null }) => http<CardOpened>(I, { method: 'POST', body: JSON.stringify(body) }) });
 
+/** Сохранение переживает обрыв связи (6.1): повтор при сетевой ошибке. Если сервер успел сохранить, а ответ
+ *  потерялся, повтор получит «уже сохранена» — это тоже успех. */
 export const useSaveCard = (id: string) =>
-  useMutation({
-    mutationFn: (body: { data: CardData; services: CardServiceIn[] }) =>
-      http<CardSaved>(`${I}/${id}/save`, { method: 'POST', body: JSON.stringify(body) }),
+  useMutation<CardSaved | null, Error, { data: CardData; services: CardServiceIn[] }>({
+    mutationFn: async (body: { data: CardData; services: CardServiceIn[] }) => {
+      try {
+        return await http<CardSaved>(`${I}/${id}/save`, { method: 'POST', body: JSON.stringify(body) });
+      } catch (e) {
+        if (e instanceof ApiError && e.code === 'card_already_saved') return null;
+        throw e;
+      }
+    },
+    ...WRITE_RETRY,
   });
 
 export const useCard = (id: string | undefined) =>
@@ -98,6 +108,7 @@ export const useJournal = (q: JournalQuery, autoRefresh: boolean) =>
     queryFn: () => http<JournalPage>(`/api/v1/incidents/journal?${journalParams(q)}`),
     placeholderData: keepPreviousData,
     refetchInterval: autoRefresh ? 5000 : false,
+    refetchIntervalInBackground: true, // окно АРМ часто в фоне — новые карточки и сигнал всё равно приходят
   });
 
 export interface AppendBody { fields: Record<string, string>; description_add: string; victims_count: number | null }
@@ -155,6 +166,7 @@ export const useDdsJournal = (service: string, q: { q: string; statuses: string[
     },
     placeholderData: keepPreviousData,
     refetchInterval: autoRefresh ? 5000 : false,
+    refetchIntervalInBackground: true, // окно АРМ часто в фоне — новые карточки и сигнал всё равно приходят
   });
 
 export const useDdsCard = (service: string, id: string | undefined) =>
