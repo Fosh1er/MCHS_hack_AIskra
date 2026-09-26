@@ -29,7 +29,7 @@ function PhoneInput({ id, label, value, hint, readOnly, foreign, onChange, onCop
           <label className="arm-phone__label" htmlFor={id}>{label}</label>
           <span className="arm-phone__tools">
             {aonTools && <button type="button" disabled title="Запрос данных абонента — п. 1.4" aria-label="Данные абонента"><Icon name="help" size="xs" /></button>}
-            {aonTools && <button type="button" disabled title="Местоположение — п. 1.2" aria-label="Местоположение"><Icon name="place" size="xs" /></button>}
+            {aonTools && <button type="button" disabled title="Местоположение абонента от оператора связи — п. 1.4" aria-label="Местоположение"><Icon name="place" size="xs" /></button>}
             <button type="button" aria-pressed={foreign} onClick={onForeign} disabled={!onForeign} title="Зарубежный номер" aria-label="Зарубежный номер"><Icon name="translate" size="xs" /></button>
           </span>
         </div>

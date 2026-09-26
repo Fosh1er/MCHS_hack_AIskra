@@ -1,6 +1,7 @@
 """Командная строка: служебные операции без HTTP.
 
 uv run python -m aiskra.cli import-dictionaries      # справочники из data/ в БД (п. 0.2)
+uv run python -m aiskra.cli import-addresses         # адресный справочник и границы районов (п. 1.2)
 uv run python -m aiskra.cli create-user --login ivanov --role student --full-name "Иванов И. И."
                                                      # пароль спрашивается интерактивно или берётся из
                                                      # переменной окружения, указанной в --password-env
@@ -19,7 +20,13 @@ import os
 import sys
 from dataclasses import asdict
 
-from aiskra.bootstrap import build_create_user_handler, build_identity_adapters, build_import_handler
+from aiskra.bootstrap import (
+    build_create_user_handler,
+    build_identity_adapters,
+    build_import_addresses_handler,
+    build_import_handler,
+)
+from aiskra.modules.dictionaries.application.commands.import_addresses import ImportAddresses
 from aiskra.modules.dictionaries.application.commands.import_dictionaries import ImportDictionaries
 from aiskra.modules.identity.application.commands.create_user import CreateUser
 from aiskra.modules.identity.infrastructure.repositories import SqlUserRepository
@@ -35,6 +42,16 @@ async def import_dictionaries(settings: Settings) -> None:
     try:
         async with create_session_factory(engine)() as session:
             report = await build_import_handler(settings, session)(ImportDictionaries())
+        print(json.dumps(asdict(report), ensure_ascii=False, indent=2))
+    finally:
+        await engine.dispose()
+
+
+async def import_addresses(settings: Settings) -> None:
+    engine = create_engine(settings.database_url)
+    try:
+        async with create_session_factory(engine)() as session:
+            report = await build_import_addresses_handler(settings, session)(ImportAddresses())
         print(json.dumps(asdict(report), ensure_ascii=False, indent=2))
     finally:
         await engine.dispose()
@@ -108,6 +125,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(prog="aiskra")
     sub = parser.add_subparsers(dest="cmd", required=True)
     sub.add_parser("import-dictionaries", help="импорт справочников из data/")
+    sub.add_parser("import-addresses", help="импорт адресного справочника и границ районов из data/ (п. 1.2)")
     user = sub.add_parser("create-user", help="создать пользователя (от имени системы, пишется в аудит)")
     user.add_argument("--login", required=True)
     user.add_argument("--full-name", required=True)
@@ -121,6 +139,8 @@ def main() -> None:
     try:
         if args.cmd == "import-dictionaries":
             asyncio.run(import_dictionaries(settings))
+        elif args.cmd == "import-addresses":
+            asyncio.run(import_addresses(settings))
         elif args.cmd == "create-user":
             password = _read_password(args.password_env)
             asyncio.run(

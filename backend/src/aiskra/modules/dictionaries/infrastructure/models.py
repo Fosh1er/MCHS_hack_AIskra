@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, func, true
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, func, true
 from sqlalchemy.orm import Mapped, mapped_column
 
 from aiskra.platform.db import Base
@@ -124,3 +124,40 @@ class EnumValueModel(Base):
     name: Mapped[str] = mapped_column(String(255))
     sort: Mapped[int] = mapped_column(Integer, default=0)
     attrs: Mapped[dict[str, Any]] = mapped_column(JsonType, default=dict)
+
+
+# ------------------------------------------------------------------ п. 1.2: адресный справочник (OpenStreetMap)
+
+
+class StreetModel(Base):
+    __tablename__ = "dict_streets"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=False)
+    name: Mapped[str] = mapped_column(String(255))
+    search_key: Mapped[str] = mapped_column(String(255), index=True)
+    okrug_code: Mapped[str | None] = mapped_column(String(8))
+    districts: Mapped[list[str]] = mapped_column(JsonType, default=list)
+    lat: Mapped[float | None] = mapped_column(Float)
+    lon: Mapped[float | None] = mapped_column(Float)
+
+
+class AddressModel(Base):
+    __tablename__ = "dict_addresses"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=False)
+    street_id: Mapped[int] = mapped_column(ForeignKey("dict_streets.id", ondelete="CASCADE"), index=True)
+    house: Mapped[str] = mapped_column(String(32))
+    building: Mapped[str] = mapped_column(String(16), default="")
+    structure: Mapped[str] = mapped_column(String(16), default="")
+    house_key: Mapped[str] = mapped_column(String(64))
+    district_code: Mapped[str] = mapped_column(String(64))
+    lat: Mapped[float] = mapped_column(Float, index=True)
+    lon: Mapped[float] = mapped_column(Float)
+
+
+class DistrictShapeModel(Base):
+    __tablename__ = "dict_district_shapes"
+    district_code: Mapped[str] = mapped_column(String(64), primary_key=True)
+    name: Mapped[str] = mapped_column(String(255))
+    okrug_code: Mapped[str] = mapped_column(String(8))
+    geometry: Mapped[dict[str, Any]] = mapped_column(JsonType)
+    label_lat: Mapped[float] = mapped_column(Float)
+    label_lon: Mapped[float] = mapped_column(Float)

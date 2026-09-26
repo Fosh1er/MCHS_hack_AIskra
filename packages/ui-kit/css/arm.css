@@ -1020,3 +1020,27 @@
   .arm112v-wk { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .arm112v-wk--head { display: none; }
 }
+
+/* ==========================================================================
+   Окно карты блока «Адрес» (п. 1.2): instr/image21, image27, image28 — отдельное окно поверх карточки
+   ========================================================================== */
+.arm112-map {
+  position: fixed; z-index: var(--z-popover); right: 16px; top: calc(var(--arm-strip-h) + 16px);
+  width: min(620px, calc(100vw - 32px)); height: min(520px, calc(100vh - 200px));
+  display: flex; flex-direction: column; background: var(--c-white); box-shadow: var(--shadow-popover);
+}
+.arm112-map__head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 8px 10px; background: var(--bg-panel); font-size: var(--fs-sm); }
+.arm112-map__head label { display: inline-flex; align-items: center; gap: 6px; color: var(--text); }
+.arm112-map__head .arm112v-input { width: 110px; font-size: var(--fs-sm); }
+.arm112-map__head .arm-iconsq { margin-left: auto; }
+.arm112-map__radius { color: var(--text-muted); }
+.arm112-map__canvas { flex: 1 1 auto; min-height: 0; background: var(--bg-canvas); }
+.arm112-map__canvas--pick, .arm112-map__canvas--pick .leaflet-interactive { cursor: crosshair; }
+.arm112-map__status { padding: 6px 10px; font-size: var(--fs-sm); color: var(--text-strong); border-top: 1px solid var(--border-subtle); }
+.arm112-map__hint { position: absolute; left: 50%; top: 56px; transform: translateX(-50%); z-index: 1000; padding: 4px 10px; background: var(--c-graphite-800); color: var(--text-inverse); font-size: var(--fs-xs); pointer-events: none; }
+.arm112-map__label { width: auto !important; height: auto !important; margin: 0 !important; transform: translate(-50%, -50%); white-space: nowrap; font-size: 11px; font-weight: var(--fw-bold); color: var(--c-slate-600); text-shadow: 0 0 2px var(--c-white), 0 0 2px var(--c-white); pointer-events: none; }
+.arm-minibtn--on { background: var(--accent); border-color: var(--accent); color: var(--text-inverse); }
+.arm112-mapbtn { border: 0; background: none; padding: 0; display: inline-flex; color: var(--text-strong); cursor: pointer; }
+.arm112-mapbtn[aria-pressed="true"] { color: var(--accent); }
+.arm112-coords { font-size: var(--fs-2xs); color: var(--text-muted); font-weight: var(--fw-regular); }
+.arm112-suggest__src { float: right; font-size: var(--fs-2xs); color: var(--text-muted); }

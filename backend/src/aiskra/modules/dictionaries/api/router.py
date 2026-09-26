@@ -7,12 +7,31 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query
 
 from aiskra.modules.dictionaries.api import deps
+from aiskra.modules.dictionaries.application.commands.import_addresses import (
+    AddressImportReport,
+    ImportAddresses,
+    ImportAddressesHandler,
+)
 from aiskra.modules.dictionaries.application.commands.import_dictionaries import (
     ImportDictionaries,
     ImportDictionariesHandler,
     ImportReport,
 )
 from aiskra.modules.dictionaries.application.ports.reader import CardTypeRow, EnumValueRow, ServiceRow
+from aiskra.modules.dictionaries.application.queries.addresses import (
+    AddressSuggestion,
+    DistrictShapes,
+    DistrictShapesHandler,
+    GeocodeResult,
+    GeoCollection,
+    HousePoint,
+    HousesInBox,
+    HousesInBoxHandler,
+    ReverseGeocode,
+    ReverseGeocodeHandler,
+    SuggestAddresses,
+    SuggestAddressesHandler,
+)
 from aiskra.modules.dictionaries.application.queries.incident_types import (
     GetIncidentType,
     GetIncidentTypeHandler,
@@ -146,3 +165,61 @@ async def list_enum(
     domain: str, handler: Annotated[ListEnumHandler, Depends(deps.provide_list_enum)]
 ) -> list[EnumValueRow]:
     return await handler(ListEnum(domain=domain))
+
+
+# ------------------------------------------------------------------ п. 1.2: адресный справочник и карта
+
+
+@router.post(
+    "/addresses/import", response_model=AddressImportReport, summary="Импорт адресного справочника из data/ (п. 1.2)"
+)
+async def import_addresses(
+    actor: Annotated[Principal, Depends(require(Permission.DICTIONARIES_IMPORT))],
+    meta: Meta,
+    handler: Annotated[ImportAddressesHandler, Depends(deps.provide_import_addresses)],
+) -> AddressImportReport:
+    return await handler(ImportAddresses(actor=actor, meta=meta))
+
+
+@router.get(
+    "/addresses/suggest",
+    response_model=list[AddressSuggestion],
+    summary="Подсказки единой адресной строки: улица → дома (instr/image20)",
+)
+async def suggest_addresses(
+    handler: Annotated[SuggestAddressesHandler, Depends(deps.provide_suggest_addresses)],
+    q: str,
+    limit: int = 10,
+) -> list[AddressSuggestion]:
+    return await handler(SuggestAddresses(q=q, limit=limit))
+
+
+@router.get(
+    "/addresses/reverse",
+    response_model=GeocodeResult,
+    summary="Адрес и район по точке: «Указать на карте», ввод координат (instr/image27, image28)",
+)
+async def reverse_geocode(
+    handler: Annotated[ReverseGeocodeHandler, Depends(deps.provide_reverse_geocode)],
+    lat: float,
+    lon: float,
+) -> GeocodeResult:
+    return await handler(ReverseGeocode(lat=lat, lon=lon))
+
+
+@router.get("/addresses/houses", response_model=list[HousePoint], summary="Дома в окне карты (крупный масштаб)")
+async def houses_in_box(
+    handler: Annotated[HousesInBoxHandler, Depends(deps.provide_houses_in_box)],
+    min_lat: float,
+    min_lon: float,
+    max_lat: float,
+    max_lon: float,
+) -> list[HousePoint]:
+    return await handler(HousesInBox(min_lat=min_lat, min_lon=min_lon, max_lat=max_lat, max_lon=max_lon))
+
+
+@router.get("/territory/shapes", response_model=GeoCollection, summary="Границы районов (GeoJSON) для окна карты")
+async def district_shapes(
+    handler: Annotated[DistrictShapesHandler, Depends(deps.provide_district_shapes)],
+) -> GeoCollection:
+    return await handler(DistrictShapes())

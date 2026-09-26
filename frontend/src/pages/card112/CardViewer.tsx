@@ -11,6 +11,7 @@ import {
   type CardServiceView, type CardView, type WorkoutBody,
 } from '../../shared/api/incidents';
 import { shortName } from '../../shared/ui/ArmTopBar';
+import { AddressMap } from './AddressMap';
 import { Hint } from './Hint';
 import { focusId, useHotkeys, type HotkeyMap } from './useHotkeys';
 
@@ -165,6 +166,7 @@ export function CardViewer({ view, me }: { view: CardView; me: Me }) {
   const [returning, setReturning] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [banner, setBanner] = useState<string | null>(null);
+  const [showMap, setShowMap] = useState(false);
 
   // «Просмотр карточки» — в аудит один раз за открытие экрана
   const viewed = useRef(false);
@@ -276,7 +278,9 @@ export function CardViewer({ view, me }: { view: CardView; me: Me }) {
           <div className="arm-panel arm112v-address">
             <div className="arm112v-address__line">
               <b>{view.address_line ?? 'адрес не указан'}</b>
-              <Icon name="place" size="sm" />
+              <button type="button" className="arm112-mapbtn" aria-label="Карта" title="Карта" aria-pressed={showMap} onClick={() => setShowMap(!showMap)}>
+                <Icon name="place" size="sm" />
+              </button>
             </div>
             {addressExtra && <div className="arm112v-muted">{addressExtra}</div>}
             {d.address?.descriptive && <div className="arm112v-muted">{d.address.descriptive}</div>}
@@ -324,6 +328,7 @@ export function CardViewer({ view, me }: { view: CardView; me: Me }) {
         </div>
       </div>
 
+      {showMap && <AddressMap lat={d.address?.lat ?? null} lon={d.address?.lon ?? null} district={d.address?.district ?? null} readOnly onClose={() => setShowMap(false)} />}
       {banner && <div className="arm112-banner" role="alert" onClick={() => setBanner(null)}><b>Действие не выполнено</b><ul><li>{banner}</li></ul></div>}
 
       <div className="arm112v-workouts arm112-rel">

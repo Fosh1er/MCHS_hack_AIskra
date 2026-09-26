@@ -23,7 +23,14 @@ from aiskra.modules.audit.application.queries.search_audit import ListEventTypes
 from aiskra.modules.audit.infrastructure.reader import SqlAuditReader
 from aiskra.modules.audit.infrastructure.recorder import IsolatedAuditRecorder, SqlAuditRecorder
 from aiskra.modules.dictionaries.api import deps as dict_deps
+from aiskra.modules.dictionaries.application.commands.import_addresses import ImportAddressesHandler
 from aiskra.modules.dictionaries.application.commands.import_dictionaries import ImportDictionariesHandler
+from aiskra.modules.dictionaries.application.queries.addresses import (
+    DistrictShapesHandler,
+    HousesInBoxHandler,
+    ReverseGeocodeHandler,
+    SuggestAddressesHandler,
+)
 from aiskra.modules.dictionaries.application.queries.incident_types import (
     GetIncidentTypeHandler,
     GetQuestionnaireTreeHandler,
@@ -36,6 +43,7 @@ from aiskra.modules.dictionaries.application.queries.reference import (
     ListTerritoryHandler,
 )
 from aiskra.modules.dictionaries.application.queries.resolve_services import ResolveServicesHandler
+from aiskra.modules.dictionaries.infrastructure.addresses import FileAddressSource, SqlAddressReader, SqlAddressWriter
 from aiskra.modules.dictionaries.infrastructure.reader import SqlDictionaryReader
 from aiskra.modules.dictionaries.infrastructure.sources import XlsxClassifierSource, YamlCuratedSource
 from aiskra.modules.dictionaries.infrastructure.writer import SqlDictionaryWriter
@@ -118,6 +126,22 @@ def build_import_handler(settings: Settings, session: AsyncSession) -> ImportDic
         audit=SqlAuditRecorder(session),
         uow=SqlAlchemyUnitOfWork(session),
     )
+
+
+def build_import_addresses_handler(settings: Settings, session: AsyncSession) -> ImportAddressesHandler:
+    return ImportAddressesHandler(
+        source=FileAddressSource(settings.dictionaries_dir),
+        writer=SqlAddressWriter(session),
+        audit=SqlAuditRecorder(session),
+        uow=SqlAlchemyUnitOfWork(session),
+    )
+
+
+def _address_query(handler_cls: Callable[[SqlAddressReader], Any]) -> Callable[..., Any]:
+    def factory(session: Session) -> Any:
+        return handler_cls(SqlAddressReader(session))
+
+    return factory
 
 
 @dataclass(frozen=True)
@@ -299,6 +323,16 @@ def wire(app: FastAPI, services: Services) -> None:
     ov[dict_deps.provide_list_territory] = _dict_query(ListTerritoryHandler)
     ov[dict_deps.provide_list_enum] = _dict_query(ListEnumHandler)
     ov[dict_deps.provide_resolve_services] = _dict_query(ResolveServicesHandler)
+
+    # --- адресный справочник и карта (п. 1.2)
+    def import_addresses_factory(session: Session) -> ImportAddressesHandler:
+        return build_import_addresses_handler(services.settings, session)
+
+    ov[dict_deps.provide_import_addresses] = import_addresses_factory
+    ov[dict_deps.provide_suggest_addresses] = _address_query(SuggestAddressesHandler)
+    ov[dict_deps.provide_reverse_geocode] = _address_query(ReverseGeocodeHandler)
+    ov[dict_deps.provide_houses_in_box] = _address_query(HousesInBoxHandler)
+    ov[dict_deps.provide_district_shapes] = _address_query(DistrictShapesHandler)
 
     # --- identity и audit (п. 0.3)
     _wire_identity_and_audit(app, services)

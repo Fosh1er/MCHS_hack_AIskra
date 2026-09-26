@@ -1,9 +1,11 @@
 /** Блок «Адрес» (Alt+A): единая строка с подсказками + поля, как на стенде 2026.
- *  Подсказки — по справочнику округов и районов (0.2); улицы и дома — п. 1.2 (локальный адресный справочник). */
+ *  Подсказки — адресный справочник (п. 1.2, OpenStreetMap): улицы, затем дома с районом и координатами;
+ *  если домов нет — районы по основе слова (0.2). Выбор дома открывает окно карты (instr/image21). */
 import { useMemo, useState } from 'react';
 import { Icon } from '@smena112/ui-kit';
-import type { District, Okrug } from '../../shared/api/dictionaries';
+import { useAddressSuggest, type AddressSuggestion, type District, type GeocodeResult, type Okrug } from '../../shared/api/dictionaries';
 import { parseAddressLine, type Action, type CardState } from './state';
+import { AddressMap } from './AddressMap';
 import { Hint } from './Hint';
 
 const norm = (s: string) => s.toLowerCase().replace(/ё/g, 'е');
@@ -25,7 +27,7 @@ export function AddressBlock({ state, dispatch, okrugs, districts, readOnly }: {
   const set = (patch: Partial<CardState['address']>) => dispatch({ type: 'address', patch });
   const okrugShort = useMemo(() => new Map(okrugs.map((o) => [o.code, o.short])), [okrugs]);
 
-  const suggestions = useMemo(() => {
+  const districtSuggestions = useMemo(() => {
     // основа слова без окончания: «Басманная улица» подсказывает «Басманный» район
     const stems = norm(a.raw).split(/[\s,.]+/).filter((w) => w.length >= 4).map((w) => w.slice(0, Math.max(4, w.length - 2)));
     if (!stems.length) return [];
@@ -33,39 +35,80 @@ export function AddressBlock({ state, dispatch, okrugs, districts, readOnly }: {
       .filter((d) => [d.name, ...d.aliases].some((n) => stems.some((st) => norm(n).split(/[\s-]+/).some((part) => part.startsWith(st)))))
       .slice(0, 8);
   }, [a.raw, districts]);
+  const lookup = useAddressSuggest(open && !readOnly ? a.raw : '');
+  const addresses = lookup.data ?? [];
+  const districtName = useMemo(() => new Map(districts.map((d) => [d.code, d.name])), [districts]);
+  const [active, setActive] = useState(0);
+  const [map, setMap] = useState(false);
+  const items = addresses.length ? addresses.length : districtSuggestions.length;
 
   const pickDistrict = (d: District) => {
     set({ district: d.code, okrug: d.okrug });
     setOpen(false);
   };
+  const pickAddress = (s: AddressSuggestion) => {
+    set({
+      raw: s.label, street: s.street, house: s.house, building: s.building, structure: s.structure,
+      okrug: s.okrug ?? a.okrug, district: s.district ?? a.district, lat: s.lat, lon: s.lon,
+    });
+    setOpen(false);
+    if (s.house && s.lat != null) setMap(true); // как в АРМ: после выбора адреса открывается карта
+  };
+  const pickPoint = (r: GeocodeResult) => {
+    const patch: Partial<CardState['address']> = { lat: r.lat, lon: r.lon, okrug: r.okrug ?? a.okrug, district: r.district ?? a.district };
+    if (r.address) Object.assign(patch, { raw: r.address.label, street: r.address.street, house: r.address.house, building: r.address.building, structure: r.address.structure });
+    set(patch);
+  };
   const applyLine = () => {
-    if (a.raw.trim()) set(parseAddressLine(a.raw));
+    if (a.raw.trim() && !a.street) set(parseAddressLine(a.raw));
+  };
+  const choose = (i: number) => {
+    if (addresses[i]) pickAddress(addresses[i]);
+    else if (!addresses.length && districtSuggestions[i]) pickDistrict(districtSuggestions[i]);
   };
 
   return (
     <div className="arm-panel arm112-address arm112-rel" style={{ padding: '10px 10px 14px' }}>
       <Hint k="Alt+A" />
       <div className="arm-panel__label" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        Адрес: <Icon name="place" size="sm" title="Карта и координаты — п. 1.2" />
+        Адрес:
+        <button type="button" className="arm112-mapbtn" aria-label="Карта" title="Карта и координаты" aria-pressed={map} onClick={() => setMap(!map)}>
+          <Icon name="place" size="sm" />
+        </button>
+        {a.lat != null && a.lon != null && <span className="arm112-coords">{a.lat.toFixed(5)}, {a.lon.toFixed(5)}</span>}
       </div>
       <div className="arm112-address__line">
         <input
           id="address-line" className="arm-field__input" placeholder="введите адрес" value={a.raw} readOnly={readOnly} autoComplete="off"
-          onChange={(e) => { set({ raw: e.target.value }); setOpen(true); }}
-          onBlur={() => { applyLine(); setTimeout(() => setOpen(false), 150); }}
-          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); applyLine(); if (suggestions[0]) pickDistrict(suggestions[0]); } }}
+          role="combobox" aria-expanded={open && items > 0} aria-autocomplete="list"
+          onChange={(e) => { set({ raw: e.target.value, street: '', house: '', building: '', structure: '', lat: null, lon: null }); setOpen(true); setActive(0); }}
+          onBlur={() => { setTimeout(() => { setOpen(false); applyLine(); }, 150); }}
+          onKeyDown={(e) => {
+            if (e.key === 'ArrowDown' && items) { e.preventDefault(); setOpen(true); setActive((i) => (i + 1) % items); }
+            else if (e.key === 'ArrowUp' && items) { e.preventDefault(); setActive((i) => (i - 1 + items) % items); }
+            else if (e.key === 'Enter') { e.preventDefault(); if (open && items) choose(active); else applyLine(); }
+          }}
         />
         {!readOnly && <button type="button" className="arm-iconsq" style={{ border: 0, background: 'none' }} aria-label="Очистить адрес" onClick={() => dispatch({ type: 'clearAddress' })}><Icon name="close" size="sm" /></button>}
       </div>
-      {open && !readOnly && suggestions.length > 0 && (
+      {open && !readOnly && items > 0 && (
         <div className="arm112-suggest" role="listbox" style={{ top: 58 }}>
-          {suggestions.map((d) => (
-            <button key={d.code} type="button" role="option" onMouseDown={(e) => e.preventDefault()} onClick={() => pickDistrict(d)}>
-              {d.name}<small>{d.kind === 'settlement' ? 'поселение' : 'район'}, {okrugShort.get(d.okrug)}</small>
-            </button>
-          ))}
+          {addresses.length > 0
+            ? addresses.map((s, i) => (
+              <button key={`${s.label}|${s.district}`} type="button" role="option" aria-selected={i === active} onMouseDown={(e) => e.preventDefault()} onClick={() => pickAddress(s)}>
+                {s.label}
+                <small>{[s.district && districtName.get(s.district), s.okrug && okrugShort.get(s.okrug)].filter(Boolean).join(', ')}</small>
+                <span className="arm112-suggest__src">{s.source}</span>
+              </button>
+            ))
+            : districtSuggestions.map((d, i) => (
+              <button key={d.code} type="button" role="option" aria-selected={i === active} onMouseDown={(e) => e.preventDefault()} onClick={() => pickDistrict(d)}>
+                {d.name}<small>{d.kind === 'settlement' ? 'поселение' : 'район'}, {okrugShort.get(d.okrug)}</small>
+              </button>
+            ))}
         </div>
       )}
+      {map && <AddressMap lat={a.lat} lon={a.lon} district={a.district} readOnly={readOnly} onPick={readOnly ? undefined : pickPoint} onClose={() => setMap(false)} />}
 
       <div className="arm112-grid arm112-grid--3">
         <Field label="Страна" value={a.country} readOnly={readOnly} onChange={(v) => set({ country: v })} />
