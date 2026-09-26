@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Any
+from pathlib import Path
+from typing import Annotated, Any, Protocol
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, File, Form, UploadFile
+from fastapi.responses import FileResponse
+from pydantic import BaseModel, ConfigDict, Field
 
 from aiskra.modules.training.api import deps
 from aiskra.modules.training.api.schemas import (
@@ -34,6 +37,14 @@ from aiskra.modules.training.application.commands.calls import (
     StartIncomingCall,
     StartIncomingCallHandler,
 )
+from aiskra.modules.training.application.commands.materials import (
+    DeleteMaterial,
+    DeleteMaterialHandler,
+    UpdateMaterial,
+    UpdateMaterialHandler,
+    UploadMaterial,
+    UploadMaterialHandler,
+)
 from aiskra.modules.training.application.commands.scenarios import (
     EditScenario,
     EditScenarioHandler,
@@ -52,6 +63,7 @@ from aiskra.modules.training.application.commands.sessions import (
     FeedResult,
     ParticipantIn,
 )
+from aiskra.modules.training.application.ports.materials import MaterialRow
 from aiskra.modules.training.application.ports.sessions import StudentRow
 from aiskra.modules.training.application.queries.calls import (
     CallView,
@@ -59,6 +71,13 @@ from aiskra.modules.training.application.queries.calls import (
     CardCallsHandler,
     GetCall,
     GetCallHandler,
+)
+from aiskra.modules.training.application.queries.materials import (
+    GetMaterial,
+    GetMaterialHandler,
+    ListMaterials,
+    ListMaterialsHandler,
+    MaterialView,
 )
 from aiskra.modules.training.application.queries.scenarios import (
     GetScenario,
@@ -92,6 +111,8 @@ from aiskra.modules.training.application.queries.sessions import (
     SessionPage,
     SessionView,
 )
+from aiskra.modules.training.domain.material import MAX_BYTES, MaterialKind
+from aiskra.shared.errors import NotFoundError
 from aiskra.shared.security import Permission, Principal
 from aiskra.shared.web import CurrentPrincipal, Meta, require
 
@@ -357,3 +378,106 @@ async def finish_session(
     return StatusOut(
         status=await handler(ChangeSessionState(actor=actor, session_id=session_id, start=False, meta=meta))
     )
+
+
+# ------------------------------------------------------------------ п. 4.4: учебные материалы
+MaterialsManager = Annotated[Principal, Depends(require(Permission.SCENARIOS_MANAGE, Permission.SYSTEM_MANAGE))]
+
+
+class MaterialPatchIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    title: str | None = Field(default=None, min_length=3, max_length=200)
+    kind: MaterialKind | None = None
+    visible: bool | None = None
+    use_in_prompts: bool | None = None
+
+
+class MaterialFilesPort(Protocol):
+    def path(self, material_id: UUID) -> Path: ...
+
+
+@router.post("/materials", response_model=CreatedOut, status_code=201, summary="Загрузить учебный материал")
+async def upload_material(
+    actor: MaterialsManager,
+    meta: Meta,
+    handler: Annotated[UploadMaterialHandler, Depends(deps.provide_upload_material)],
+    file: Annotated[UploadFile, File(description="PDF, DOCX, XLSX, TXT или MD, до 25 МБ")],
+    title: Annotated[str, Form(min_length=3, max_length=200)],
+    kind: Annotated[MaterialKind, Form()] = MaterialKind.OTHER,
+    visible: Annotated[bool, Form()] = True,
+    use_in_prompts: Annotated[bool, Form()] = False,
+) -> CreatedOut:
+    data = await file.read(MAX_BYTES + 1)
+    mid = await handler(
+        UploadMaterial(
+            actor=actor,
+            title=title,
+            kind=kind,
+            filename=file.filename or "file",
+            data=data,
+            visible=visible,
+            use_in_prompts=use_in_prompts,
+            meta=meta,
+        )
+    )
+    return CreatedOut(id=mid)
+
+
+@router.get("/materials", response_model=list[MaterialRow], summary="Учебные материалы (обучающимся — опубликованные)")
+async def list_materials(
+    actor: CurrentPrincipal, handler: Annotated[ListMaterialsHandler, Depends(deps.provide_list_materials)], q: str = ""
+) -> list[MaterialRow]:
+    return await handler(ListMaterials(actor=actor, q=q))
+
+
+@router.get("/materials/{material_id}", response_model=MaterialView, summary="Материал: текст и найденные места")
+async def get_material(
+    material_id: UUID,
+    actor: CurrentPrincipal,
+    handler: Annotated[GetMaterialHandler, Depends(deps.provide_get_material)],
+    q: str = "",
+) -> MaterialView:
+    return await handler(GetMaterial(actor=actor, material_id=material_id, q=q))
+
+
+@router.get("/materials/{material_id}/file", summary="Файл материала (PDF открывается в браузере)")
+async def material_file(
+    material_id: UUID,
+    actor: CurrentPrincipal,
+    handler: Annotated[GetMaterialHandler, Depends(deps.provide_get_material)],
+    files: Annotated[MaterialFilesPort, Depends(deps.provide_material_files)],
+    download: bool = False,
+) -> FileResponse:
+    view = await handler(GetMaterial(actor=actor, material_id=material_id))
+    path = files.path(material_id)
+    if not path.is_file():
+        raise NotFoundError("Файл материала не найден в хранилище", code="material_file_missing")
+    inline = view.file_type == "pdf" and not download
+    return FileResponse(
+        path,
+        media_type=view.content_type,
+        filename=view.filename,
+        content_disposition_type="inline" if inline else "attachment",
+    )
+
+
+@router.patch("/materials/{material_id}", response_model=StatusOut, summary="Изменить материал")
+async def update_material(
+    material_id: UUID,
+    body: MaterialPatchIn,
+    actor: MaterialsManager,
+    meta: Meta,
+    handler: Annotated[UpdateMaterialHandler, Depends(deps.provide_update_material)],
+) -> StatusOut:
+    await handler(UpdateMaterial(actor=actor, material_id=material_id, meta=meta, **body.model_dump()))
+    return StatusOut(status="ok")
+
+
+@router.delete("/materials/{material_id}", status_code=204, summary="Удалить материал")
+async def delete_material(
+    material_id: UUID,
+    actor: MaterialsManager,
+    meta: Meta,
+    handler: Annotated[DeleteMaterialHandler, Depends(deps.provide_delete_material)],
+) -> None:
+    await handler(DeleteMaterial(actor=actor, material_id=material_id, meta=meta))

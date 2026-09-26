@@ -35,6 +35,9 @@ class AuditEvent(StrEnum):
     GROUP_UPDATED = "groups.updated"
     GROUP_DELETED = "groups.deleted"
     SETTINGS_CHANGED = "system.settings_changed"
+    MATERIAL_UPLOADED = "materials.uploaded"
+    MATERIAL_UPDATED = "materials.updated"
+    MATERIAL_DELETED = "materials.deleted"
     BACKUP_CREATED = "system.backup_created"
     BACKUP_RESTORED = "system.backup_restored"
     DICTIONARIES_IMPORTED = "dictionaries.imported"
@@ -80,6 +83,9 @@ AUDIT_EVENT_TITLES: Mapping[AuditEvent, str] = {
     AuditEvent.GROUP_UPDATED: "Изменение группы",
     AuditEvent.GROUP_DELETED: "Удаление группы",
     AuditEvent.SETTINGS_CHANGED: "Изменение настроек",
+    AuditEvent.MATERIAL_UPLOADED: "Загрузка учебного материала",
+    AuditEvent.MATERIAL_UPDATED: "Изменение учебного материала",
+    AuditEvent.MATERIAL_DELETED: "Удаление учебного материала",
     AuditEvent.BACKUP_CREATED: "Резервная копия",
     AuditEvent.BACKUP_RESTORED: "Восстановление из копии",
     AuditEvent.PASSWORD_RESET: "Сброс пароля",

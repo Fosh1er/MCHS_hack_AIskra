@@ -10,6 +10,7 @@ export const PERMISSIONS = {
   systemManage: 'system.manage',
   trainingParticipate: 'training.participate',
   lessonsConduct: 'lessons.conduct',
+  scenariosManage: 'scenarios.manage',
 } as const;
 
 export interface Me {

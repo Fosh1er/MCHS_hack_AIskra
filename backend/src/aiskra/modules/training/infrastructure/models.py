@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, Uuid, func
+from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, String, Text, Uuid, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from aiskra.platform.db import Base
@@ -101,3 +101,21 @@ class CallMessageModel(Base):
     speaker: Mapped[str] = mapped_column(String(16))  # operator | party | system
     text: Mapped[str] = mapped_column(Text)
     at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class MaterialModel(Base):
+    """Учебный материал (п. 4.4): файл лежит в materials_dir под своим id, текст — здесь для поиска и промптов."""
+
+    __tablename__ = "materials"
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    title: Mapped[str] = mapped_column(String(200))
+    kind: Mapped[str] = mapped_column(String(16), index=True)
+    filename: Mapped[str] = mapped_column(String(160))
+    file_type: Mapped[str] = mapped_column(String(8))
+    size_bytes: Mapped[int] = mapped_column(BigInteger)
+    sha256: Mapped[str] = mapped_column(String(64), unique=True)
+    text: Mapped[str] = mapped_column(Text, default="")
+    visible: Mapped[bool] = mapped_column(Boolean, default=True)
+    use_in_prompts: Mapped[bool] = mapped_column(Boolean, default=False)
+    uploaded_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
