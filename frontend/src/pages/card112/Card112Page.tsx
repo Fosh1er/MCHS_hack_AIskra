@@ -9,9 +9,10 @@ import {
   useCardTypes, useEnum, useResolvedServices, useServices, useTerritory,
   type IncidentTypeDetails, type Questionnaire,
 } from '../../shared/api/dictionaries';
-import { useCard, useOpenCard, useSaveCard, type CardView } from '../../shared/api/incidents';
+import { SERVICE_STATUS, useCard, useOpenCard, useSaveCard, type CardView } from '../../shared/api/incidents';
 import { shortName } from '../../shared/ui/ArmTopBar';
 import { CardHeader } from './CardHeader';
+import { CardViewer } from './CardViewer';
 import { ApplicantRow, VictimsRow } from './ApplicantBlock';
 import { AddressBlock, DescriptionBlock } from './AddressBlock';
 import { WhatHappened, cardTypeLabel } from './WhatHappened';
@@ -24,7 +25,6 @@ import {
   questionnaireAnswers, reducer, toCardData, toServicesIn,
 } from './state';
 
-const SERVICE_STATUS: Record<string, string> = { added: 'Добавлена', received: 'Получена службой', accepted: 'Принята' };
 const hhmm = (iso: string | null) => (iso ? new Date(iso).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : '');
 
 /** /arm/112 — открывает карточку на сервере (номер, время регистрации) и переходит к ней. */
@@ -51,6 +51,8 @@ export function Card112Page() {
   if (card.isPending) return <div className="arm112" />;
   if (card.isError) return <div className="arm112"><p className="arm-empty" style={{ padding: 24 }}>{card.error.message}</p></div>;
   const editable = card.data.status === 'draft' && card.data.author_id === me.user_id;
+  // сохранённая карточка — экран просмотра (п. 1.3); чужой черновик преподаватель видит в раскладке заполнения
+  if (card.data.status !== 'draft') return <CardViewer key={card.data.id} view={card.data} me={me} />;
   return <CardEditor key={`${card.data.id}:${card.data.status}`} view={card.data} editable={editable} me={me} />;
 }
 

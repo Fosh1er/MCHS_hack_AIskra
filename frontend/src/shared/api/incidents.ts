@@ -1,5 +1,5 @@
-/** Модуль incidents: карточка происшествия 112 (п. 1.1). */
-import { useMutation, useQuery } from '@tanstack/react-query';
+/** Модуль incidents: карточка происшествия 112 (п. 1.1), журнал и работа с сохранённой карточкой (п. 1.3). */
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { http } from './http';
 
 export interface CardAddress {
@@ -24,11 +24,22 @@ export interface CardData {
 export interface CardServiceIn { code: string; is_main: boolean; added_by: 'auto' | 'manual'; service_type?: string | null }
 export interface CardOpened { id: string; number: number; opened_at: string }
 export interface CardSaved { id: string; number: number; status: string; saved_at: string; processing_ms: number; services: CardServiceIn[] }
+export interface StatusHistoryItem { status: string; at: string | null; operator: string | null; comment: string | null }
+export interface CardServiceView {
+  code: string; short: string; integrated: boolean; is_main: boolean; added_by: string;
+  status: string; status_at: string | null; history: StatusHistoryItem[];
+}
+export interface WorkoutView {
+  id: string; at: string; operator_number: string | null; service_code: string | null;
+  target: string; called_to: string; phone: string; receiver: string; message: string;
+}
+export interface IncidentTypeInfo { code: string; final_type: string | null; ekp_type: string | null }
 export interface CardView {
-  id: string; number: number; status: string; author_id: string | null; author_name: string | null;
+  id: string; number: number; status: string; display_status: string; author_id: string | null; author_name: string | null;
   operator_number: string | null; arm_number: string | null; opened_at: string | null; saved_at: string | null;
-  processing_ms: number | null; data: Partial<CardData>;
-  services: { code: string; short: string; integrated: boolean; is_main: boolean; added_by: string; status: string; status_at: string | null }[];
+  worked_at: string | null; checked_at: string | null; checked_by_name: string | null;
+  processing_ms: number | null; is_emergency: boolean; is_incident: boolean; address_line: string | null;
+  data: Partial<CardData>; services: CardServiceView[]; workouts: WorkoutView[]; incident_types: IncidentTypeInfo[];
 }
 
 const I = '/api/v1/incidents/cards';
@@ -44,3 +55,74 @@ export const useSaveCard = (id: string) =>
 
 export const useCard = (id: string | undefined) =>
   useQuery({ queryKey: ['card', id], queryFn: () => http<CardView>(`${I}/${id}`), enabled: !!id });
+
+// ------------------------------------------------------------------ п. 1.3: журнал и сохранённая карточка
+
+/** Строка «Списка происшествий» (image57, image113). */
+export interface JournalRow {
+  id: string; number: number; display_status: string; checked: boolean; is_emergency: boolean; is_incident: boolean;
+  operator_number: string | null; arm_number: string | null; author_name: string | null; channel: string | null;
+  registered_at: string | null; card_types: string[]; empty_call: 'no_contact' | 'call_dropped' | null;
+  has_victims: boolean; victims_count: number; address_line: string | null; description: string | null;
+}
+export interface JournalPage { items: JournalRow[]; total: number; page: number; page_size: number }
+export interface JournalQuery {
+  q: string; statuses: string[]; date_from: string; date_to: string; page: number; page_size: number;
+}
+
+/** Статусы журнала: коды сервера → подписи оригинала. */
+export const CARD_STATUS: Record<string, string> = {
+  draft: 'Заполняется', registered: 'Зарегистрирована', not_notified: 'Не оповещено', worked: 'Отработана',
+  checked: 'Проверена', completed: 'Завершена', not_completed: 'Не завершено', refusal: 'Отказ',
+};
+export const SERVICE_STATUS: Record<string, string> = {
+  added: 'Добавлена', received: 'Получена службой', accepted: 'Принята', rejected: 'Не принята',
+  response_started: 'Начало реагирования', arrived: 'Прибытие', works_in_progress: 'Проведение работ',
+  works_completed: 'Работы завершены', works_refused: 'Отказ от выполнения работ',
+};
+
+const journalParams = (q: JournalQuery) => {
+  const p = new URLSearchParams({ page: String(q.page), page_size: String(q.page_size) });
+  if (q.q) p.set('q', q.q);
+  q.statuses.forEach((st) => p.append('status', st));
+  if (q.date_from) p.set('date_from', q.date_from);
+  if (q.date_to) p.set('date_to', q.date_to);
+  return p.toString();
+};
+
+/** Журнал; автообновление — опрос раз в 5 с (push через WebSocket — в 2.x, ADR-0005). */
+export const useJournal = (q: JournalQuery, autoRefresh: boolean) =>
+  useQuery({
+    queryKey: ['journal', q],
+    queryFn: () => http<JournalPage>(`/api/v1/incidents/journal?${journalParams(q)}`),
+    placeholderData: keepPreviousData,
+    refetchInterval: autoRefresh ? 5000 : false,
+  });
+
+export interface AppendBody { fields: Record<string, string>; description_add: string; victims_count: number | null }
+export interface WorkoutBody {
+  service_code: string | null; target: string; called_to: string; phone: string; receiver: string; message: string;
+}
+
+/** Действия с сохранённой карточкой; после успеха обновляются карточка и журнал. */
+export function useCardActions(id: string) {
+  const qc = useQueryClient();
+  const refresh = () => {
+    qc.invalidateQueries({ queryKey: ['card', id] });
+    qc.invalidateQueries({ queryKey: ['journal'] });
+  };
+  const post = <T,>(path: string) => (body: unknown) =>
+    http<T>(`${I}/${id}/${path}`, { method: 'POST', body: JSON.stringify(body) });
+  const opts = { onSuccess: refresh };
+  return {
+    worked: useMutation({ mutationFn: (comment: string) => post<{ status: string }>('worked')({ comment }), ...opts }),
+    checked: useMutation({ mutationFn: (comment: string) => post<{ status: string }>('checked')({ comment }), ...opts }),
+    returned: useMutation({ mutationFn: (comment: string) => post<{ status: string }>('returned')({ comment }), ...opts }),
+    flags: useMutation({ mutationFn: post<{ changed: string[] }>('flags') as (b: { emergency: boolean; incident: boolean }) => Promise<{ changed: string[] }>, ...opts }),
+    append: useMutation({ mutationFn: post<{ changed: string[] }>('append') as (b: AppendBody) => Promise<{ changed: string[] }>, ...opts }),
+    workout: useMutation({ mutationFn: post<{ id: string }>('workouts') as (b: WorkoutBody) => Promise<{ id: string }>, ...opts }),
+  };
+}
+
+/** «Просмотр карточки» в аудите — один раз при открытии (а не при каждом обновлении экрана). */
+export const markCardViewed = (id: string) => http<void>(`${I}/${id}/viewed`, { method: 'POST' });
