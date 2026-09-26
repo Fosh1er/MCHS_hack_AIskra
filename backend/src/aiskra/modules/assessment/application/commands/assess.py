@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from uuid import UUID, uuid4
 
 from aiskra.modules.assessment.application.judge import Judge, JudgeOut
@@ -148,6 +148,17 @@ class AssessCardHandler:
             grader="rules+llm" if judged else "rules",
             details=to_details(result, service, number),
         )
+        prev = await self._repo.latest(cmd.card_id, result.role, service)
+        if prev and prev.details.get("expert"):
+            # экспертная оценка (п. 4.3) окончательна: повторная автопроверка обновляет критерии, но не балл
+            expert = {**prev.details["expert"], "auto_score": result.score}
+            record = replace(
+                record,
+                score=float(expert["score"]),
+                passed=bool(prev.passed),
+                grader="expert",
+                details={**record.details, "expert": expert},
+            )
         try:
             await self._repo.add(record)
             await self._audit.record(

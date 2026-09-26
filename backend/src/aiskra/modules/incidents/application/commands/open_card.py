@@ -23,6 +23,7 @@ class OpenCard(Command):
     aon: str = ""  # номер из телефонии; при ручном создании пусто
     channel: str | None = None
     scenario_id: UUID | None = None  # «Принять» учебный входящий вызов
+    session_id: UUID | None = None  # идёт занятие (п. 4.2)
     meta: RequestMeta = field(default_factory=RequestMeta)
 
 
@@ -48,6 +49,7 @@ class OpenCardHandler:
             arm_number=cmd.actor.arm_number,
             data=IncidentCardData(phones=Phones(aon=cmd.aon.strip()), channel=cmd.channel),
             scenario_id=cmd.scenario_id,
+            session_id=cmd.session_id,
         )
         try:
             await self._cards.add(card)

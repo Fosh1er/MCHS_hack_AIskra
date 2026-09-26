@@ -29,6 +29,11 @@ export function AssessmentPanel({ cardId, role, service, auto }: { cardId: strin
       {evaluate.isError && <div className="assess__err" role="alert">{evaluate.error.message}</div>}
       {open && data && (
         <>
+          {data.details.expert && (
+            <p className="assess__expert">
+              <b>Оценка преподавателя: {data.details.expert.score}</b> (автооценка {data.details.expert.auto_score}). {data.details.expert.comment}
+            </p>
+          )}
           {!data.details.has_reference && <p className="assess__note">Карточка заведена без сценария — сравнить с эталоном нельзя, проверено только время.</p>}
           <ul className="assess__list">
             {data.details.criteria.map((c) => (
@@ -41,7 +46,7 @@ export function AssessmentPanel({ cardId, role, service, auto }: { cardId: strin
               </li>
             ))}
           </ul>
-          <p className="assess__meta">Проверка: {data.grader === 'rules+llm' ? 'правила и ИИ-судья' : 'правила'} · версия {data.details.version ?? 1}</p>
+          <p className="assess__meta">Проверка: {data.grader === 'expert' ? 'преподаватель' : data.grader === 'rules+llm' ? 'правила и ИИ-судья' : 'правила'} · версия {data.details.version ?? 1}</p>
         </>
       )}
     </section>

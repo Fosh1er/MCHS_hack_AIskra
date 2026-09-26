@@ -20,11 +20,15 @@ from aiskra.ai.adapters.factory import build_router, build_stt, build_tts
 from aiskra.ai.config import load_ai_config
 from aiskra.ai.router import ModelRouter
 from aiskra.integration.assessment_sources import IncidentAttempts
+from aiskra.integration.session_sources import IncidentSystemCards, SessionFactsReader, SessionProgress
 from aiskra.integration.training_sources import DictionaryScenarioFacts, IncidentCardContext
 from aiskra.modules.assessment.api import deps as assessment_deps
 from aiskra.modules.assessment.application.commands.assess import AssessCardHandler
+from aiskra.modules.assessment.application.commands.evaluate_session import EvaluateSessionHandler
+from aiskra.modules.assessment.application.commands.override import OverrideAssessmentHandler
 from aiskra.modules.assessment.application.judge import Judge
 from aiskra.modules.assessment.application.queries.assessments import GetAssessmentHandler, GroupInsightsHandler
+from aiskra.modules.assessment.application.queries.reports import GetSessionReportHandler, MyProgressHandler
 from aiskra.modules.assessment.infrastructure.repositories import SqlAssessmentRepository
 from aiskra.modules.audit.api import deps as audit_deps
 from aiskra.modules.audit.application.queries.search_audit import ListEventTypesHandler, SearchAuditHandler
@@ -47,6 +51,7 @@ from aiskra.modules.dictionaries.application.queries.incident_types import (
 )
 from aiskra.modules.dictionaries.application.queries.reference import (
     ListEnumHandler,
+    ListGroupsHandler,
     ListServicesHandler,
     ListTerritoryHandler,
 )
@@ -98,13 +103,32 @@ from aiskra.modules.training.application.commands.calls import (
     StartIncomingCallHandler,
 )
 from aiskra.modules.training.application.commands.scenarios import (
+    EditScenarioHandler,
     GenerateScenariosHandler,
     ReviewScenarioHandler,
     ScenarioGenerator,
 )
+from aiskra.modules.training.application.commands.sessions import (
+    ChangeSessionStateHandler,
+    CreateSessionHandler,
+    FeedDdsCardHandler,
+)
 from aiskra.modules.training.application.queries.calls import CardCallsHandler, GetCallHandler
-from aiskra.modules.training.application.queries.scenarios import GetScenarioHandler, ListScenariosHandler
+from aiskra.modules.training.application.queries.scenarios import (
+    GetScenarioHandler,
+    ListScenariosHandler,
+    PreviewScenarioHandler,
+)
+from aiskra.modules.training.application.queries.sessions import (
+    GetSessionHandler,
+    ListSessionsHandler,
+    ListStudentsHandler,
+    MySessionHandler,
+    SessionMonitorHandler,
+)
 from aiskra.modules.training.infrastructure.repositories import SqlCallRepository, SqlScenarioRepository
+from aiskra.modules.training.infrastructure.sessions import SqlSessionRepository as SqlTrainingSessionRepository
+from aiskra.modules.training.infrastructure.sessions import SqlStudentDirectory
 from aiskra.platform.db import SqlAlchemyUnitOfWork, create_engine, create_session_factory
 from aiskra.platform.deps import get_session
 from aiskra.platform.models_registry import metadata as _all_models  # noqa: F401 — все ORM-модели в одном реестре
@@ -423,6 +447,71 @@ def _wire_training(app: FastAPI, services: Services) -> None:
     ov[training_deps.provide_end_call] = end_call
     ov[training_deps.provide_get_call] = get_call
     ov[training_deps.provide_card_calls] = card_calls
+    _wire_sessions(app, services)
+
+
+def _wire_sessions(app: FastAPI, services: Services) -> None:
+    """п. 4.1–4.2: правка и прогон сценариев, занятия, поток карточек в ДДС, мониторинг."""
+    ov = app.dependency_overrides
+    clock = SystemClock()
+
+    def edit(session: Session) -> EditScenarioHandler:
+        return EditScenarioHandler(
+            SqlScenarioRepository(session),
+            services.model_router,
+            SqlAuditRecorder(session),
+            SqlAlchemyUnitOfWork(session),
+        )
+
+    def preview(session: Session) -> PreviewScenarioHandler:
+        return PreviewScenarioHandler(SqlScenarioRepository(session))
+
+    def create(session: Session) -> CreateSessionHandler:
+        return CreateSessionHandler(
+            SqlTrainingSessionRepository(session), SqlAuditRecorder(session), SqlAlchemyUnitOfWork(session), clock
+        )
+
+    def state(session: Session) -> ChangeSessionStateHandler:
+        return ChangeSessionStateHandler(
+            SqlTrainingSessionRepository(session), SqlAuditRecorder(session), SqlAlchemyUnitOfWork(session), clock
+        )
+
+    def feed(session: Session) -> FeedDdsCardHandler:
+        return FeedDdsCardHandler(
+            SqlTrainingSessionRepository(session),
+            SqlScenarioRepository(session),
+            IncidentSystemCards(session),
+            SqlAlchemyUnitOfWork(session),
+            clock,
+        )
+
+    def list_sessions(session: Session) -> ListSessionsHandler:
+        return ListSessionsHandler(SqlTrainingSessionRepository(session), SqlStudentDirectory(session))
+
+    def get_session_(session: Session) -> GetSessionHandler:
+        return GetSessionHandler(SqlTrainingSessionRepository(session), SqlStudentDirectory(session))
+
+    def my_session(session: Session) -> MySessionHandler:
+        return MySessionHandler(SqlTrainingSessionRepository(session))
+
+    def monitor(session: Session) -> SessionMonitorHandler:
+        return SessionMonitorHandler(
+            SqlTrainingSessionRepository(session), SqlStudentDirectory(session), SessionProgress(session)
+        )
+
+    def students(session: Session) -> ListStudentsHandler:
+        return ListStudentsHandler(SqlStudentDirectory(session))
+
+    ov[training_deps.provide_edit_scenario] = edit
+    ov[training_deps.provide_preview] = preview
+    ov[training_deps.provide_create_session] = create
+    ov[training_deps.provide_session_state] = state
+    ov[training_deps.provide_feed] = feed
+    ov[training_deps.provide_list_sessions] = list_sessions
+    ov[training_deps.provide_get_session] = get_session_
+    ov[training_deps.provide_my_session] = my_session
+    ov[training_deps.provide_monitor] = monitor
+    ov[training_deps.provide_students] = students
 
 
 def _wire_assessment(app: FastAPI, services: Services) -> None:
@@ -438,6 +527,20 @@ def _wire_assessment(app: FastAPI, services: Services) -> None:
             SqlAlchemyUnitOfWork(session),
         )
 
+    def override(session: Session) -> OverrideAssessmentHandler:
+        return OverrideAssessmentHandler(
+            SqlAssessmentRepository(session), SqlAuditRecorder(session), SqlAlchemyUnitOfWork(session)
+        )
+
+    def report(session: Session) -> GetSessionReportHandler:
+        return GetSessionReportHandler(SessionFactsReader(session), SqlAssessmentRepository(session))
+
+    def evaluate_session(session: Session) -> EvaluateSessionHandler:
+        return EvaluateSessionHandler(SessionFactsReader(session), assess(session))
+
+    def progress(session: Session) -> MyProgressHandler:
+        return MyProgressHandler(SqlAssessmentRepository(session))
+
     def get(session: Session) -> GetAssessmentHandler:
         return GetAssessmentHandler(SqlAssessmentRepository(session))
 
@@ -447,6 +550,10 @@ def _wire_assessment(app: FastAPI, services: Services) -> None:
     ov[assessment_deps.provide_assess] = assess
     ov[assessment_deps.provide_get] = get
     ov[assessment_deps.provide_insights] = insights
+    ov[assessment_deps.provide_override] = override
+    ov[assessment_deps.provide_report] = report
+    ov[assessment_deps.provide_evaluate_session] = evaluate_session
+    ov[assessment_deps.provide_progress] = progress
 
 
 def wire(app: FastAPI, services: Services) -> None:
@@ -469,6 +576,7 @@ def wire(app: FastAPI, services: Services) -> None:
     ov[dict_deps.provide_search_incident_types] = _dict_query(SearchIncidentTypesHandler)
     ov[dict_deps.provide_get_incident_type] = _dict_query(GetIncidentTypeHandler)
     ov[dict_deps.provide_list_services] = _dict_query(ListServicesHandler)
+    ov[dict_deps.provide_list_groups] = _dict_query(ListGroupsHandler)
     ov[dict_deps.provide_list_territory] = _dict_query(ListTerritoryHandler)
     ov[dict_deps.provide_list_enum] = _dict_query(ListEnumHandler)
     ov[dict_deps.provide_resolve_services] = _dict_query(ResolveServicesHandler)

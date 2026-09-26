@@ -17,7 +17,7 @@ from aiskra.modules.dictionaries.application.commands.import_dictionaries import
     ImportDictionariesHandler,
     ImportReport,
 )
-from aiskra.modules.dictionaries.application.ports.reader import CardTypeRow, EnumValueRow, ServiceRow
+from aiskra.modules.dictionaries.application.ports.reader import CardTypeRow, EnumValueRow, GroupRow, ServiceRow
 from aiskra.modules.dictionaries.application.queries.addresses import (
     AddressSuggestion,
     DistrictShapes,
@@ -48,6 +48,8 @@ from aiskra.modules.dictionaries.application.queries.incident_types import (
 from aiskra.modules.dictionaries.application.queries.reference import (
     ListEnum,
     ListEnumHandler,
+    ListGroups,
+    ListGroupsHandler,
     ListServices,
     ListServicesHandler,
     ListTerritory,
@@ -118,6 +120,11 @@ async def get_incident_type(
     handler: Annotated[GetIncidentTypeHandler, Depends(deps.provide_get_incident_type)],
 ) -> IncidentTypeDetails:
     return await handler(GetIncidentType(code=code))
+
+
+@router.get("/incident-groups", response_model=list[GroupRow], summary="Группы классификатора (категории событий)")
+async def list_groups(handler: Annotated[ListGroupsHandler, Depends(deps.provide_list_groups)]) -> list[GroupRow]:
+    return await handler(ListGroups())
 
 
 @router.get("/services", response_model=list[ServiceRow], summary="Справочник служб и ДДС")

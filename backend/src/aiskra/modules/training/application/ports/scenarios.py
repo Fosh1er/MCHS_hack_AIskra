@@ -42,7 +42,16 @@ class ScenarioRepository(Protocol):
 
     async def save(self, scenario: Scenario) -> None: ...
 
-    async def page(self, *, status: str | None, limit: int, offset: int) -> tuple[list[ScenarioRow], int]: ...
+    async def page(
+        self,
+        *,
+        status: str | None,
+        difficulty: int | None,
+        card_type: str | None,
+        source: str | None,
+        limit: int,
+        offset: int,
+    ) -> tuple[list[ScenarioRow], int]: ...
 
     async def random_approved(self, rng: random.Random, groups: list[int] | None) -> Scenario | None: ...
 

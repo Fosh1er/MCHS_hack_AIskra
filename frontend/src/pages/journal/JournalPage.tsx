@@ -6,7 +6,8 @@ import { Icon, IncomingCall } from '@smena112/ui-kit';
 import { PERMISSIONS, useMe } from '../../shared/api/auth';
 import { useCardTypes } from '../../shared/api/dictionaries';
 import { CARD_STATUS, useJournal, useOpenCard, type JournalQuery, type JournalRow } from '../../shared/api/incidents';
-import { endCall, startIncomingCall, type CallStarted } from '../../shared/api/training';
+import { endCall, startIncomingCall, useMySession, type CallStarted } from '../../shared/api/training';
+import { SessionBanner } from '../../shared/ui/SessionBanner';
 import { ArmTopBar } from '../../shared/ui/ArmTopBar';
 import { ARM_MENU } from '../../shared/ui/armMenu';
 import { useHotkeys } from '../card112/useHotkeys';
@@ -134,22 +135,29 @@ export function JournalPage() {
   const [ringError, setRingError] = useState('');
   const [stream, setStream] = useState(false);
   const ringing = useRef(false);
+  // п. 4.2: на занятии с ролью 112 поток вызовов включается сам — категории, сложность и темп задал преподаватель
+  const session = useMySession(canCreate).data ?? null;
+  const lesson = session?.role === '112' ? session : null;
+  useEffect(() => { if (lesson) setStream(true); }, [lesson?.session_id]); // eslint-disable-line react-hooks/exhaustive-deps
   const callIn = async () => {
     if (ringing.current) return;
     ringing.current = true;
     setRingError('');
-    try { setRing(await startIncomingCall()); } catch (e) { setRingError((e as Error).message); ringing.current = false; }
+    try {
+      setRing(await startIncomingCall(lesson ? { groups: lesson.groups, difficulty: lesson.settings.difficulty } : {}));
+    } catch (e) { setRingError((e as Error).message); ringing.current = false; }
   };
   useEffect(() => {
     if (!stream || ring) return;
-    const t = setTimeout(() => { void callIn(); }, 15_000 + Math.random() * 20_000);
+    const base = lesson ? lesson.settings.call_interval_s * 1000 : 25_000;
+    const t = setTimeout(() => { void callIn(); }, base * (0.6 + Math.random() * 0.8));
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stream, ring]);
+  }, [stream, ring, lesson?.session_id]);
   const answer = () => {
     if (!ring) return;
     openCard.mutate(
-      { aon: ring.aon, channel: ring.channel, scenario_id: ring.scenario_id },
+      { aon: ring.aon, channel: ring.channel, scenario_id: ring.scenario_id, session_id: lesson?.session_id ?? null },
       { onSuccess: (c) => navigate(`/arm/112/${c.id}?call=${ring.call_id}`) },
     );
   };
@@ -198,6 +206,7 @@ export function JournalPage() {
         <ArmTopBar me={me} menu={ARM_MENU} />
       </div>
 
+      {session && <SessionBanner s={session} here="112" extra={lesson ? `вызовы примерно раз в ${lesson.settings.call_interval_s} с, норматив ${lesson.settings.norm_112} с` : undefined} />}
       {ring && (
         <div className="call-ring">
           <IncomingCall who={`Входящий звонок с номера ${ring.aon}`} sub="Учебный вызов · ответьте, откроется карточка" onAnswer={answer} onReject={reject} />

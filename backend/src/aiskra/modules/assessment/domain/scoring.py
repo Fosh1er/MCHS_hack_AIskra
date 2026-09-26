@@ -222,7 +222,9 @@ def assess_card_112(
     c = Criterion("victims", 0.7 * has_ok + 0.3 * (has_ok and count_ok))
     if not has_ok:
         c.errors.append(
-            "пострадавшие: " + ("есть, а в карточке — нет" if rv.get("has") else "в карточке отмечены лишние")
+            "в легенде есть пострадавшие, а в карточке — нет"
+            if rv.get("has")
+            else "в карточке отмечены пострадавшие, которых нет"
         )
     elif not count_ok:
         c.errors.append(f"неверное количество пострадавших (эталон {rv.get('count')})")

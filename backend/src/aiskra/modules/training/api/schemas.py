@@ -7,6 +7,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
 from aiskra.modules.training.domain.call import CallParty
+from aiskra.modules.training.domain.session import CardSource, SessionMode
 
 
 class _Strict(BaseModel):
@@ -51,3 +52,43 @@ class ReplicaIn(_Strict):
 class ReplicaOut(BaseModel):
     speaker: str
     text: str
+
+
+class EditScenarioIn(_Strict):
+    title: str | None = Field(default=None, min_length=3, max_length=200)
+    difficulty: int | None = Field(default=None, ge=1, le=5)
+    opening: str | None = Field(default=None, min_length=3, max_length=500)
+    what: str | None = Field(default=None, min_length=3, max_length=1000)
+    details: str | None = Field(default=None, max_length=2000)
+    comment: str | None = Field(
+        default=None, min_length=3, max_length=1000, description="Перегенерировать моделью по комментарию"
+    )
+
+
+class ParticipantBody(_Strict):
+    student_id: UUID
+    role: str = Field(pattern="^(112|dds)$")
+    dds_service_code: str | None = Field(default=None, max_length=64)
+
+
+class SessionSettingsIn(_Strict):
+    norm_112: float = Field(default=80, ge=5, le=3600)
+    norm_dds: float = Field(default=30, ge=5, le=3600)
+    threshold: float = Field(default=70, ge=0, le=100)
+    difficulty: int = Field(default=2, ge=1, le=5)
+    call_interval_s: float = Field(default=40, ge=5, le=3600)
+    feed_interval_s: float = Field(default=45, ge=5, le=3600)
+    max_waiting: int = Field(default=3, ge=1, le=10)
+
+
+class CreateSessionIn(_Strict):
+    title: str = Field(min_length=3, max_length=200)
+    mode: SessionMode
+    card_source: CardSource = CardSource.GENERATED
+    groups: list[int] = Field(default_factory=list, description="Категории событий — группы классификатора")
+    participants: list[ParticipantBody] = Field(default_factory=list, max_length=100)
+    settings: SessionSettingsIn = Field(default_factory=SessionSettingsIn)
+
+
+class CreatedOut(BaseModel):
+    id: UUID

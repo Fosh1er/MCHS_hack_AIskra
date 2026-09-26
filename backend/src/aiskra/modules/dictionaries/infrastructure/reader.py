@@ -11,6 +11,7 @@ from aiskra.modules.dictionaries.application.ports.reader import (
     CardTypeRow,
     DistrictRow,
     EnumValueRow,
+    GroupRow,
     IncidentTypeRow,
     OkrugRow,
     RoutingCell,
@@ -187,6 +188,10 @@ class SqlDictionaryReader:
     async def get_district(self, code: str) -> DistrictRow | None:
         d = await self._s.get(DistrictModel, code)
         return _district_row(d) if d is not None and d.active else None
+
+    async def list_groups(self) -> list[GroupRow]:
+        rows = (await self._s.execute(select(IncidentGroupModel).order_by(IncidentGroupModel.id))).scalars().all()
+        return [GroupRow(id=g.id, title=g.title) for g in rows]
 
     async def list_okrugs(self) -> list[OkrugRow]:
         rows = (await self._s.execute(select(OkrugModel))).scalars().all()

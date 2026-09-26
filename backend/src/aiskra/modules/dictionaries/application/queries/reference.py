@@ -8,6 +8,7 @@ from aiskra.modules.dictionaries.application.ports.reader import (
     DictionaryReader,
     DistrictRow,
     EnumValueRow,
+    GroupRow,
     OkrugRow,
     ServiceRow,
 )
@@ -76,3 +77,16 @@ class ListEnumHandler:
             domains = await self._reader.list_enum_domains()
             raise NotFoundError(f"Справочник «{query.domain}» не найден. Доступны: {', '.join(domains)}")
         return rows
+
+
+@dataclass(frozen=True, kw_only=True)
+class ListGroups(Query):
+    """Группы классификатора — «категории событий» занятия (ТЗ, сценарии 2–3)."""
+
+
+class ListGroupsHandler:
+    def __init__(self, reader: DictionaryReader) -> None:
+        self._reader = reader
+
+    async def __call__(self, query: ListGroups) -> list[GroupRow]:
+        return await self._reader.list_groups()

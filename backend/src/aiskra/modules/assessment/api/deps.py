@@ -5,3 +5,7 @@ from aiskra.shared.di import provider_stub
 provide_assess = provider_stub("assessment.AssessCardHandler")
 provide_get = provider_stub("assessment.GetAssessmentHandler")
 provide_insights = provider_stub("assessment.GroupInsightsHandler")
+provide_override = provider_stub("assessment.OverrideAssessmentHandler")
+provide_report = provider_stub("assessment.GetSessionReportHandler")
+provide_evaluate_session = provider_stub("assessment.EvaluateSessionHandler")
+provide_progress = provider_stub("assessment.MyProgressHandler")

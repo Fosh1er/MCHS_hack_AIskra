@@ -40,6 +40,11 @@ class AuditEvent(StrEnum):
     SCENARIO_ARCHIVED = "scenarios.archived"
     CALL_ENDED = "calls.ended"
     CARD_ASSESSED = "assessment.card_assessed"
+    ASSESSMENT_OVERRIDDEN = "assessment.overridden"
+    SESSION_CREATED = "sessions.created"
+    SESSION_STARTED = "sessions.started"
+    SESSION_FINISHED = "sessions.finished"
+    SCENARIO_EDITED = "scenarios.edited"
     SERVICE_STATUS_CHANGED = "dds.status_changed"
     CARD_SAVED = "card.saved"
     CARD_VIEWED = "card.viewed"
@@ -75,6 +80,11 @@ AUDIT_EVENT_TITLES: Mapping[AuditEvent, str] = {
     AuditEvent.SCENARIO_ARCHIVED: "Сценарий в архив",
     AuditEvent.CALL_ENDED: "Учебный звонок завершён",
     AuditEvent.CARD_ASSESSED: "Автооценка",
+    AuditEvent.ASSESSMENT_OVERRIDDEN: "Экспертная правка оценки",
+    AuditEvent.SESSION_CREATED: "Создание занятия",
+    AuditEvent.SESSION_STARTED: "Начало занятия",
+    AuditEvent.SESSION_FINISHED: "Завершение занятия",
+    AuditEvent.SCENARIO_EDITED: "Правка сценария",
     AuditEvent.SERVICE_STATUS_CHANGED: "Изменение статуса службы (ДДС)",
     AuditEvent.CARD_SAVED: "Сохранение карточки происшествия",
     AuditEvent.CARD_VIEWED: "Просмотр карточки",

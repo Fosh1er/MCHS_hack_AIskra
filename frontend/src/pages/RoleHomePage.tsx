@@ -6,11 +6,44 @@ import { keyCode } from './card112/useHotkeys';
 import { ArmTopBar } from '../shared/ui/ArmTopBar';
 import { ARM_MENU } from '../shared/ui/armMenu';
 import { useInsights } from '../shared/api/assessment';
+import { Button, Card, StatusPill } from '@smena112/ui-kit';
+import { MODE_TITLE, SESSION_STATUS, useMySession, useSessions } from '../shared/api/training';
+import { SessionBanner } from '../shared/ui/SessionBanner';
+import { TeacherShell } from '../shared/ui/TeacherShell';
 
 const NEXT: Record<string, string> = {
-  teacher: 'Пульт преподавателя: сценарии, занятия, мониторинг и оценки — пункты 3.x и 4.x плана.',
-  student: 'Кабинет обучающегося: назначенные занятия и эмулятор АРМ-112 / ДДС — пункты 1.x, 2.x и 5.1 плана.',
+  student: 'Кабинет обучающегося: назначенное занятие, эмулятор АРМ-112 и АРМ ДДС, мои результаты.',
 };
+
+/** Пульт преподавателя (п. 4.x): идущие и последние занятия, переходы, инсайты по группе. */
+function TeacherHome() {
+  const navigate = useNavigate();
+  const sessions = useSessions();
+  const items = sessions.data?.items ?? [];
+  const recent = [...items.filter((s) => s.status === 'running'), ...items.filter((s) => s.status !== 'running')].slice(0, 6);
+  return (
+    <TeacherShell active="home" title="Пульт преподавателя"
+      actions={<>
+        <Button icon="library" onClick={() => navigate('/teacher/scenarios')}>банк сценариев</Button>
+        <Button variant="primary" icon="plus" onClick={() => navigate('/teacher/sessions')}>занятие</Button>
+      </>}>
+      <Card title="Занятия" subtitle="Идущие — первыми" flush>
+        <table className="cab-table">
+          <tbody>
+            {recent.map((s) => (
+              <tr key={s.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/teacher/sessions/${s.id}`)}>
+                <td><b>{s.title}</b></td><td>{MODE_TITLE[s.mode]}</td><td className="num">{s.participants.length} уч.</td>
+                <td><StatusPill status={s.status === 'running' ? 'ok' : s.status === 'planned' ? 'info' : 'neutral'}>{SESSION_STATUS[s.status]}</StatusPill></td>
+              </tr>
+            ))}
+            {sessions.data && !recent.length && <tr><td className="c-slate">Занятий пока нет — создайте первое.</td></tr>}
+          </tbody>
+        </table>
+      </Card>
+      <Card title="Инсайты по группе"><GroupInsights /></Card>
+    </TeacherShell>
+  );
+}
 
 /** Инсайты по группе (п. 3.4): слабые критерии и частые ошибки по последним автооценкам. */
 function GroupInsights() {
@@ -49,8 +82,14 @@ function GroupInsights() {
 
 export function RoleHomePage() {
   const me = useMe().data!;
+  return me.role === 'teacher' ? <TeacherHome /> : <StudentHome />;
+}
+
+function StudentHome() {
+  const me = useMe().data!;
   const navigate = useNavigate();
   const canCreate = me.permissions.includes(PERMISSIONS.trainingParticipate);
+  const session = useMySession(canCreate).data ?? null;
   useEffect(() => {
     if (!canCreate) return;
     const onKey = (e: KeyboardEvent) => { if (keyCode(e) === 'Insert') navigate('/arm/112'); };
@@ -62,7 +101,7 @@ export function RoleHomePage() {
       <div className="arm-search">
         <div className="arm-search__main">
           <h1 className="cab-title" style={{ margin: 0 }}>{me.role_title}</h1>
-          <p style={{ marginTop: 8 }}>{NEXT[me.role]}</p>
+          <p style={{ marginTop: 8 }}>{NEXT[me.role] ?? ''}</p>
           {canCreate && (
             <button type="button" className="arm-bigbtn arm-bigbtn--alert" style={{ marginTop: 12 }} onClick={() => navigate('/arm/112')}>
               создать новую карточку (Insert)
@@ -71,7 +110,7 @@ export function RoleHomePage() {
         </div>
         <ArmTopBar me={me} menu={ARM_MENU} />
       </div>
-      {me.role === 'teacher' && <div className="arm-list"><div className="arm-list__title">Инсайты по группе</div><GroupInsights /></div>}
+      {session && <SessionBanner s={session} here={session.role === 'dds' ? '112' : 'dds'} />}
     </div>
   );
 }

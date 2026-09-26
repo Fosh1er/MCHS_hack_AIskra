@@ -70,7 +70,14 @@ async def open_card(
     handler: Annotated[OpenCardHandler, Depends(deps.provide_open_card)],
 ) -> CardOpenedOut:
     opened = await handler(
-        OpenCard(actor=actor, aon=body.aon, channel=body.channel, scenario_id=body.scenario_id, meta=meta)
+        OpenCard(
+            actor=actor,
+            aon=body.aon,
+            channel=body.channel,
+            scenario_id=body.scenario_id,
+            session_id=body.session_id,
+            meta=meta,
+        )
     )
     return CardOpenedOut(id=opened.id, number=opened.number, opened_at=opened.opened_at)
 

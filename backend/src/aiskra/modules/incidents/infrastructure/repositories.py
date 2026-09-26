@@ -71,6 +71,8 @@ class SqlCardRepository:
             checked_at=as_utc(row.checked_at),
             checked_by=row.checked_by,
             scenario_id=row.scenario_id,
+            session_id=row.session_id,
+            origin=row.origin,
         )
 
     async def save(self, card: IncidentCard) -> None:
@@ -125,8 +127,9 @@ def _new_row(card: IncidentCard) -> IncidentCardModel:
         id=card.id,
         number=card.number,
         author_id=card.author_id,
-        origin="scenario" if card.scenario_id else "student",
+        origin=card.origin if card.origin != "student" else ("scenario" if card.scenario_id else "student"),
         scenario_id=card.scenario_id,
+        session_id=card.session_id,
     )
     _fill(row, card)
     return row

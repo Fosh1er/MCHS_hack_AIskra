@@ -10,6 +10,9 @@ import { SERVICE_STATUS, useDdsJournal, type DdsJournalRow } from '../../shared/
 import { ArmTopBar, shortName } from '../../shared/ui/ArmTopBar';
 import { ARM_MENU } from '../../shared/ui/armMenu';
 import { rememberDds } from './DdsSelectPage';
+import { PERMISSIONS } from '../../shared/api/auth';
+import { feedDdsCard, useMySession } from '../../shared/api/training';
+import { SessionBanner } from '../../shared/ui/SessionBanner';
 
 export const DDS_NORM_SECONDS = 30; // ТЗ: тайминг по умолчанию; настраивается преподавателем в 4.2
 const PAGE_SIZES = [10, 15, 30, 50, 100];
@@ -55,6 +58,23 @@ export function DdsJournalPage() {
   const journal = useDdsJournal(service, { q, statuses: FILTERS.find((f) => f.value === filter)?.statuses ?? [], page, page_size: pageSize }, true);
   const titles = useMemo(() => new Map((cardTypes.data ?? []).map((t) => [t.code, t.title])), [cardTypes.data]);
   useEffect(() => { rememberDds(service); }, [service]);
+
+  // п. 4.2: на занятии с ролью ДДС этой службы карточки занятия приходят в очередь сами — темп и предел очереди
+  // решает сервер (FeedDdsCard), страница только периодически спрашивает
+  const session = useMySession(me.permissions.includes(PERMISSIONS.trainingParticipate)).data ?? null;
+  const feeding = session?.role === 'dds' && session.dds_service_code === service && session.card_source !== 'trainee';
+  const [feedNote, setFeedNote] = useState('');
+  useEffect(() => {
+    if (!feeding) return;
+    const tick = () => feedDdsCard().then((r) => {
+      setFeedNote(r.card_id ? '' : r.reason === 'очередь заполнена' ? `в очереди ${r.waiting} — новые карточки придут, когда примете решение` : '');
+      if (r.card_id) void journal.refetch();
+    }).catch(() => undefined);
+    void tick();
+    const t = setInterval(tick, 10_000);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [feeding, service]);
 
   // таймеры ожидания тикают каждую секунду
   const [now, setNow] = useState(() => Date.now());
@@ -125,6 +145,9 @@ export function DdsJournalPage() {
         <ArmTopBar me={me} menu={ARM_MENU} />
       </div>
 
+      {session && <SessionBanner s={session} here="dds"
+        extra={[session.role === 'dds' && session.dds_service_code !== service ? `ваша служба на занятии — ${session.dds_service_code}` : '',
+          feeding ? `норматив решения ${session.settings.norm_dds} с` : '', feedNote].filter(Boolean).join(' · ') || undefined} />}
       <div className="arm-list">
         <div className="arm-list__head">
           <div className="arm-list__title">
