@@ -1,0 +1,128 @@
+"""Порт `AttemptSource` модуля assessment поверх incidents (карточка, статусы служб) и training (сценарий, звонки)."""
+
+from __future__ import annotations
+
+import json
+from uuid import UUID
+
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from aiskra.modules.assessment.application.ports.attempts import Card112Attempt, DdsAttempt
+from aiskra.modules.assessment.domain.scoring import StatusStep
+from aiskra.modules.dictionaries.infrastructure.models import EnumValueModel, ServiceModel
+from aiskra.modules.incidents.infrastructure.models import CardServiceStatusModel, IncidentCardModel
+from aiskra.modules.incidents.infrastructure.reader import SqlCardReader
+from aiskra.modules.training.domain.actors import topic_of
+from aiskra.modules.training.infrastructure.models import CallMessageModel, CallModel, ScenarioModel
+from aiskra.platform.types import as_utc
+
+
+class IncidentAttempts:
+    def __init__(self, session: AsyncSession) -> None:
+        self._s = session
+
+    async def _scenario(self, card_id: UUID) -> ScenarioModel | None:
+        sid = (
+            await self._s.execute(select(IncidentCardModel.scenario_id).where(IncidentCardModel.id == card_id))
+        ).scalar_one_or_none()
+        return await self._s.get(ScenarioModel, sid) if sid else None
+
+    async def card_112(self, card_id: UUID) -> Card112Attempt | None:
+        card = await SqlCardReader(self._s).get(card_id)
+        if card is None:
+            return None
+        scenario = await self._scenario(card_id)
+        calls = (
+            (await self._s.execute(select(CallModel.id).where(CallModel.card_id == card_id, CallModel.role == "112")))
+            .scalars()
+            .all()
+        )
+        topics: set[str] | None = None
+        if calls:
+            texts = (
+                (
+                    await self._s.execute(
+                        select(CallMessageModel.text).where(
+                            CallMessageModel.call_id.in_(calls), CallMessageModel.speaker == "operator"
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            topics = {t for t in (topic_of(x) for x in texts) if t}
+        reference = dict(scenario.reference_card) if scenario and scenario.reference_card else None
+        codes = {s.code for s in card.services} | {s["code"] for s in (reference or {}).get("services", [])}
+        names = dict(
+            (
+                await self._s.execute(
+                    select(ServiceModel.code, ServiceModel.short_name).where(ServiceModel.code.in_(codes))
+                )
+            ).all()
+        )
+        flags = dict(
+            (
+                await self._s.execute(
+                    select(EnumValueModel.code, EnumValueModel.name).where(EnumValueModel.domain == "card_flag")
+                )
+            ).all()
+        )
+        legend = dict(scenario.legend or {}) if scenario else {}
+        public = {k: legend[k] for k in ("what", "details", "address", "victims", "facts") if k in legend}
+        return Card112Attempt(
+            card_id=card.id,
+            card_number=card.number,
+            author_id=card.author_id,
+            status=card.status,
+            data=card.data,
+            services=[s.code for s in card.services],
+            processing_s=card.processing_ms / 1000 if card.processing_ms is not None else None,
+            reference=reference,
+            legend_text=json.dumps(public, ensure_ascii=False),
+            asked_topics=topics,
+            service_names=names,
+            flag_names={k: v.lower() for k, v in flags.items()},
+        )
+
+    async def dds(self, card_id: UUID, service_code: str) -> DdsAttempt | None:
+        card = await SqlCardReader(self._s).get(card_id)
+        own = next((s for s in card.services if s.code == service_code), None) if card else None
+        if card is None or own is None:
+            return None
+        rows = (
+            (
+                await self._s.execute(
+                    select(CardServiceStatusModel)
+                    .where(
+                        CardServiceStatusModel.card_id == card_id, CardServiceStatusModel.service_code == service_code
+                    )
+                    .order_by(CardServiceStatusModel.id)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        history = [StatusStep(status=r.status, at=as_utc(r.at), order_no=r.order_no, comment=r.comment) for r in rows]
+        actors = {r.actor_id for r in rows if r.actor_id and r.status not in ("added",)}
+        added = next((h.at for h in history if h.status == "added"), None) or as_utc(card.saved_at)
+        parties = (
+            (
+                await self._s.execute(
+                    select(CallModel.party).where(CallModel.card_id == card_id, CallModel.service_code == service_code)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        scenario = await self._scenario(card_id)
+        return DdsAttempt(
+            card_id=card.id,
+            card_number=card.number,
+            service_code=service_code,
+            history=history,
+            added_at=added,
+            reference=dict(scenario.reference_dds) if scenario and scenario.reference_dds else None,
+            calls=list(parties),
+            actor_ids=actors,
+        )

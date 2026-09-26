@@ -19,7 +19,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from aiskra.ai.adapters.factory import build_router, build_stt, build_tts
 from aiskra.ai.config import load_ai_config
 from aiskra.ai.router import ModelRouter
+from aiskra.integration.assessment_sources import IncidentAttempts
 from aiskra.integration.training_sources import DictionaryScenarioFacts, IncidentCardContext
+from aiskra.modules.assessment.api import deps as assessment_deps
+from aiskra.modules.assessment.application.commands.assess import AssessCardHandler
+from aiskra.modules.assessment.application.judge import Judge
+from aiskra.modules.assessment.application.queries.assessments import GetAssessmentHandler, GroupInsightsHandler
+from aiskra.modules.assessment.infrastructure.repositories import SqlAssessmentRepository
 from aiskra.modules.audit.api import deps as audit_deps
 from aiskra.modules.audit.application.queries.search_audit import ListEventTypesHandler, SearchAuditHandler
 from aiskra.modules.audit.infrastructure.reader import SqlAuditReader
@@ -419,6 +425,30 @@ def _wire_training(app: FastAPI, services: Services) -> None:
     ov[training_deps.provide_card_calls] = card_calls
 
 
+def _wire_assessment(app: FastAPI, services: Services) -> None:
+    """п. 3.4: автооценка по эталону (правила + ИИ-судья)."""
+    ov = app.dependency_overrides
+
+    def assess(session: Session) -> AssessCardHandler:
+        return AssessCardHandler(
+            IncidentAttempts(session),
+            SqlAssessmentRepository(session),
+            Judge(services.model_router),
+            SqlAuditRecorder(session),
+            SqlAlchemyUnitOfWork(session),
+        )
+
+    def get(session: Session) -> GetAssessmentHandler:
+        return GetAssessmentHandler(SqlAssessmentRepository(session))
+
+    def insights(session: Session) -> GroupInsightsHandler:
+        return GroupInsightsHandler(SqlAssessmentRepository(session))
+
+    ov[assessment_deps.provide_assess] = assess
+    ov[assessment_deps.provide_get] = get
+    ov[assessment_deps.provide_insights] = insights
+
+
 def wire(app: FastAPI, services: Services) -> None:
     ov = app.dependency_overrides
     # --- system
@@ -459,4 +489,6 @@ def wire(app: FastAPI, services: Services) -> None:
     _wire_incidents(app)
     # --- training: сценарии, ИИ-собеседники, учебные звонки (п. 3.2, 3.3, 1.4, 2.3)
     _wire_training(app, services)
+    # --- assessment: автооценка (п. 3.4)
+    _wire_assessment(app, services)
     # --- сюда добавляются связывания модулей training, assessment … (п. 3.x, 4.x)

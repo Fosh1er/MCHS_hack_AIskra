@@ -108,6 +108,11 @@ cd backend && uv run python -m aiskra.cli create-user --login admin --full-name 
 - **API:** `/api/v1/training/scenarios…`, `/training/calls/incoming`, `/calls/dds`, `/calls/{id}/answer|replicas|end`, `/training/cards/{id}/calls`. CLI `generate-scenarios --count N`.
 - **Фронт:** входящий вызов — `pages/journal/JournalPage.tsx`; панель разговора — `shared/ui/CallPanel.tsx`; софтфон ДДС — `pages/dds/DdsSoftphone.tsx`.
 
+## Автооценка (п. 3.4) — что уже есть
+- **Правила** — `modules/assessment/domain/scoring.py` (формулы и веса описаны в `specs/3.4-assessment.md`); ИИ-судья — `application/judge.py` (без модели критерии «не проверено»).
+- **Попытка** (карточка, сценарий, статусы, звонки) — `aiskra/integration/assessment_sources.py`.
+- **API:** `POST /api/v1/assessment/cards/{id}/evaluate {role: 112|dds, service_code?, weights?, norm_seconds?, threshold?}`, `GET /assessment/cards/{id}?role=`, `GET /assessment/insights`. Фронт — `shared/ui/AssessmentPanel.tsx`, инсайты — `RoleHomePage`.
+
 ## Рецепты
 **Новая команда** (пример: `SaveCard` в `incidents`):
 1. `modules/incidents/application/commands/save_card.py` — `@dataclass(frozen=True, kw_only=True) class SaveCard(Command)` и `class SaveCardHandler` с зависимостями-портами в `__init__` и `async __call__(cmd) -> Result`.

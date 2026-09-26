@@ -1089,3 +1089,27 @@
 .ipphone__log { font-size: var(--fs-xs); color: var(--text-inverse); }
 .ipphone__logrow { display: flex; gap: 6px; align-items: center; padding: 3px 0; }
 .ipphone__hang { margin-left: auto; border: 0; background: none; color: #ffb4a0; cursor: pointer; font-size: var(--fs-2xs); }
+
+/* ==========================================================================
+   Автооценка (п. 3.4): итог, критерии со шкалой, ошибки; инсайты преподавателя
+   ========================================================================== */
+.assess { display: flex; flex-direction: column; gap: 8px; }
+.assess__head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.assess__toggle { border: 0; background: none; padding: 0; display: inline-flex; align-items: center; gap: 4px; color: var(--text-strong); font: inherit; cursor: pointer; }
+.assess__score { padding: 2px 10px; font-weight: var(--fw-bold); color: var(--text-inverse); }
+.assess__score--ok { background: var(--s-ok); }
+.assess__score--bad { background: var(--s-critical); }
+.assess .arm-minibtn { margin-left: auto; }
+.assess__err { color: #c0461f; font-size: var(--fs-xs); }
+.assess__note, .assess__meta { margin: 0; font-size: var(--fs-xs); color: var(--text-muted); }
+.assess__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.assess__item { display: grid; grid-template-columns: minmax(160px, 38%) 1fr; gap: 4px 12px; align-items: center; font-size: var(--fs-sm); }
+.assess__na { font-size: var(--fs-xs); color: var(--text-muted); }
+.assess__bar { height: 8px; background: var(--border-subtle); position: relative; }
+.assess__bar > span { position: absolute; inset: 0 auto 0 0; }
+.assess__bar .ok { background: var(--s-ok); }
+.assess__bar .warn { background: var(--s-warn); }
+.assess__bar .bad { background: var(--s-critical); }
+.assess__errors { grid-column: 1 / -1; margin: 0; padding-left: 18px; font-size: var(--fs-xs); color: #8a3a1c; }
+.insights { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; margin-top: 16px; }
+.insights__kpi { font-size: 28px; font-weight: var(--fw-bold); }
