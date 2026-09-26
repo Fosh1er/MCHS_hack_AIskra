@@ -143,6 +143,11 @@ def test_status_flow_by_roles(app_client: Callable[[], TestClient]) -> None:
     assert teacher.post(f"{base}/returned", json={"comment": "уточните адрес"}).json() == {"status": "registered"}
     view = teacher.get(base).json()
     assert view["checked_by_name"] is None and view["status"] == "registered"
+    # п. 5.1: автор видит, почему карточку вернули; после «Отработана» комментарий уходит
+    rework = student.get(base).json()["rework"]
+    assert rework["comment"] == "уточните адрес" and rework["by"] == "Преподаватель Тестовый"
+    student.post(f"{base}/worked", json={})
+    assert student.get(base).json()["rework"] is None
 
 
 def test_flags_append_view_and_audit(app_client: Callable[[], TestClient]) -> None:

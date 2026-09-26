@@ -26,10 +26,13 @@ from aiskra.modules.assessment.application.queries.assessments import (
     Insights,
 )
 from aiskra.modules.assessment.application.queries.reports import (
+    GetMySessionReport,
+    GetMySessionReportHandler,
     GetSessionReport,
     GetSessionReportHandler,
     MyProgress,
     MyProgressHandler,
+    MySessionReport,
     ProgressView,
     SessionReport,
     report_csv,
@@ -154,3 +157,14 @@ async def my_progress(
     actor: CurrentPrincipal, handler: Annotated[MyProgressHandler, Depends(deps.provide_progress)]
 ) -> ProgressView:
     return await handler(MyProgress(actor=actor))
+
+
+@router.get(
+    "/sessions/{session_id}/mine", response_model=MySessionReport, summary="Мои результаты по занятию и рекомендации"
+)
+async def my_session_report(
+    session_id: UUID,
+    actor: CurrentPrincipal,
+    handler: Annotated[GetMySessionReportHandler, Depends(deps.provide_my_report)],
+) -> MySessionReport:
+    return await handler(GetMySessionReport(actor=actor, session_id=session_id))

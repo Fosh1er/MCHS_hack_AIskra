@@ -31,6 +31,12 @@ class AuditEvent(StrEnum):
     USER_BLOCKED = "users.blocked"
     USER_UNBLOCKED = "users.unblocked"
     PASSWORD_RESET = "users.password_reset"
+    GROUP_CREATED = "groups.created"
+    GROUP_UPDATED = "groups.updated"
+    GROUP_DELETED = "groups.deleted"
+    SETTINGS_CHANGED = "system.settings_changed"
+    BACKUP_CREATED = "system.backup_created"
+    BACKUP_RESTORED = "system.backup_restored"
     DICTIONARIES_IMPORTED = "dictionaries.imported"
     ADDRESSES_IMPORTED = "dictionaries.addresses_imported"
     CARD_CREATED = "card.created"
@@ -70,6 +76,12 @@ AUDIT_EVENT_TITLES: Mapping[AuditEvent, str] = {
     AuditEvent.USER_UPDATED: "Изменение пользователя",
     AuditEvent.USER_BLOCKED: "Блокировка пользователя",
     AuditEvent.USER_UNBLOCKED: "Разблокировка пользователя",
+    AuditEvent.GROUP_CREATED: "Создание группы",
+    AuditEvent.GROUP_UPDATED: "Изменение группы",
+    AuditEvent.GROUP_DELETED: "Удаление группы",
+    AuditEvent.SETTINGS_CHANGED: "Изменение настроек",
+    AuditEvent.BACKUP_CREATED: "Резервная копия",
+    AuditEvent.BACKUP_RESTORED: "Восстановление из копии",
     AuditEvent.PASSWORD_RESET: "Сброс пароля",
     AuditEvent.DICTIONARIES_IMPORTED: "Импорт справочников",
     AuditEvent.ADDRESSES_IMPORTED: "Импорт адресного справочника",

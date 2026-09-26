@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends
@@ -73,6 +73,8 @@ from aiskra.modules.training.application.queries.scenarios import (
 )
 from aiskra.modules.training.application.queries.sessions import (
     GetSession,
+    GetSessionDefaults,
+    GetSessionDefaultsHandler,
     GetSessionHandler,
     ListSessions,
     ListSessionsHandler,
@@ -81,6 +83,9 @@ from aiskra.modules.training.application.queries.sessions import (
     MonitorView,
     MySession,
     MySessionHandler,
+    MySessionRow,
+    MySessions,
+    MySessionsHandler,
     MySessionView,
     SessionMonitor,
     SessionMonitorHandler,
@@ -271,11 +276,18 @@ async def create_session(
             card_source=body.card_source,
             groups=body.groups,
             participants=[ParticipantIn(p.student_id, p.role, p.dds_service_code) for p in body.participants],
-            settings=body.settings.model_dump(),
+            settings=body.settings.model_dump(exclude_none=True),
             meta=meta,
         )
     )
     return CreatedOut(id=sid)
+
+
+@router.get("/session-defaults", summary="Тайминг и пороги занятия по умолчанию (настройки администратора)")
+async def session_defaults(
+    _: Teacher, handler: Annotated[GetSessionDefaultsHandler, Depends(deps.provide_session_defaults)]
+) -> dict[str, Any]:
+    return await handler(GetSessionDefaults())
 
 
 @router.get("/sessions", response_model=SessionPage, summary="Мои занятия (преподаватель)")
@@ -293,6 +305,13 @@ async def my_session(
     actor: CurrentPrincipal, handler: Annotated[MySessionHandler, Depends(deps.provide_my_session)]
 ) -> MySessionView | None:
     return await handler(MySession(actor=actor))
+
+
+@router.get("/sessions/mine", response_model=list[MySessionRow], summary="Мои занятия: назначенные, идущее, прошедшие")
+async def my_sessions(
+    actor: Trainee, handler: Annotated[MySessionsHandler, Depends(deps.provide_my_sessions)]
+) -> list[MySessionRow]:
+    return await handler(MySessions(actor=actor))
 
 
 @router.post("/sessions/feed", response_model=FeedResult, summary="Выпустить карточку занятия в очередь своей ДДС")

@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from uuid import UUID
 
 from aiskra.modules.training.application.ports.scenarios import ScenarioRepository
-from aiskra.modules.training.application.ports.sessions import SessionRepository, SystemCards
+from aiskra.modules.training.application.ports.sessions import SessionDefaults, SessionRepository, SystemCards
 from aiskra.modules.training.domain.session import CardSource, Participant, SessionMode, TrainingSession
 from aiskra.shared.application import Clock, Command, UnitOfWork
 from aiskra.shared.audit import AuditEntry, AuditEvent, AuditRecorder, RequestMeta
@@ -58,6 +58,17 @@ class _Base:
 
 
 class CreateSessionHandler(_Base):
+    def __init__(
+        self,
+        repo: SessionRepository,
+        audit: AuditRecorder,
+        uow: UnitOfWork,
+        clock: Clock,
+        defaults: SessionDefaults | None = None,
+    ) -> None:
+        super().__init__(repo, audit, uow, clock)
+        self._defaults = defaults
+
     async def __call__(self, cmd: CreateSession) -> UUID:
         seen: set[UUID] = set()
         participants = []
@@ -73,7 +84,7 @@ class CreateSessionHandler(_Base):
             teacher_id=cmd.actor.user_id,
             groups=list(cmd.groups),
             participants=participants,
-            settings=dict(cmd.settings),
+            settings={**(await self._defaults.get() if self._defaults else {}), **cmd.settings},
         )
         await self._repo.add(session)
         await self._commit(

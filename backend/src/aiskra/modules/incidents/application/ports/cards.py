@@ -74,6 +74,13 @@ class IncidentTypeInfo:
     ekp_type: str | None
 
 
+@dataclass(frozen=True)
+class ReworkNote:
+    comment: str
+    at: datetime | None
+    by: str | None
+
+
 @dataclass(frozen=True, kw_only=True)
 class CardView:
     id: UUID
@@ -97,6 +104,7 @@ class CardView:
     services: list[CardServiceView]
     workouts: list[WorkoutView]
     incident_types: list[IncidentTypeInfo]
+    rework: ReworkNote | None = None  # последний «Вернуть на доработку», пока карточка не отработана снова
 
 
 @dataclass(frozen=True, kw_only=True)

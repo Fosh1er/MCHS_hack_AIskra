@@ -36,15 +36,15 @@ def request_meta(request: Request) -> RequestMeta:
 Meta = Annotated[RequestMeta, Depends(request_meta)]
 
 
-def require(permission: Permission) -> Callable[..., Awaitable[Principal]]:
-    """Зависимость «нужно право». Возвращает субъекта, чтобы эндпоинт мог передать его в команду."""
+def require(permission: Permission, *alternatives: Permission) -> Callable[..., Awaitable[Principal]]:
+    """Зависимость «нужно право» (или любое из `alternatives`). Возвращает субъекта для команды."""
 
     async def dependency(
         principal: CurrentPrincipal,
         request: Request,
         audit: Annotated[AuditRecorder, Depends(provide_isolated_audit)],
     ) -> Principal:
-        if not principal.can(permission):
+        if not principal.can(permission) and not any(principal.can(p) for p in alternatives):
             await audit.record(
                 AuditEntry(
                     event=AuditEvent.ACCESS_DENIED,

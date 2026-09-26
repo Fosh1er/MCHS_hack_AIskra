@@ -18,3 +18,4 @@ dist/
 
 # Сырые выгрузки OpenStreetMap (~80 МБ): генератор data/tools/build_addresses.py
 data/raw/osm/
+var/

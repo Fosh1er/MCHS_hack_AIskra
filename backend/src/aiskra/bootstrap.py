@@ -21,6 +21,7 @@ from aiskra.ai.config import load_ai_config
 from aiskra.ai.router import ModelRouter
 from aiskra.integration.assessment_sources import IncidentAttempts
 from aiskra.integration.session_sources import IncidentSystemCards, SessionFactsReader, SessionProgress
+from aiskra.integration.system_sources import SystemSessionDefaults
 from aiskra.integration.training_sources import DictionaryScenarioFacts, IncidentCardContext
 from aiskra.modules.assessment.api import deps as assessment_deps
 from aiskra.modules.assessment.application.commands.assess import AssessCardHandler
@@ -28,7 +29,11 @@ from aiskra.modules.assessment.application.commands.evaluate_session import Eval
 from aiskra.modules.assessment.application.commands.override import OverrideAssessmentHandler
 from aiskra.modules.assessment.application.judge import Judge
 from aiskra.modules.assessment.application.queries.assessments import GetAssessmentHandler, GroupInsightsHandler
-from aiskra.modules.assessment.application.queries.reports import GetSessionReportHandler, MyProgressHandler
+from aiskra.modules.assessment.application.queries.reports import (
+    GetMySessionReportHandler,
+    GetSessionReportHandler,
+    MyProgressHandler,
+)
 from aiskra.modules.assessment.infrastructure.repositories import SqlAssessmentRepository
 from aiskra.modules.audit.api import deps as audit_deps
 from aiskra.modules.audit.application.queries.search_audit import ListEventTypesHandler, SearchAuditHandler
@@ -63,6 +68,8 @@ from aiskra.modules.dictionaries.infrastructure.writer import SqlDictionaryWrite
 from aiskra.modules.identity.api import deps as identity_deps
 from aiskra.modules.identity.api.cookies import SessionCookie
 from aiskra.modules.identity.application.commands.create_user import CreateUserHandler
+from aiskra.modules.identity.application.commands.groups import DeleteGroupHandler, SaveGroupHandler
+from aiskra.modules.identity.application.commands.groups import ListGroupsHandler as IdentityListGroupsHandler
 from aiskra.modules.identity.application.commands.login import LoginHandler
 from aiskra.modules.identity.application.commands.logout import LogoutHandler
 from aiskra.modules.identity.application.commands.reset_password import ResetPasswordHandler
@@ -72,6 +79,7 @@ from aiskra.modules.identity.application.ports.auth import AuthPolicy
 from aiskra.modules.identity.application.queries.list_users import ListUsersHandler
 from aiskra.modules.identity.application.queries.resolve_session import ResolveSession, ResolveSessionHandler
 from aiskra.modules.identity.domain.user import LockoutPolicy
+from aiskra.modules.identity.infrastructure.groups import SqlGroupStore
 from aiskra.modules.identity.infrastructure.reader import SqlSessionReader, SqlUserReader
 from aiskra.modules.identity.infrastructure.repositories import SqlSessionRepository, SqlUserRepository
 from aiskra.modules.identity.infrastructure.security import ScryptPasswordHasher, SessionTokenIssuer
@@ -91,8 +99,16 @@ from aiskra.modules.incidents.infrastructure.dds import SqlDdsReader, SqlDdsRepo
 from aiskra.modules.incidents.infrastructure.reader import SqlCardReader
 from aiskra.modules.incidents.infrastructure.repositories import SqlCardRepository
 from aiskra.modules.system.api import deps as system_deps
+from aiskra.modules.system.application.commands.backups import (
+    CreateBackupHandler,
+    ListBackupsHandler,
+    RestoreBackupHandler,
+)
 from aiskra.modules.system.application.commands.probe_model import ProbeModelHandler
+from aiskra.modules.system.application.commands.settings import GetSettingsHandler, UpdateSettingsHandler
+from aiskra.modules.system.application.queries.admin import GetStatusHandler, RecentLogsHandler
 from aiskra.modules.system.application.queries.get_ai_config import GetAIConfigHandler
+from aiskra.modules.system.infrastructure.settings import SqlSettingsStore
 from aiskra.modules.training.api import deps as training_deps
 from aiskra.modules.training.application.actors import Actors
 from aiskra.modules.training.application.commands.calls import (
@@ -120,20 +136,25 @@ from aiskra.modules.training.application.queries.scenarios import (
     PreviewScenarioHandler,
 )
 from aiskra.modules.training.application.queries.sessions import (
+    GetSessionDefaultsHandler,
     GetSessionHandler,
     ListSessionsHandler,
     ListStudentsHandler,
     MySessionHandler,
+    MySessionsHandler,
     SessionMonitorHandler,
 )
 from aiskra.modules.training.infrastructure.repositories import SqlCallRepository, SqlScenarioRepository
 from aiskra.modules.training.infrastructure.sessions import SqlSessionRepository as SqlTrainingSessionRepository
 from aiskra.modules.training.infrastructure.sessions import SqlStudentDirectory
+from aiskra.platform import logbuffer
+from aiskra.platform.backup import FileBackupStore
 from aiskra.platform.db import SqlAlchemyUnitOfWork, create_engine, create_session_factory
 from aiskra.platform.deps import get_session
 from aiskra.platform.models_registry import metadata as _all_models  # noqa: F401 — все ORM-модели в одном реестре
 from aiskra.platform.services import Services
 from aiskra.platform.settings import Settings
+from aiskra.platform.status import SystemStatus
 from aiskra.shared import web
 from aiskra.shared.application import SystemClock
 from aiskra.shared.cache import CachePort, InMemoryTTLCache, NullCache
@@ -468,8 +489,18 @@ def _wire_sessions(app: FastAPI, services: Services) -> None:
 
     def create(session: Session) -> CreateSessionHandler:
         return CreateSessionHandler(
-            SqlTrainingSessionRepository(session), SqlAuditRecorder(session), SqlAlchemyUnitOfWork(session), clock
+            SqlTrainingSessionRepository(session),
+            SqlAuditRecorder(session),
+            SqlAlchemyUnitOfWork(session),
+            clock,
+            defaults=SystemSessionDefaults(session),
         )
+
+    def session_defaults(session: Session) -> GetSessionDefaultsHandler:
+        return GetSessionDefaultsHandler(SystemSessionDefaults(session))
+
+    def my_sessions(session: Session) -> MySessionsHandler:
+        return MySessionsHandler(SqlTrainingSessionRepository(session))
 
     def state(session: Session) -> ChangeSessionStateHandler:
         return ChangeSessionStateHandler(
@@ -512,6 +543,8 @@ def _wire_sessions(app: FastAPI, services: Services) -> None:
     ov[training_deps.provide_my_session] = my_session
     ov[training_deps.provide_monitor] = monitor
     ov[training_deps.provide_students] = students
+    ov[training_deps.provide_session_defaults] = session_defaults
+    ov[training_deps.provide_my_sessions] = my_sessions
 
 
 def _wire_assessment(app: FastAPI, services: Services) -> None:
@@ -535,6 +568,9 @@ def _wire_assessment(app: FastAPI, services: Services) -> None:
     def report(session: Session) -> GetSessionReportHandler:
         return GetSessionReportHandler(SessionFactsReader(session), SqlAssessmentRepository(session))
 
+    def my_report(session: Session) -> GetMySessionReportHandler:
+        return GetMySessionReportHandler(SessionFactsReader(session), SqlAssessmentRepository(session))
+
     def evaluate_session(session: Session) -> EvaluateSessionHandler:
         return EvaluateSessionHandler(SessionFactsReader(session), assess(session))
 
@@ -552,12 +588,57 @@ def _wire_assessment(app: FastAPI, services: Services) -> None:
     ov[assessment_deps.provide_insights] = insights
     ov[assessment_deps.provide_override] = override
     ov[assessment_deps.provide_report] = report
+    ov[assessment_deps.provide_my_report] = my_report
     ov[assessment_deps.provide_evaluate_session] = evaluate_session
     ov[assessment_deps.provide_progress] = progress
 
 
+def _wire_admin(app: FastAPI, services: Services) -> None:
+    """п. 5.2: группы, настройки, резервные копии, состояние сервисов, логи."""
+    ov = app.dependency_overrides
+    backups = FileBackupStore(services.engine, services.settings.backup_dir)
+    status = SystemStatus(services, backups)
+    logs = logbuffer.install()
+
+    def save_group(session: Session) -> SaveGroupHandler:
+        return SaveGroupHandler(SqlGroupStore(session), SqlAuditRecorder(session), SqlAlchemyUnitOfWork(session))
+
+    def delete_group(session: Session) -> DeleteGroupHandler:
+        return DeleteGroupHandler(SqlGroupStore(session), SqlAuditRecorder(session), SqlAlchemyUnitOfWork(session))
+
+    def list_groups(session: Session) -> IdentityListGroupsHandler:
+        return IdentityListGroupsHandler(SqlGroupStore(session))
+
+    def get_settings(session: Session) -> GetSettingsHandler:
+        return GetSettingsHandler(SqlSettingsStore(session))
+
+    def update_settings(session: Session) -> UpdateSettingsHandler:
+        return UpdateSettingsHandler(
+            SqlSettingsStore(session), SqlAuditRecorder(session), SqlAlchemyUnitOfWork(session)
+        )
+
+    def create_backup(session: Session) -> CreateBackupHandler:
+        return CreateBackupHandler(backups, SqlSettingsStore(session), IsolatedAuditRecorder(services.session_factory))
+
+    def restore_backup() -> RestoreBackupHandler:
+        return RestoreBackupHandler(backups, IsolatedAuditRecorder(services.session_factory))
+
+    ov[identity_deps.provide_save_group] = save_group
+    ov[identity_deps.provide_delete_group] = delete_group
+    ov[identity_deps.provide_list_groups] = list_groups
+    ov[system_deps.provide_get_settings] = get_settings
+    ov[system_deps.provide_update_settings] = update_settings
+    ov[system_deps.provide_create_backup] = create_backup
+    ov[system_deps.provide_restore_backup] = restore_backup
+    ov[system_deps.provide_list_backups] = lambda: ListBackupsHandler(backups)
+    ov[system_deps.provide_backup_file] = lambda: backups
+    ov[system_deps.provide_status] = lambda: GetStatusHandler(status)
+    ov[system_deps.provide_logs] = lambda: RecentLogsHandler(logs)
+
+
 def wire(app: FastAPI, services: Services) -> None:
     ov = app.dependency_overrides
+    _wire_admin(app, services)
     # --- system
     ov[system_deps.provide_probe_model_handler] = lambda: ProbeModelHandler(services.model_router)
     ov[system_deps.provide_get_ai_config_handler] = lambda: GetAIConfigHandler(

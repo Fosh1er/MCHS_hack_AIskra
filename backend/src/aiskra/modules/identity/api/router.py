@@ -7,6 +7,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Response
+from pydantic import BaseModel, ConfigDict, Field
 
 from aiskra.modules.identity.api import deps
 from aiskra.modules.identity.api.cookies import SessionCookie
@@ -24,11 +25,20 @@ from aiskra.modules.identity.api.schemas import (
     UserUpdateIn,
 )
 from aiskra.modules.identity.application.commands.create_user import CreateUser, CreateUserHandler
+from aiskra.modules.identity.application.commands.groups import (
+    DeleteGroup,
+    DeleteGroupHandler,
+    ListGroups,
+    ListGroupsHandler,
+    SaveGroup,
+    SaveGroupHandler,
+)
 from aiskra.modules.identity.application.commands.login import Login, LoginHandler
 from aiskra.modules.identity.application.commands.logout import Logout, LogoutHandler
 from aiskra.modules.identity.application.commands.reset_password import ResetPassword, ResetPasswordHandler
 from aiskra.modules.identity.application.commands.set_user_blocked import SetUserBlocked, SetUserBlockedHandler
 from aiskra.modules.identity.application.commands.update_user import UpdateUser, UpdateUserHandler
+from aiskra.modules.identity.application.ports.groups import GroupMember, GroupView
 from aiskra.modules.identity.application.queries.list_users import ListUsers, ListUsersHandler
 from aiskra.shared.security import Permission, Principal, Role
 from aiskra.shared.web import CurrentPrincipal, Meta, require
@@ -156,3 +166,65 @@ async def reset_password(
     handler: Annotated[ResetPasswordHandler, Depends(deps.provide_reset_password)],
 ) -> None:
     await handler(ResetPassword(actor=actor, user_id=user_id, new_password=body.new_password, meta=meta))
+
+
+# ------------------------------------------------------------------ п. 5.2: группы обучающихся
+groups_router = APIRouter(prefix="/groups", tags=["groups"])
+GroupReader = Annotated[Principal, Depends(require(Permission.USERS_MANAGE, Permission.LESSONS_CONDUCT))]
+
+
+class GroupMemberIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    user_id: UUID
+    member_role: str = Field(default="112", pattern="^(112|dds)$")
+    dds_service_code: str | None = Field(default=None, max_length=64)
+
+
+class GroupIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: str = Field(min_length=2, max_length=128)
+    members: list[GroupMemberIn] = Field(default_factory=list, max_length=200)
+
+
+class GroupIdOut(BaseModel):
+    id: UUID
+
+
+def _members(body: GroupIn) -> list[GroupMember]:
+    return [
+        GroupMember(user_id=m.user_id, member_role=m.member_role, dds_service_code=m.dds_service_code)
+        for m in body.members
+    ]
+
+
+@groups_router.get("", response_model=list[GroupView], summary="Группы обучающихся с составом")
+async def list_groups(
+    _: GroupReader, handler: Annotated[ListGroupsHandler, Depends(deps.provide_list_groups)]
+) -> list[GroupView]:
+    return await handler(ListGroups())
+
+
+@groups_router.post("", response_model=GroupIdOut, status_code=201, summary="Создать группу")
+async def create_group(
+    body: GroupIn, actor: Admin, meta: Meta, handler: Annotated[SaveGroupHandler, Depends(deps.provide_save_group)]
+) -> GroupIdOut:
+    return GroupIdOut(id=await handler(SaveGroup(actor=actor, name=body.name, members=_members(body), meta=meta)))
+
+
+@groups_router.put("/{group_id}", response_model=GroupIdOut, summary="Изменить название и состав группы")
+async def update_group(
+    group_id: UUID,
+    body: GroupIn,
+    actor: Admin,
+    meta: Meta,
+    handler: Annotated[SaveGroupHandler, Depends(deps.provide_save_group)],
+) -> GroupIdOut:
+    gid = await handler(SaveGroup(actor=actor, group_id=group_id, name=body.name, members=_members(body), meta=meta))
+    return GroupIdOut(id=gid)
+
+
+@groups_router.delete("/{group_id}", status_code=204, summary="Удалить группу")
+async def delete_group(
+    group_id: UUID, actor: Admin, meta: Meta, handler: Annotated[DeleteGroupHandler, Depends(deps.provide_delete_group)]
+) -> None:
+    await handler(DeleteGroup(actor=actor, group_id=group_id, meta=meta))
