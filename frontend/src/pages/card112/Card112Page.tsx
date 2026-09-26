@@ -13,6 +13,8 @@ import { SERVICE_STATUS, useCard, useOpenCard, useSaveCard, type CardView } from
 import { shortName } from '../../shared/ui/ArmTopBar';
 import { CardHeader } from './CardHeader';
 import { CardViewer } from './CardViewer';
+import { CallPanel } from '../../shared/ui/CallPanel';
+import { answerCall } from '../../shared/api/training';
 import { ApplicantRow, VictimsRow } from './ApplicantBlock';
 import { AddressBlock, DescriptionBlock } from './AddressBlock';
 import { WhatHappened, cardTypeLabel } from './WhatHappened';
@@ -44,16 +46,36 @@ export function Card112NewPage() {
   return <div className="arm112"><p className="arm-empty" style={{ padding: 24 }}>{open.isError ? `Не удалось открыть карточку: ${open.error.message}` : 'Открытие карточки…'}</p></div>;
 }
 
+/** Разговор с ИИ-заявителем (п. 1.4): звонок принимается один раз при открытии карточки по входящему вызову
+ *  и остаётся на экране после сохранения — оператор может договорить и завершить. */
+function IncomingCallDock({ callId, cardId, aon }: { callId: string; cardId: string; aon: string }) {
+  const [ready, setReady] = useState(false);
+  const [open, setOpen] = useState(true);
+  const answered = useRef(false);
+  useEffect(() => {
+    if (answered.current) return;
+    answered.current = true;
+    answerCall(callId, cardId).finally(() => setReady(true));
+  }, [callId, cardId]);
+  if (!ready || !open) return null;
+  return <CallPanel callId={callId} title={`Заявитель · ${aon}`} subtitle="Уточните адрес, что случилось, пострадавших, ФИО" partyName="Заявитель" onClose={() => setOpen(false)} />;
+}
+
 export function Card112Page() {
   const { id } = useParams();
+  const [params] = useSearchParams();
   const card = useCard(id);
   const me = useMe().data!;
   if (card.isPending) return <div className="arm112" />;
   if (card.isError) return <div className="arm112"><p className="arm-empty" style={{ padding: 24 }}>{card.error.message}</p></div>;
+  const callId = params.get('call');
+  const dock = callId && card.data.author_id === me.user_id
+    ? <IncomingCallDock callId={callId} cardId={card.data.id} aon={card.data.data.phones?.aon ?? ''} />
+    : null;
   const editable = card.data.status === 'draft' && card.data.author_id === me.user_id;
   // сохранённая карточка — экран просмотра (п. 1.3); чужой черновик преподаватель видит в раскладке заполнения
-  if (card.data.status !== 'draft') return <CardViewer key={card.data.id} view={card.data} me={me} />;
-  return <CardEditor key={`${card.data.id}:${card.data.status}`} view={card.data} editable={editable} me={me} />;
+  if (card.data.status !== 'draft') return <>{<CardViewer key={card.data.id} view={card.data} me={me} />}{dock}</>;
+  return <>{<CardEditor key={`${card.data.id}:${card.data.status}`} view={card.data} editable={editable} me={me} />}{dock}</>;
 }
 
 type ModalKind = null | 'services' | 'save' | 'close' | 'new' | 'no_contact' | 'call_dropped';

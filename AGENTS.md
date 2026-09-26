@@ -101,6 +101,13 @@ cd backend && uv run python -m aiskra.cli create-user --login admin --full-name 
 - **API:** `GET /api/v1/incidents/dds/{service}/journal`, `GET …/cards/{id}` (с `next_statuses`), `POST …/cards/{id}/received`, `POST …/cards/{id}/status`.
 - **Правила статусов** — `modules/incidents/domain/dds.py` (`NEXT`, `check_transition`). Очередь ДДС = `card_services` сохранённых карточек; `dds_queue_items` — для потока по расписанию (4.2).
 
+## Сценарии, ИИ-собеседники, звонки (п. 3.2, 3.3, 1.4, 2.3) — что уже есть
+- **Модуль `training`:** `domain/scenario.py` (легенда + эталоны, офлайн-легенда), `domain/actors.py` (офлайн-агенты), `domain/call.py`; `application/actors.py` (агенты поверх `ModelRouter`, при `fake` или ошибке модели — офлайн), `commands/scenarios.py`, `commands/calls.py`.
+- **Промпты:** `aiskra/ai/prompts/<task>/v1.md` (`scenario_generation`, `applicant_actor`, `brigade_actor`, `service_actor`), загрузка — `aiskra.ai.prompts.load_prompt`.
+- **Связь модулей:** `aiskra/integration/training_sources.py` реализует порты `training` через `dictionaries` и `incidents` (модули друг друга не импортируют).
+- **API:** `/api/v1/training/scenarios…`, `/training/calls/incoming`, `/calls/dds`, `/calls/{id}/answer|replicas|end`, `/training/cards/{id}/calls`. CLI `generate-scenarios --count N`.
+- **Фронт:** входящий вызов — `pages/journal/JournalPage.tsx`; панель разговора — `shared/ui/CallPanel.tsx`; софтфон ДДС — `pages/dds/DdsSoftphone.tsx`.
+
 ## Рецепты
 **Новая команда** (пример: `SaveCard` в `incidents`):
 1. `modules/incidents/application/commands/save_card.py` — `@dataclass(frozen=True, kw_only=True) class SaveCard(Command)` и `class SaveCardHandler` с зависимостями-портами в `__init__` и `async __call__(cmd) -> Result`.

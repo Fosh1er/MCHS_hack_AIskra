@@ -1,0 +1,95 @@
+"""Запросы звонков (п. 1.4, 2.3): звонок с репликами и журнал звонков по карточке (для ДДС и оценки 3.4)."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import datetime
+from uuid import UUID
+
+from aiskra.modules.training.application.ports.scenarios import CallRepository
+from aiskra.modules.training.domain.call import Call
+from aiskra.shared.application import Query
+from aiskra.shared.errors import NotFoundError
+from aiskra.shared.security import Permission, Principal
+
+
+@dataclass(frozen=True)
+class MessageView:
+    speaker: str
+    text: str
+    at: datetime
+
+
+@dataclass(frozen=True)
+class CallView:
+    id: UUID
+    role: str
+    party: str
+    direction: str
+    status: str
+    aon: str
+    card_id: UUID | None
+    service_code: str | None
+    target_service: str | None
+    started_at: datetime
+    answered_at: datetime | None
+    ended_at: datetime | None
+    messages: list[MessageView]
+
+
+def _visible(call: Call | None, actor: Principal) -> bool:
+    return call is not None and (call.student_id == actor.user_id or actor.can(Permission.RESULTS_READ_ALL))
+
+
+async def _view(repo: CallRepository, call: Call, with_messages: bool = True) -> CallView:
+    messages = await repo.messages(call.id) if with_messages else []
+    return CallView(
+        id=call.id,
+        role=call.role,
+        party=call.party.value,
+        direction=call.direction,
+        status=call.status.value,
+        aon=call.aon,
+        card_id=call.card_id,
+        service_code=call.service_code,
+        target_service=call.target_service,
+        started_at=call.started_at,
+        answered_at=call.answered_at,
+        ended_at=call.ended_at,
+        messages=[MessageView(speaker=m.speaker.value, text=m.text, at=m.at) for m in messages],
+    )
+
+
+@dataclass(frozen=True, kw_only=True)
+class GetCall(Query):
+    actor: Principal
+    call_id: UUID
+
+
+class GetCallHandler:
+    def __init__(self, repo: CallRepository) -> None:
+        self._repo = repo
+
+    async def __call__(self, q: GetCall) -> CallView:
+        call = await self._repo.get(q.call_id)
+        if call is None or not _visible(call, q.actor):
+            raise NotFoundError("Звонок не найден", code="call_not_found")
+        return await _view(self._repo, call)
+
+
+@dataclass(frozen=True, kw_only=True)
+class CardCalls(Query):
+    actor: Principal
+    card_id: UUID
+
+
+class CardCallsHandler:
+    """Журнал звонков по карточке: свои — обучающемуся, все — преподавателю."""
+
+    def __init__(self, repo: CallRepository) -> None:
+        self._repo = repo
+
+    async def __call__(self, q: CardCalls) -> list[CallView]:
+        student = None if q.actor.can(Permission.RESULTS_READ_ALL) else q.actor.user_id
+        calls = await self._repo.calls_of_card(q.card_id, student)
+        return [await _view(self._repo, c) for c in calls]

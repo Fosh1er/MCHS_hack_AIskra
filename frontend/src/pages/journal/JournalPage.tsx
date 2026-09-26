@@ -2,10 +2,11 @@
  *  Обучающийся видит свои карточки, преподаватель — все (сервер). Автообновление — опрос раз в 5 с. */
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Icon } from '@smena112/ui-kit';
+import { Icon, IncomingCall } from '@smena112/ui-kit';
 import { PERMISSIONS, useMe } from '../../shared/api/auth';
 import { useCardTypes } from '../../shared/api/dictionaries';
-import { CARD_STATUS, useJournal, type JournalQuery, type JournalRow } from '../../shared/api/incidents';
+import { CARD_STATUS, useJournal, useOpenCard, type JournalQuery, type JournalRow } from '../../shared/api/incidents';
+import { endCall, startIncomingCall, type CallStarted } from '../../shared/api/training';
 import { ArmTopBar } from '../../shared/ui/ArmTopBar';
 import { ARM_MENU } from '../../shared/ui/armMenu';
 import { useHotkeys } from '../card112/useHotkeys';
@@ -127,6 +128,37 @@ export function JournalPage() {
 
   useHotkeys({}, canCreate ? { Insert: () => navigate('/arm/112') } : {});
 
+  // --- учебные входящие вызовы (п. 1.4): по кнопке или потоком
+  const openCard = useOpenCard();
+  const [ring, setRing] = useState<CallStarted | null>(null);
+  const [ringError, setRingError] = useState('');
+  const [stream, setStream] = useState(false);
+  const ringing = useRef(false);
+  const callIn = async () => {
+    if (ringing.current) return;
+    ringing.current = true;
+    setRingError('');
+    try { setRing(await startIncomingCall()); } catch (e) { setRingError((e as Error).message); ringing.current = false; }
+  };
+  useEffect(() => {
+    if (!stream || ring) return;
+    const t = setTimeout(() => { void callIn(); }, 15_000 + Math.random() * 20_000);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stream, ring]);
+  const answer = () => {
+    if (!ring) return;
+    openCard.mutate(
+      { aon: ring.aon, channel: ring.channel, scenario_id: ring.scenario_id },
+      { onSuccess: (c) => navigate(`/arm/112/${c.id}?call=${ring.call_id}`) },
+    );
+  };
+  const reject = () => {
+    if (ring) void endCall(ring.call_id);
+    setRing(null);
+    ringing.current = false;
+  };
+
   return (
     <div className="arm-journal" style={{ minHeight: '100vh' }}>
       <div className="arm-search">
@@ -142,7 +174,12 @@ export function JournalPage() {
             </button>
             <span style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
               {canCreate && (
-                <button type="button" className="arm-newcard" onClick={() => navigate('/arm/112')}>создать новую карточку (insert)</button>
+                <>
+                  <button type="button" className="arm-newcard arm-newcard--call" onClick={() => { void callIn(); }} disabled={!!ring}>
+                    <Icon name="phone" size="xs" /> учебный вызов
+                  </button>
+                  <button type="button" className="arm-newcard" onClick={() => navigate('/arm/112')}>создать новую карточку (insert)</button>
+                </>
               )}
               <button type="button" className="arm-search__reset" onClick={reset}>сбросить</button>
             </span>
@@ -161,6 +198,12 @@ export function JournalPage() {
         <ArmTopBar me={me} menu={ARM_MENU} />
       </div>
 
+      {ring && (
+        <div className="call-ring">
+          <IncomingCall who={`Входящий звонок с номера ${ring.aon}`} sub="Учебный вызов · ответьте, откроется карточка" onAnswer={answer} onReject={reject} />
+        </div>
+      )}
+      {ringError && <div className="arm112-banner" role="alert" onClick={() => setRingError('')}><b>Вызов не поступил</b><ul><li>{ringError}</li></ul></div>}
       <div className="arm-list">
         <div className="arm-list__head">
           <div className="arm-list__title">Список происшествий <Icon name="expand_less" size="sm" /></div>
@@ -169,6 +212,7 @@ export function JournalPage() {
             <Switch label="уведомление" checked={notify} onChange={setNotify} />
             <Switch label="автообновление" checked={autoRefresh} onChange={setAutoRefresh} />
             <Switch label="обращения в очереди" checked={queue} onChange={(v) => { setQueue(v); setPage(1); }} />
+            {canCreate && <Switch label="поток вызовов" checked={stream} onChange={setStream} />}
             <select className="arm-list__filter" aria-label="Выберите что показывать" value={filter} onChange={(e) => { setFilter(e.target.value); setPage(1); }}>
               <option value="" disabled hidden>выберите что показывать</option>
               {FILTERS.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}

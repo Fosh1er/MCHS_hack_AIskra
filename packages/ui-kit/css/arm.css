@@ -1056,3 +1056,36 @@
 .dds-waiting { margin-left: 14px; padding: 2px 10px; background: var(--accent-112); font-size: var(--fs-sm); font-weight: var(--fw-medium); }
 .dds-editor { position: absolute; left: 90px; right: auto; bottom: calc(100% + 4px); z-index: var(--z-popover); min-width: 820px; flex-wrap: wrap; }
 .dds-editor__err { flex-basis: 100%; color: #c0461f; font-size: var(--fs-xs); }
+
+/* ==========================================================================
+   Учебные звонки (п. 1.4, 2.3): входящий вызов, панель разговора, IP-телефон ДДС (РТУ Т16Р)
+   ========================================================================== */
+.call-ring { position: fixed; z-index: var(--z-modal); top: 18px; left: 50%; transform: translateX(-50%); width: min(560px, calc(100vw - 32px)); box-shadow: var(--shadow-popover); }
+.call-panel {
+  position: fixed; z-index: var(--z-popover); right: 16px; bottom: calc(var(--arm-svcbar-h, 80px) + 12px);
+  width: min(400px, calc(100vw - 32px)); height: min(460px, calc(100vh - 220px));
+  display: flex; flex-direction: column; box-shadow: var(--shadow-popover);
+}
+.call-panel__timer { font-variant-numeric: tabular-nums; color: var(--text-inverse-muted); }
+.call-panel__sub { font-size: var(--fs-xs); color: var(--text-inverse-muted); }
+.call-panel__err { color: #ffb4a0; font-size: var(--fs-xs); margin-top: 6px; }
+.call-panel__actions { display: flex; justify-content: space-between; align-items: center; color: var(--text-inverse); font-size: var(--fs-sm); }
+.call-panel__end { display: inline-flex; gap: 6px; align-items: center; height: 32px; padding: 0 14px; border: 0; background: var(--s-critical); color: var(--text-inverse); font-weight: var(--fw-bold); cursor: pointer; }
+.call-panel__close { height: 32px; padding: 0 14px; border: 1px solid var(--c-mist-100); background: transparent; color: var(--text-inverse); cursor: pointer; }
+.arm-newcard--call { display: inline-flex; gap: 4px; align-items: center; background: var(--accent); }
+.arm-newcard:disabled { opacity: .6; cursor: default; }
+
+.ipphone { height: auto; max-height: min(520px, calc(100vh - 220px)); }
+.ipphone--collapsed { height: auto; }
+.ipphone__screen { background: #1d2a33; }
+.ipphone__toggle { border: 0; background: none; color: inherit; display: flex; cursor: pointer; padding: 0; }
+.ipphone__keys { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; overflow-y: auto; }
+.ipphone__key { position: relative; display: flex; flex-direction: column; gap: 2px; min-height: 48px; padding: 6px 8px 6px 22px; border: 1px solid rgba(255, 255, 255, .12); background: var(--bg-dark-2); color: var(--text-inverse); text-align: left; cursor: pointer; }
+.ipphone__key:hover:not(:disabled) { border-color: var(--accent); }
+.ipphone__key:disabled { opacity: .5; cursor: default; }
+.ipphone__key small { font-size: var(--fs-2xs); color: var(--text-inverse-muted); }
+.ipphone__led { position: absolute; left: 8px; top: 11px; width: 8px; height: 8px; border-radius: 50%; background: var(--c-grey-500); }
+.ipphone__led--on { background: var(--s-ok); }
+.ipphone__log { font-size: var(--fs-xs); color: var(--text-inverse); }
+.ipphone__logrow { display: flex; gap: 6px; align-items: center; padding: 3px 0; }
+.ipphone__hang { margin-left: auto; border: 0; background: none; color: #ffb4a0; cursor: pointer; font-size: var(--fs-2xs); }

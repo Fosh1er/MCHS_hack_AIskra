@@ -5,6 +5,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useMe } from '../../shared/api/auth';
 import { useDdsActions, useDdsCard } from '../../shared/api/incidents';
 import { CardViewer } from '../card112/CardViewer';
+import { DdsSoftphone } from './DdsSoftphone';
 
 export function DdsCardPage() {
   const { service = '', id = '' } = useParams();
@@ -22,7 +23,10 @@ export function DdsCardPage() {
 
   if (card.isPending) return <div className="arm112" />;
   if (card.isError) return <div className="arm112"><p className="arm-empty" style={{ padding: 24 }}>{card.error.message}</p></div>;
+  const canCall = card.data.next_statuses.length > 0 || !['added', 'received', 'rejected'].includes(card.data.service_status);
   return (
+    <>
+    {canCall && <DdsSoftphone card={card.data.card} service={service} status={card.data.service_status} />}
     <CardViewer
       key={card.data.card.id}
       view={card.data.card}
@@ -35,5 +39,6 @@ export function DdsCardPage() {
         onClose: () => navigate(`/arm/dds/${encodeURIComponent(service)}`),
       }}
     />
+    </>
   );
 }
