@@ -55,9 +55,15 @@ from aiskra.modules.identity.infrastructure.reader import SqlSessionReader, SqlU
 from aiskra.modules.identity.infrastructure.repositories import SqlSessionRepository, SqlUserRepository
 from aiskra.modules.identity.infrastructure.security import ScryptPasswordHasher, SessionTokenIssuer
 from aiskra.modules.incidents.api import deps as incidents_deps
+from aiskra.modules.incidents.application.commands.add_workout import AddWorkoutHandler
+from aiskra.modules.incidents.application.commands.append_card import AppendCardHandler
+from aiskra.modules.incidents.application.commands.change_card_status import ChangeCardStatusHandler
 from aiskra.modules.incidents.application.commands.open_card import OpenCardHandler
+from aiskra.modules.incidents.application.commands.record_card_view import RecordCardViewHandler
 from aiskra.modules.incidents.application.commands.save_card import SaveCardHandler
+from aiskra.modules.incidents.application.commands.set_card_flags import SetCardFlagsHandler
 from aiskra.modules.incidents.application.queries.get_card import GetCardHandler
+from aiskra.modules.incidents.application.queries.search_journal import SearchJournalHandler
 from aiskra.modules.incidents.infrastructure.reader import SqlCardReader
 from aiskra.modules.incidents.infrastructure.repositories import SqlCardRepository
 from aiskra.modules.system.api import deps as system_deps
@@ -236,6 +242,38 @@ def _wire_incidents(app: FastAPI) -> None:
     ov[incidents_deps.provide_open_card] = open_card
     ov[incidents_deps.provide_save_card] = save_card
     ov[incidents_deps.provide_get_card] = get_card
+
+    # п. 1.3: журнал и работа с сохранённой карточкой
+    def journal(session: Session) -> SearchJournalHandler:
+        return SearchJournalHandler(SqlCardReader(session))
+
+    def change_status(session: Session) -> ChangeCardStatusHandler:
+        return ChangeCardStatusHandler(
+            SqlCardRepository(session), SqlAuditRecorder(session), SqlAlchemyUnitOfWork(session), clock
+        )
+
+    def set_flags(session: Session) -> SetCardFlagsHandler:
+        return SetCardFlagsHandler(SqlCardRepository(session), SqlAuditRecorder(session), SqlAlchemyUnitOfWork(session))
+
+    def append(session: Session) -> AppendCardHandler:
+        return AppendCardHandler(SqlCardRepository(session), SqlAuditRecorder(session), SqlAlchemyUnitOfWork(session))
+
+    def add_workout(session: Session) -> AddWorkoutHandler:
+        return AddWorkoutHandler(
+            SqlCardRepository(session), SqlAuditRecorder(session), SqlAlchemyUnitOfWork(session), clock
+        )
+
+    def record_view(session: Session) -> RecordCardViewHandler:
+        return RecordCardViewHandler(
+            SqlCardRepository(session), SqlAuditRecorder(session), SqlAlchemyUnitOfWork(session)
+        )
+
+    ov[incidents_deps.provide_search_journal] = journal
+    ov[incidents_deps.provide_change_status] = change_status
+    ov[incidents_deps.provide_set_flags] = set_flags
+    ov[incidents_deps.provide_append] = append
+    ov[incidents_deps.provide_add_workout] = add_workout
+    ov[incidents_deps.provide_record_view] = record_view
 
 
 def wire(app: FastAPI, services: Services) -> None:

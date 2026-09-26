@@ -119,3 +119,44 @@ class CardSavedOut(BaseModel):
     saved_at: datetime
     processing_ms: int
     services: list[CardServiceOut]
+
+
+# ------------------------------------------------------------------ п. 1.3: после сохранения
+
+
+class CardFlagsIn(_Strict):
+    emergency: bool
+    incident: bool
+
+
+class AppendIn(_Strict):
+    fields: dict[str, str] = Field(
+        default_factory=dict, description="Только пустые поля: applicant.name, phones.*, address.*"
+    )
+    description_add: str = Field(default="", max_length=DESCRIPTION_MAX)
+    victims_count: int | None = Field(default=None, ge=0, le=10_000)
+
+
+class WorkoutIn(_Strict):
+    service_code: str | None = Field(default=None, max_length=64)
+    target: str = Field(default="", max_length=255, description="Адресат, если это не служба: «экипаж», «заявитель»")
+    called_to: str = Field(default="", max_length=255)
+    phone: str = Field(default="", max_length=32)
+    receiver: str = Field(default="", max_length=255)
+    message: str = Field(max_length=1000)
+
+
+class StatusCommentIn(_Strict):
+    comment: str = Field(default="", max_length=500)
+
+
+class StatusOut(BaseModel):
+    status: str
+
+
+class ChangedOut(BaseModel):
+    changed: list[str]
+
+
+class CreatedOut(BaseModel):
+    id: UUID

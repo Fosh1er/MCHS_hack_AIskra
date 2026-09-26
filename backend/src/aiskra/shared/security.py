@@ -48,6 +48,7 @@ class Permission(StrEnum):
     LESSONS_CONDUCT = "lessons.conduct"
     RESULTS_READ_ALL = "results.read_all"
     RESULTS_OVERRIDE = "results.override"
+    CARDS_CHECK = "cards.check"  # «Проверена» / «Вернуть на доработку» — главный специалист (п. 1.3)
     # обучающийся (пункты 1.x, 2.x, 5.1)
     TRAINING_PARTICIPATE = "training.participate"
     RESULTS_READ_OWN = "results.read_own"
@@ -70,6 +71,7 @@ ROLE_PERMISSIONS: Mapping[Role, frozenset[Permission]] = {
             Permission.LESSONS_CONDUCT,
             Permission.RESULTS_READ_ALL,
             Permission.RESULTS_OVERRIDE,
+            Permission.CARDS_CHECK,
         }
     ),
     Role.STUDENT: frozenset(

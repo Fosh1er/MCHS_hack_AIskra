@@ -57,7 +57,7 @@ class SaveCardHandler:
         card.save(data, cmd.services, self._clock.now())
         assert card.saved_at is not None and card.processing_ms is not None
         try:
-            await self._cards.save(card)
+            await self._cards.register(card)
             await self._audit.record(
                 AuditEntry(
                     event=AuditEvent.CARD_SAVED,
