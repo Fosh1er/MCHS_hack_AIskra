@@ -118,6 +118,11 @@ from aiskra.modules.training.application.commands.calls import (
     StartDdsCallHandler,
     StartIncomingCallHandler,
 )
+from aiskra.modules.training.application.commands.materials import (
+    DeleteMaterialHandler,
+    UpdateMaterialHandler,
+    UploadMaterialHandler,
+)
 from aiskra.modules.training.application.commands.scenarios import (
     EditScenarioHandler,
     GenerateScenariosHandler,
@@ -130,6 +135,7 @@ from aiskra.modules.training.application.commands.sessions import (
     FeedDdsCardHandler,
 )
 from aiskra.modules.training.application.queries.calls import CardCallsHandler, GetCallHandler
+from aiskra.modules.training.application.queries.materials import GetMaterialHandler, ListMaterialsHandler
 from aiskra.modules.training.application.queries.scenarios import (
     GetScenarioHandler,
     ListScenariosHandler,
@@ -143,6 +149,12 @@ from aiskra.modules.training.application.queries.sessions import (
     MySessionHandler,
     MySessionsHandler,
     SessionMonitorHandler,
+)
+from aiskra.modules.training.infrastructure.materials import (
+    DocumentTextExtractor,
+    LocalFileStorage,
+    SqlMaterialContext,
+    SqlMaterialRepository,
 )
 from aiskra.modules.training.infrastructure.repositories import SqlCallRepository, SqlScenarioRepository
 from aiskra.modules.training.infrastructure.sessions import SqlSessionRepository as SqlTrainingSessionRepository
@@ -397,7 +409,7 @@ def _wire_incidents(app: FastAPI) -> None:
 
 def build_generate_handler(router: ModelRouter, session: AsyncSession) -> GenerateScenariosHandler:
     return GenerateScenariosHandler(
-        ScenarioGenerator(DictionaryScenarioFacts(session), router),
+        ScenarioGenerator(DictionaryScenarioFacts(session), router, SqlMaterialContext(session)),
         SqlScenarioRepository(session),
         SqlAuditRecorder(session),
         SqlAlchemyUnitOfWork(session),
@@ -436,7 +448,8 @@ def _wire_training(app: FastAPI, services: Services) -> None:
 
     def incoming(session: Session) -> StartIncomingCallHandler:
         return StartIncomingCallHandler(
-            *call_parts(session), generator=ScenarioGenerator(DictionaryScenarioFacts(session), router)
+            *call_parts(session),
+            generator=ScenarioGenerator(DictionaryScenarioFacts(session), router, SqlMaterialContext(session)),
         )
 
     def answer(session: Session) -> AnswerCallHandler:
@@ -545,6 +558,50 @@ def _wire_sessions(app: FastAPI, services: Services) -> None:
     ov[training_deps.provide_students] = students
     ov[training_deps.provide_session_defaults] = session_defaults
     ov[training_deps.provide_my_sessions] = my_sessions
+    _wire_materials(app, services)
+
+
+def build_upload_material_handler(settings: Settings, session: AsyncSession) -> UploadMaterialHandler:
+    return UploadMaterialHandler(
+        SqlMaterialRepository(session),
+        LocalFileStorage(settings.materials_dir),
+        DocumentTextExtractor(),
+        SqlAuditRecorder(session),
+        SqlAlchemyUnitOfWork(session),
+        SystemClock(),
+    )
+
+
+def _wire_materials(app: FastAPI, services: Services) -> None:
+    """п. 4.4: учебные материалы."""
+    ov = app.dependency_overrides
+    storage = LocalFileStorage(services.settings.materials_dir)
+
+    def upload(session: Session) -> UploadMaterialHandler:
+        return build_upload_material_handler(services.settings, session)
+
+    def update(session: Session) -> UpdateMaterialHandler:
+        return UpdateMaterialHandler(
+            SqlMaterialRepository(session), SqlAuditRecorder(session), SqlAlchemyUnitOfWork(session)
+        )
+
+    def remove(session: Session) -> DeleteMaterialHandler:
+        return DeleteMaterialHandler(
+            SqlMaterialRepository(session), storage, SqlAuditRecorder(session), SqlAlchemyUnitOfWork(session)
+        )
+
+    def list_(session: Session) -> ListMaterialsHandler:
+        return ListMaterialsHandler(SqlMaterialRepository(session))
+
+    def get(session: Session) -> GetMaterialHandler:
+        return GetMaterialHandler(SqlMaterialRepository(session))
+
+    ov[training_deps.provide_upload_material] = upload
+    ov[training_deps.provide_update_material] = update
+    ov[training_deps.provide_delete_material] = remove
+    ov[training_deps.provide_list_materials] = list_
+    ov[training_deps.provide_get_material] = get
+    ov[training_deps.provide_material_files] = lambda: storage
 
 
 def _wire_assessment(app: FastAPI, services: Services) -> None:

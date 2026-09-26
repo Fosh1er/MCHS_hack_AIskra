@@ -20,7 +20,10 @@ class Settings(BaseSettings):
     cors_origins: list[str] = ["http://localhost:5173", "http://localhost:8080"]
     api_prefix: str = "/api/v1"
     data_dir: str = str(_REPO_ROOT / "data")
-    backup_dir: str = str(_REPO_ROOT / "var" / "backups")  # резервные копии (п. 5.2); в docker — том backups
+    backup_dir: str = str(_REPO_ROOT / "var" / "backups")
+    materials_dir: str = str(
+        _REPO_ROOT / "var" / "materials"
+    )  # учебные материалы (п. 4.4); в docker — том materials  # резервные копии (п. 5.2); в docker — том backups
 
     # Вход и сессии (п. 0.3, ADR-0010)
     session_cookie_name: str = "aiskra_session"

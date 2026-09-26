@@ -19,6 +19,7 @@ from aiskra.ai.ports import ChatMessage
 from aiskra.ai.prompts import load_prompt
 from aiskra.ai.router import ModelRouter
 from aiskra.ai.tasks import AITask
+from aiskra.modules.training.application.ports.materials import MaterialContext
 from aiskra.modules.training.application.ports.scenarios import ScenarioFactsSource, ScenarioRepository
 from aiskra.modules.training.domain.scenario import FLAG_FACTS, Scenario, ScenarioStatus, build_scenario, offline_story
 from aiskra.shared.application import Command, UnitOfWork
@@ -52,9 +53,24 @@ class GenerateScenarios(Command):
 class ScenarioGenerator:
     """Одна генерация без сохранения — используется и командой, и входящим вызовом при пустом банке."""
 
-    def __init__(self, facts: ScenarioFactsSource, router: ModelRouter) -> None:
+    def __init__(
+        self, facts: ScenarioFactsSource, router: ModelRouter, materials: MaterialContext | None = None
+    ) -> None:
         self._facts = facts
         self._router = router
+        self._materials = materials
+
+    async def _with_materials(self, facts: dict[str, object]) -> dict[str, object]:
+        """R4.4-06: выдержки из материалов «для генерации» по типу и признакам — модель согласует с ними легенду."""
+        if self._materials is None:
+            return facts
+        signs = facts.get("признаки")
+        parts = [facts.get("тип"), *(signs if isinstance(signs, list) else [])]
+        query = " ".join(str(x) for x in parts if x)
+        found = await self._materials.snippets(query, limit=3)
+        if not found:
+            return facts
+        return {**facts, "выдержки_из_учебных_материалов": [f"{t}: {p}" for t, p in found]}
 
     async def _story(
         self, incident_facts: Mapping[str, object], fallback: dict[str, str]
@@ -62,6 +78,7 @@ class ScenarioGenerator:
         model = self._router.for_task(AITask.SCENARIO_GENERATION)
         if model.provider_name == "fake":
             return fallback, "offline"
+        incident_facts = await self._with_materials(dict(incident_facts))
         try:
             result = await model.complete(
                 [

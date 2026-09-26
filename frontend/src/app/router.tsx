@@ -9,6 +9,7 @@ import { DdsCardPage } from '../pages/dds/DdsCardPage';
 import { DdsJournalPage } from '../pages/dds/DdsJournalPage';
 import { DdsSelectPage } from '../pages/dds/DdsSelectPage';
 import { ScenariosPage } from '../pages/teacher/ScenariosPage';
+import { MaterialsPage } from '../pages/teacher/MaterialsPage';
 import { SessionsPage } from '../pages/teacher/SessionsPage';
 import { SessionMonitorPage } from '../pages/teacher/SessionMonitorPage';
 import { SessionReportPage } from '../pages/teacher/SessionReportPage';
@@ -35,6 +36,7 @@ export const router = createBrowserRouter([
   { path: '/dev/ai', element: <RequireAuth permission={PERMISSIONS.systemManage}><AiDiagnosticsPage /></RequireAuth> },
   { path: '/teacher', element: <RequireAuth permission={PERMISSIONS.lessonsConduct}><RoleHomePage /></RequireAuth> },
   { path: '/teacher/scenarios', element: <RequireAuth permission={PERMISSIONS.lessonsConduct}><ScenariosPage /></RequireAuth> },
+  { path: '/teacher/materials', element: <RequireAuth anyOf={[PERMISSIONS.scenariosManage, PERMISSIONS.systemManage]}><MaterialsPage /></RequireAuth> },
   { path: '/teacher/sessions', element: <RequireAuth permission={PERMISSIONS.lessonsConduct}><SessionsPage /></RequireAuth> },
   { path: '/teacher/sessions/:id', element: <RequireAuth permission={PERMISSIONS.lessonsConduct}><SessionMonitorPage /></RequireAuth> },
   { path: '/teacher/sessions/:id/report', element: <RequireAuth permission={PERMISSIONS.lessonsConduct}><SessionReportPage /></RequireAuth> },

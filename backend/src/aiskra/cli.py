@@ -9,6 +9,8 @@ uv run python -m aiskra.cli create-user --login ivanov --role student --full-nam
 uv run python -m aiskra.cli ensure-admin             # администратор из AISKRA_BOOTSTRAP_ADMIN_* (п. 0.3);
                                                      # без пароля в окружении ничего не делает
 uv run python -m aiskra.cli create-schema            # создать таблицы без Alembic (только для SQLite-демо)
+uv run python -m aiskra.cli import-materials FILE... --kind instruction --as admin --prompts
+                                                     # учебные материалы (п. 4.4) от имени пользователя
 """
 
 from __future__ import annotations
@@ -28,6 +30,7 @@ from aiskra.bootstrap import (
     build_import_addresses_handler,
     build_import_handler,
     build_services,
+    build_upload_material_handler,
 )
 from aiskra.modules.dictionaries.application.commands.import_addresses import ImportAddresses
 from aiskra.modules.dictionaries.application.commands.import_dictionaries import ImportDictionaries
@@ -78,6 +81,50 @@ async def generate_scenarios(
     finally:
         await engine.dispose()
         await services.aclose()
+
+
+async def import_materials(
+    settings: Settings, *, files: list[str], kind: str, login: str, visible: bool, prompts: bool
+) -> None:
+    from pathlib import Path
+    from uuid import uuid4
+
+    from sqlalchemy import select
+
+    from aiskra.modules.identity.infrastructure.models import UserModel
+    from aiskra.modules.training.application.commands.materials import UploadMaterial
+    from aiskra.modules.training.domain.material import MaterialKind
+    from aiskra.shared.security import Principal
+
+    engine = create_engine(settings.database_url)
+    try:
+        async with create_session_factory(engine)() as session:
+            user = (await session.execute(select(UserModel).where(UserModel.login == login))).scalars().first()
+            if user is None:
+                raise SystemExit(f"Пользователь {login} не найден")
+            actor = Principal(
+                user_id=user.id, session_id=uuid4(), login=user.login, full_name=user.full_name, role=Role(user.role)
+            )
+            handler = build_upload_material_handler(settings, session)
+            for f in files:
+                path = Path(f)
+                try:
+                    mid = await handler(
+                        UploadMaterial(
+                            actor=actor,
+                            title=path.stem.replace("_", " "),
+                            kind=MaterialKind(kind),
+                            filename=path.name,
+                            data=await asyncio.to_thread(path.read_bytes),
+                            visible=visible,
+                            use_in_prompts=prompts,
+                        )
+                    )
+                    print(f"Загружен: {path.name} → {mid}")
+                except AppError as exc:
+                    print(f"Пропущен {path.name}: {exc.message}")
+    finally:
+        await engine.dispose()
 
 
 async def create_user(
@@ -162,6 +209,12 @@ def main() -> None:
     user.add_argument("--password-env", help="имя переменной окружения с паролем (иначе — интерактивный ввод)")
     sub.add_parser("ensure-admin", help="создать администратора из AISKRA_BOOTSTRAP_ADMIN_*, если его нет")
     sub.add_parser("create-schema", help="создать таблицы напрямую (SQLite/демо; в PostgreSQL — alembic)")
+    mat = sub.add_parser("import-materials", help="загрузить учебные материалы: PDF, DOCX, XLSX, TXT (п. 4.4)")
+    mat.add_argument("files", nargs="+")
+    mat.add_argument("--kind", default="other", choices=["instruction", "memo", "classifier", "regulation", "other"])
+    mat.add_argument("--as", dest="login", default="admin", help="от чьего имени (логин), пишется в аудит")
+    mat.add_argument("--hidden", action="store_true", help="не публиковать обучающимся")
+    mat.add_argument("--prompts", action="store_true", help="использовать выдержки в генерации сценариев")
     args = parser.parse_args()
     settings = Settings()
     try:
@@ -191,6 +244,17 @@ def main() -> None:
             asyncio.run(ensure_admin(settings))
         elif args.cmd == "create-schema":
             asyncio.run(create_schema(settings))
+        elif args.cmd == "import-materials":
+            asyncio.run(
+                import_materials(
+                    settings,
+                    files=args.files,
+                    kind=args.kind,
+                    login=args.login,
+                    visible=not args.hidden,
+                    prompts=args.prompts,
+                )
+            )
     except AppError as exc:
         sys.exit(f"Ошибка: {exc.message}")
 

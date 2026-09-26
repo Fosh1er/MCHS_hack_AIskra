@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { CabinetShell } from './CabinetShell';
 
 export { initials } from './CabinetShell';
-export type TeacherSection = 'home' | 'scenarios' | 'sessions' | 'journal' | 'dds';
+export type TeacherSection = 'home' | 'scenarios' | 'sessions' | 'materials' | 'journal' | 'dds';
 
 export function TeacherShell(p: {
   active: TeacherSection; title: string; subtitle?: string; crumbs?: string; actions?: ReactNode; children: ReactNode;

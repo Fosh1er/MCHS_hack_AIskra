@@ -24,10 +24,12 @@ services:
       AISKRA_DATABASE_URL: postgresql+asyncpg://aiskra:${POSTGRES_PASSWORD:-aiskra}@db:5432/aiskra
       AISKRA_AI_CONFIG_PATH: /app/config/ai.yaml
       AISKRA_BACKUP_DIR: /app/backups
+      AISKRA_MATERIALS_DIR: /app/materials
     volumes:
       - ./config:/app/config:ro
       - ./data:/app/data:ro
       - backups:/app/backups   # резервные копии (п. 5.2)
+      - materials:/app/materials   # учебные материалы (п. 4.4)
     ports: ["8000:8000"]
     depends_on:
       db: {condition: service_healthy}
@@ -53,3 +55,4 @@ volumes:
   pgdata:
   ollama:
   backups:
+  materials:

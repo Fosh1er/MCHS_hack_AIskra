@@ -40,6 +40,7 @@ def make_settings(db_path: Path) -> Settings:
         database_url=f"sqlite+aiosqlite:///{db_path}",
         data_dir=str(REPO / "data"),
         backup_dir=str(db_path.parent / "backups"),
+        materials_dir=str(db_path.parent / "materials"),
         ai_config_path=str(REPO / "config" / "absent.yaml"),
         password_scrypt_n=1024,  # быстрее в тестах; в проде — 2**14
         login_max_attempts=3,
