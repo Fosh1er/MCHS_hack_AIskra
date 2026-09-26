@@ -241,7 +241,7 @@
 }
 .arm-svc__caret { color: var(--text-inverse); opacity: .9; }
 .arm-svc__name { max-width: 100%; font-size: var(--fs-md); font-weight: var(--fw-bold); }
-.arm-svc__status { font-size: var(--fs-xs); color: var(--text-inverse-muted); white-space: nowrap; }
+.arm-svc__status { font-size: var(--fs-xs); color: var(--text-inverse-muted); white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 .arm-svc--main .arm-svc__name { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 3px; }
 .arm-svc--nointegr { background: var(--c-grey-500); }
 .arm-svc--mine { background: var(--accent); }
@@ -740,8 +740,16 @@
 .arm-pager select { border: 0; background: transparent; color: inherit; font: inherit; }
 .arm-pager button { border: 0; background: none; color: inherit; display: flex; cursor: pointer; }
 .arm-pager button:disabled { opacity: .35; cursor: default; }
+.arm-audit__row { display: flex; gap: 24px; align-items: flex-end; }
+.arm-audit__row .arm-search__input { flex: 1 1 auto; min-width: 0; }
+.arm-audit__row select { min-width: 200px; max-width: 100%; }
 @media (max-width: 900px) {
   .arm-search { grid-template-columns: 1fr; }
+  .arm-search > * { min-width: 0; }
+  .arm-search__input { font-size: var(--fs-2xl); box-sizing: border-box; }
+  .arm-audit__row { flex-wrap: wrap; gap: 10px; }
+  .arm-audit__row .arm-search__input { flex-basis: 100%; }
+  .arm-audit__row select { min-width: 0; flex: 1 1 auto; }
   .arm-menu { overflow-x: auto; }
   .arm-list { overflow-x: auto; }
   .arm-agrid { min-width: 900px; }
@@ -941,6 +949,10 @@
   grid-template-columns: var(--cols);
   column-gap: 1px;
 }
+/* планшет горизонтально, 1024 (6.3): плотнее служебные колонки, адрес и описание переносятся */
+@media (max-width: 1180px) {
+  .arm-j112 { --cols: 28px 40px 28px 28px 28px 48px 40px 74px 66px 56px minmax(110px, 1.2fr) 50px 112px minmax(140px, 1.6fr) 66px; font-size: 13px; }
+}
 .arm-j112.arm-jhead > div:nth-child(n+6) { text-align: center; }
 .arm-j112.arm-jhead > div:nth-child(11), .arm-j112.arm-jhead > div:nth-child(13), .arm-j112.arm-jhead > div:nth-child(14) { text-align: left; }
 .arm-j112 .c-type { cursor: pointer; }
@@ -1136,4 +1148,19 @@ body:has(.dds-editor) .ipphone > .arm-dock__section:not(.ipphone__screen) { disp
   display: flex; align-items: center; gap: 8px; max-width: min(720px, calc(100vw - 32px));
   padding: 8px 14px; font-size: 14px; background: #fff3cd; color: #5c4400; border: 1px solid #f0c36d;
   box-shadow: 0 2px 8px rgba(0, 0, 0, .15);
+}
+
+/* ---- Эмулятор АРМ на узком экране (п. 6.3) ---------------------------------------------------- */
+.arm-guard { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px 16px; background: var(--bg-canvas); }
+.arm-guard__box { max-width: 460px; background: var(--bg-panel); padding: 24px 20px; color: var(--text-strong); display: flex; flex-direction: column; gap: 10px; }
+.arm-guard__box h1 { margin: 0; font-size: 22px; font-weight: 400; line-height: 1.2; }
+.arm-guard__box p { margin: 0; font-size: 15px; line-height: 1.45; color: var(--text); }
+.arm-guard__actions { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.arm-guard__primary, .arm-guard__secondary { font: inherit; font-size: 15px; padding: 10px 14px; border: 1px solid var(--accent); cursor: pointer; }
+.arm-guard__primary { background: var(--accent); color: var(--text-inverse); }
+.arm-guard__secondary { background: transparent; color: var(--accent); }
+
+/* планшет горизонтально (6.3): кнопки шапки журнала растут по высоте, а не обрезают текст */
+@media (max-width: 1180px) {
+  .arm-newcard { height: auto; min-height: 26px; line-height: 1.2; padding-top: 3px; padding-bottom: 3px; }
 }

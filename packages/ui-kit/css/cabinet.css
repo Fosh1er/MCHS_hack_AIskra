@@ -402,7 +402,9 @@
     height: 60px;
     display: grid;
     grid-auto-flow: column;
-    grid-auto-columns: 1fr;
+    grid-auto-columns: minmax(76px, 1fr);  /* все разделы роли; не влезают — панель листается (6.3) */
+    overflow-x: auto;
+    scrollbar-width: none;
     background: var(--bg-dark);
   }
   .cab-tabbar a {
@@ -416,6 +418,23 @@
     font-size: var(--fs-2xs);
   }
   .cab-tabbar a[aria-current="page"] { color: var(--text-inverse); box-shadow: inset 0 3px 0 var(--accent); }
+  .cab-tabbar a span { text-align: center; line-height: 1.1; padding: 0 2px; }
+  /* широкие таблицы листаются внутри карточки, страница — нет (6.3) */
+  .cab-card__body { overflow-x: auto; }
+  .cab-card__body > .cab-table { min-width: 560px; }
+}
+@media (max-width: 600px) {
+  .cab-select, .cab-filters input { max-width: 100%; min-width: 0; }
+  .cab-filters { flex-direction: column; align-items: stretch; }
+  .cab-filters > .cab-seg { max-width: 100%; overflow-x: auto; display: flex; }
+  .cab-seg button { flex: 0 0 auto; }
+  .cab-topbar__main { flex-basis: 100%; }
+  .cab-topbar__actions > * { flex: 0 1 auto; }
+  .cab-card__head { flex-wrap: wrap; gap: 8px; }
+  .cab-kpis { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .tch-dl { grid-template-columns: minmax(0, 1fr); }
+  .tch-dl dt { margin-top: 6px; }
+  .tch-form--grid { grid-template-columns: minmax(0, 1fr); }
 }
 
 /* ---- Кабинет преподавателя (п. 4.1–4.3): формы, легенда, прогон, отчёт ------------------------- */

@@ -75,7 +75,9 @@ export function homeFor(me: Me): string {
   if (me.permissions.includes(PERMISSIONS.systemManage)) return '/admin';
   if (me.permissions.includes(PERMISSIONS.auditRead)) return '/admin/audit';
   if (me.role === 'teacher') return '/teacher';
-  // обучающийся сразу попадает в «Список происшествий», как оператор в АРМ-112 (п. 1.3)
-  if (me.permissions.includes(PERMISSIONS.trainingParticipate)) return '/arm/112/journal';
+  // обучающийся сразу попадает в «Список происшествий», как оператор в АРМ-112 (п. 1.3);
+  // на телефоне эмулятор неудобен (6.3) — в кабинет
+  const narrow = typeof window !== 'undefined' && window.innerWidth < 1000;
+  if (me.permissions.includes(PERMISSIONS.trainingParticipate)) return narrow ? '/student' : '/arm/112/journal';
   return '/student';
 }

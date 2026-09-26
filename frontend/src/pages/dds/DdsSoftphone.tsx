@@ -21,7 +21,8 @@ export function DdsSoftphone({ card, service, status }: { card: CardView; servic
   const calls = useCardCalls(card.id);
   const [active, setActive] = useState<Active | null>(null);
   const [ring, setRing] = useState<string | null>(null); // статус, по которому звонит старший группы
-  const [collapsed, setCollapsed] = useState(false);
+  // на планшете и небольшом ноутбуке (до 1280) панель закрыла бы карточку — по умолчанию свёрнута (6.3)
+  const [collapsed, setCollapsed] = useState(() => window.innerWidth < 1280);
   const [error, setError] = useState('');
   const reported = useRef(new Set<string>());
 

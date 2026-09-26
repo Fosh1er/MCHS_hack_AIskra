@@ -3,6 +3,7 @@
 import { Card, LineChart, StatTile } from '@smena112/ui-kit';
 import { useMyProgress } from '../../shared/api/assessment';
 import { CabinetShell } from '../../shared/ui/CabinetShell';
+import { num } from '../../shared/format';
 
 export function ProgressPage() {
   const q = useMyProgress();
@@ -16,7 +17,7 @@ export function ProgressPage() {
         {d && d.points.length > 0 && (
           <>
             <section className="cab-kpis">
-              <StatTile label="Средний балл" value={d.avg_score ?? '—'} />
+              <StatTile label="Средний балл" value={num(d.avg_score)} />
               <StatTile label="Оценённых работ" value={d.points.length} />
               <StatTile label="Зачтено" value={`${passed} из ${d.points.length}`} />
             </section>
@@ -43,7 +44,7 @@ export function ProgressPage() {
               {d.expert_comments.length > 0 && (
                 <Card title="Комментарии преподавателя">
                   <ul style={{ margin: 0, paddingLeft: 18 }}>
-                    {d.expert_comments.map((c, i) => <li key={i}>Карточка № {c.card_number}: <b>{c.score}</b> — {c.comment}</li>)}
+                    {d.expert_comments.map((c, i) => <li key={i}>Карточка № {c.card_number}: <b>{num(c.score)}</b> — {c.comment}</li>)}
                   </ul>
                 </Card>
               )}

@@ -73,7 +73,7 @@ export function TabBar({ items, activeId, onNavigate }: { items: NavItem[]; acti
       {items.map((it) => (
         <a key={it.id} href={it.href ?? '#'} aria-current={it.id === activeId ? 'page' : undefined}
           onClick={(e) => { if (onNavigate) { e.preventDefault(); onNavigate(it.id); } }}>
-          <Icon name={it.icon} />{it.label}
+          <Icon name={it.icon} /><span>{it.label}</span>
         </a>
       ))}
     </nav>

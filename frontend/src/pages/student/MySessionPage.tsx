@@ -4,6 +4,7 @@ import { useParams } from 'react-router-dom';
 import { Banner, Card, StatTile, StatusPill } from '@smena112/ui-kit';
 import { useMySessionReport } from '../../shared/api/assessment';
 import { CabinetShell } from '../../shared/ui/CabinetShell';
+import { num } from '../../shared/format';
 
 export function MySessionPage() {
   const { id = '' } = useParams();
@@ -17,10 +18,10 @@ export function MySessionPage() {
       {me && (
         <>
           <section className="cab-kpis">
-            <StatTile label="Средний балл" value={me.avg_score ?? '—'} note={`порог ${r!.settings.threshold ?? 70}`} />
+            <StatTile label="Средний балл" value={num(me.avg_score)} note={`порог ${r!.settings.threshold ?? 70}`} />
             <StatTile label="Зачтено" value={me.passed_share === null ? '—' : `${Math.round(me.passed_share * 100)} %`} />
             <StatTile label="Карточек" value={me.cards.length} />
-            <StatTile label="Среднее время" value={me.avg_time_s ?? '—'} unit={me.avg_time_s ? 'с' : undefined} />
+            <StatTile label="Среднее время" value={num(me.avg_time_s)} unit={me.avg_time_s ? 'с' : undefined} />
           </section>
           {me.not_assessed > 0 && <Banner>Не оценено карточек: {me.not_assessed}. Оценку запускает преподаватель.</Banner>}
           {q.data!.recommendations.length > 0 && (
@@ -39,7 +40,7 @@ export function MySessionPage() {
                     </span>
                   )}
                   {c.score !== null
-                    ? <StatusPill status={c.passed ? 'ok' : 'critical'}>{c.score} · {c.passed ? 'зачтено' : 'не зачтено'}</StatusPill>
+                    ? <StatusPill status={c.passed ? 'ok' : 'critical'}>{num(c.score)} · {c.passed ? 'зачтено' : 'не зачтено'}</StatusPill>
                     : <StatusPill status="neutral">не оценена</StatusPill>}
                 </div>
                 {c.expert_comment && <div className="tch-expert">Преподаватель: {c.expert_comment}</div>}

@@ -60,7 +60,7 @@ export function CabinetShell({ kind, active, title, subtitle, crumbs, actions, c
           onLogout={() => logout.mutate(undefined, { onSettled: () => navigate('/', { replace: true }) })} />
       }
       topbar={<Topbar crumbs={crumbs} title={title} subtitle={subtitle} actions={actions} />}
-      tabbar={<TabBar items={nav.items.slice(0, 4)} activeId={active} onNavigate={go} />}
+      tabbar={<TabBar items={nav.items} activeId={active} onNavigate={go} />}
     >
       {children}
     </AppShell>

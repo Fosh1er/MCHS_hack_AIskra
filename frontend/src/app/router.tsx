@@ -24,6 +24,7 @@ import { SettingsPage } from '../pages/admin/SettingsPage';
 import { LogsPage } from '../pages/admin/LogsPage';
 import { PERMISSIONS } from '../shared/api/auth';
 import { RequireAuth } from '../shared/auth/RequireAuth';
+import { ArmScreenGuard } from '../shared/ui/ArmScreenGuard';
 
 export const router = createBrowserRouter([
   { path: '/', element: <LoginPage /> },
@@ -45,13 +46,13 @@ export const router = createBrowserRouter([
   { path: '/student/sessions/:id', element: <RequireAuth permission={PERMISSIONS.trainingParticipate}><MySessionPage /></RequireAuth> },
   { path: '/student/reference', element: <RequireAuth><ReferencePage /></RequireAuth> },
   // журнал: свои карточки — обучающемуся, все — преподавателю (сервер, п. 1.3)
-  { path: '/arm/112/journal', element: <RequireAuth><JournalPage /></RequireAuth> },
-  { path: '/arm/112', element: <RequireAuth permission={PERMISSIONS.trainingParticipate}><Card112NewPage /></RequireAuth> },
+  { path: '/arm/112/journal', element: <ArmScreenGuard><RequireAuth><JournalPage /></RequireAuth></ArmScreenGuard> },
+  { path: '/arm/112', element: <ArmScreenGuard><RequireAuth permission={PERMISSIONS.trainingParticipate}><Card112NewPage /></RequireAuth></ArmScreenGuard> },
   // своя карточка — обучающемуся, любая — преподавателю: права проверяет сервер (GET /incidents/cards/{id})
-  { path: '/arm/112/:id', element: <RequireAuth><Card112Page /></RequireAuth> },
+  { path: '/arm/112/:id', element: <ArmScreenGuard><RequireAuth><Card112Page /></RequireAuth></ArmScreenGuard> },
   // АРМ ДДС (п. 2.1, 2.2): обучающийся работает за выбранную службу, преподаватель смотрит; права — на сервере
-  { path: '/arm/dds', element: <RequireAuth><DdsSelectPage /></RequireAuth> },
-  { path: '/arm/dds/:service', element: <RequireAuth><DdsJournalPage /></RequireAuth> },
-  { path: '/arm/dds/:service/:id', element: <RequireAuth><DdsCardPage /></RequireAuth> },
+  { path: '/arm/dds', element: <ArmScreenGuard><RequireAuth><DdsSelectPage /></RequireAuth></ArmScreenGuard> },
+  { path: '/arm/dds/:service', element: <ArmScreenGuard><RequireAuth><DdsJournalPage /></RequireAuth></ArmScreenGuard> },
+  { path: '/arm/dds/:service/:id', element: <ArmScreenGuard><RequireAuth><DdsCardPage /></RequireAuth></ArmScreenGuard> },
   { path: '*', element: <Navigate to="/" replace /> },
 ]);

@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Icon } from '@smena112/ui-kit';
 import { useAssessment, useEvaluate } from '../api/assessment';
+import { num } from '../format';
 
 export function AssessmentPanel({ cardId, role, service, auto }: { cardId: string; role: '112' | 'dds'; service?: string | null; auto: boolean }) {
   const a = useAssessment(cardId, role, service);
@@ -21,7 +22,7 @@ export function AssessmentPanel({ cardId, role, service, auto }: { cardId: strin
         <button type="button" className="assess__toggle" aria-expanded={open} onClick={() => setOpen(!open)}>
           <Icon name={open ? 'expand_less' : 'expand_more'} size="sm" /> <b>Автооценка{role === 'dds' ? ' работы ДДС' : ''}</b>
         </button>
-        {data && <span className={`assess__score ${data.passed ? 'assess__score--ok' : 'assess__score--bad'}`}>{data.score} / 100 · {data.passed ? 'зачтено' : 'не зачтено'}</span>}
+        {data && <span className={`assess__score ${data.passed ? 'assess__score--ok' : 'assess__score--bad'}`}>{num(data.score)} / 100 · {data.passed ? 'зачтено' : 'не зачтено'}</span>}
         <button type="button" className="arm-minibtn" disabled={evaluate.isPending} onClick={() => evaluate.mutate()}>
           {evaluate.isPending ? 'проверяю…' : data ? 'проверить снова' : 'проверить'}
         </button>
@@ -31,7 +32,7 @@ export function AssessmentPanel({ cardId, role, service, auto }: { cardId: strin
         <>
           {data.details.expert && (
             <p className="assess__expert">
-              <b>Оценка преподавателя: {data.details.expert.score}</b> (автооценка {data.details.expert.auto_score}). {data.details.expert.comment}
+              <b>Оценка преподавателя: {num(data.details.expert.score)}</b> (автооценка {num(data.details.expert.auto_score)}). {data.details.expert.comment}
             </p>
           )}
           {!data.details.has_reference && <p className="assess__note">Карточка заведена без сценария — сравнить с эталоном нельзя, проверено только время.</p>}

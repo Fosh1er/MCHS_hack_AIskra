@@ -6,6 +6,7 @@ import { useServices } from '../../shared/api/dictionaries';
 import { useMyProgress } from '../../shared/api/assessment';
 import { MODE_TITLE, SESSION_STATUS, armFor, useMySessions, type MySessionRow } from '../../shared/api/training';
 import { CabinetShell } from '../../shared/ui/CabinetShell';
+import { num } from '../../shared/format';
 
 function useRole() {
   const services = useServices();
@@ -34,7 +35,7 @@ export function StudentHomePage() {
         <Banner>Сейчас занятий нет. Потренироваться можно в АРМ-112: кнопка «учебный вызов» в журнале.</Banner>
       )}
       <section className="cab-kpis">
-        <StatTile label="Средний балл" value={p?.avg_score ?? '—'} />
+        <StatTile label="Средний балл" value={num(p?.avg_score)} />
         <StatTile label="Оценённых работ" value={p?.points.length ?? 0} />
         <StatTile label="Занятий пройдено" value={finished.length} />
         <StatTile label="Запланировано" value={planned.length} />

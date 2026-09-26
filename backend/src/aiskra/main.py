@@ -7,9 +7,11 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from aiskra.bootstrap import build_services, wire
 from aiskra.modules.assessment.api.router import router as assessment_router
@@ -23,6 +25,7 @@ from aiskra.platform.health import router as health_router
 from aiskra.platform.security_headers import SecurityHeadersMiddleware
 from aiskra.platform.services import Services
 from aiskra.platform.settings import Settings
+from aiskra.platform.validation_ru import translate
 from aiskra.shared.errors import (
     AppError,
     AuthenticationError,
@@ -82,6 +85,21 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
         log.exception("Необработанная ошибка %s %s", request.method, request.url.path)
         return JSONResponse(
             status_code=500, content={"error": "internal_error", "message": "Внутренняя ошибка сервера"}
+        )
+
+    @app.exception_handler(RequestValidationError)
+    async def _invalid(_: Request, exc: RequestValidationError) -> JSONResponse:
+        return JSONResponse(status_code=422, content=translate(list(exc.errors())))
+
+    @app.exception_handler(StarletteHTTPException)
+    async def _http(_: Request, exc: StarletteHTTPException) -> JSONResponse:
+        # «Not Found», «Method Not Allowed» и т. п. — тоже по-русски и в общем формате (6.3)
+        titles = {404: "Не найдено", 405: "Метод не поддерживается", 401: "Требуется вход в систему"}
+        message = titles.get(exc.status_code) or (exc.detail if isinstance(exc.detail, str) else "Ошибка запроса")
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"error": "http_error", "message": message},
+            headers=getattr(exc, "headers", None),
         )
 
     @app.exception_handler(AppError)
