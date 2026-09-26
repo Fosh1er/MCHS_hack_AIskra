@@ -24,6 +24,8 @@ class IncidentCardModel(Base):
     assignment_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("assignments.id"), index=True)
     scenario_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("scenarios.id"))
     author_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
+    operator_number: Mapped[str | None] = mapped_column(String(16))  # «Опер.» в шапке карточки и журнале
+    arm_number: Mapped[str | None] = mapped_column(String(16))  # «АРМ» — номер, введённый при входе
     origin: Mapped[str] = mapped_column(String(16), default="student")  # student | system | scenario
     channel: Mapped[str | None] = mapped_column(String(32))  # сообщение/звонок/СМС
     status: Mapped[str] = mapped_column(String(16), default="draft", index=True)  # draft + enums.card_status

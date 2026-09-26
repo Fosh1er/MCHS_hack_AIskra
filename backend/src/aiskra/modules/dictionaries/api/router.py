@@ -35,6 +35,11 @@ from aiskra.modules.dictionaries.application.queries.reference import (
     ListTerritoryHandler,
     Territory,
 )
+from aiskra.modules.dictionaries.application.queries.resolve_services import (
+    ResolvedServices,
+    ResolveServices,
+    ResolveServicesHandler,
+)
 from aiskra.shared.security import Permission, Principal
 from aiskra.shared.web import Meta, require
 
@@ -104,6 +109,23 @@ async def list_services(
     okrug: str | None = None,
 ) -> list[ServiceRow]:
     return await handler(ListServices(q=q, kinds=kind, okrug=okrug))
+
+
+@router.get(
+    "/services/resolve",
+    response_model=ResolvedServices,
+    summary="Автоподбор служб карточки 112: типы классификатора + признаки + адрес (основа п. 1.5)",
+)
+async def resolve_services(
+    handler: Annotated[ResolveServicesHandler, Depends(deps.provide_resolve_services)],
+    incident_type: Annotated[list[str], Query(description="Конечные типы классификатора")],
+    flag: Annotated[list[str] | None, Query(description="Признаки карточки (enums.card_flag)")] = None,
+    okrug: str | None = None,
+    district: str | None = None,
+) -> ResolvedServices:
+    return await handler(
+        ResolveServices(incident_types=incident_type, flags=flag or [], okrug=okrug, district=district)
+    )
 
 
 @router.get("/territory", response_model=Territory, summary="Округа и районы (поселения) Москвы")

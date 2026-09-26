@@ -2,8 +2,9 @@
 
 Справочники: классификатор происшествий (ЕКП), службы и ДДС с телефонами, округа/районы, каналы связи, статусы заявителя/карточки/ДДС.
 
-- **Пункты плана:** 0.2
-- **Ключевые сценарии:** ImportClassifier; SearchIncidentTypes, GetQuestionnaire, ListServices, SuggestAddress
+- **Пункты плана:** 0.2; автоподбор служб — основа 1.5 (используется карточкой 1.1)
+- **Ключевые сценарии:** ImportDictionaries; SearchCardTypes, GetQuestionnaireTree, SearchIncidentTypes, GetIncidentType, ListServices, ListTerritory, ListEnum, **ResolveServices**
+- **Правило матрицы служб** — `domain/routing.py` (чистая функция, тесты `unit/test_routing.py`); территориальные службы и главная служба — `application/queries/resolve_services.py`; API `GET /dictionaries/services/resolve`.
 
 ## Слои
 | Папка | Что кладём | Можно импортировать |

@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, func, true
 from sqlalchemy.orm import Mapped, mapped_column
 
 from aiskra.platform.db import Base
@@ -77,6 +77,7 @@ class ServiceModel(Base):
     phone: Mapped[str] = mapped_column(String(32))
     phone_synthetic: Mapped[bool] = mapped_column(Boolean, default=True)
     confirmed: Mapped[bool] = mapped_column(Boolean, default=True)
+    integrated: Mapped[bool] = mapped_column(Boolean, default=True, server_default=true())  # подключена к системе 112
     source: Mapped[str] = mapped_column(String(32))
     search_text: Mapped[str] = mapped_column(Text, default="")
     active: Mapped[bool] = mapped_column(Boolean, default=True)

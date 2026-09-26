@@ -8,7 +8,7 @@
 ## Решение
 - **Один backend-сервис**, разбитый на модули по предметным областям: `system`, `identity`, `dictionaries`, `incidents`, `training`, `assessment`, `audit`.
 - **Слои внутри модуля:** `domain` (чистый Python) ← `application` (команды, запросы, порты) ← `infrastructure` и `api` (адаптеры).
-- **Правила зависимостей проверяются автоматически** — `import-linter` в CI (`backend/pyproject.toml`, `[tool.importlinter]`).
+- **Правила зависимостей проверяются автоматически** — `import-linter` в `make be-check` перед каждым коммитом (`backend/pyproject.toml`, `[tool.importlinter]`).
 
 ## Последствия
 - Модули можно развивать параллельно; модуль при необходимости выносится в сервис по своей границе.

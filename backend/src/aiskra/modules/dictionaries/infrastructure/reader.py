@@ -47,6 +47,32 @@ def _type_row(t: IncidentTypeModel, group_title: str) -> IncidentTypeRow:
     )
 
 
+_TERRITORIAL_KINDS = ("district_dds", "prefecture_dds", "okrug_roads")
+
+
+def _service_row(x: ServiceModel) -> ServiceRow:
+    return ServiceRow(
+        code=x.code,
+        short=x.short_name,
+        full=x.full_name,
+        kind=x.kind,
+        okrug=x.okrug_code,
+        district=x.district_code,
+        phone=x.phone,
+        phone_synthetic=x.phone_synthetic,
+        confirmed=x.confirmed,
+        source=x.source,
+        main_codes=list(x.main_codes or []),
+        integrated=x.integrated,
+    )
+
+
+def _district_row(d: DistrictModel) -> DistrictRow:
+    return DistrictRow(
+        code=d.code, name=d.name, okrug=d.okrug_code, kind=d.kind, dds=d.dds_service_code, aliases=list(d.aliases or [])
+    )
+
+
 def _card_row(c: CardTypeModel) -> CardTypeRow:
     return CardTypeRow(
         code=c.code,
@@ -145,21 +171,22 @@ class SqlDictionaryReader:
         if okrug:
             cond.append(ServiceModel.okrug_code == okrug)
         stmt = select(ServiceModel).where(and_(*cond)).order_by(ServiceModel.kind, ServiceModel.short_name).limit(limit)
-        return [
-            ServiceRow(
-                code=x.code,
-                short=x.short_name,
-                full=x.full_name,
-                kind=x.kind,
-                okrug=x.okrug_code,
-                district=x.district_code,
-                phone=x.phone,
-                phone_synthetic=x.phone_synthetic,
-                confirmed=x.confirmed,
-                source=x.source,
-            )
-            for x in (await self._s.execute(stmt)).scalars().all()
-        ]
+        return [_service_row(x) for x in (await self._s.execute(stmt)).scalars().all()]
+
+    async def get_services(self, codes: list[str]) -> list[ServiceRow]:
+        if not codes:
+            return []
+        stmt = select(ServiceModel).where(ServiceModel.code.in_(codes), ServiceModel.active.is_(True))
+        return [_service_row(x) for x in (await self._s.execute(stmt)).scalars().all()]
+
+    async def list_main_services(self) -> list[ServiceRow]:
+        # коды главной службы есть только у служб верхнего уровня (~20 строк) — фильтр в Python переносим между СУБД
+        stmt = select(ServiceModel).where(ServiceModel.active.is_(True), ServiceModel.kind.not_in(_TERRITORIAL_KINDS))
+        return [_service_row(x) for x in (await self._s.execute(stmt)).scalars().all() if x.main_codes]
+
+    async def get_district(self, code: str) -> DistrictRow | None:
+        d = await self._s.get(DistrictModel, code)
+        return _district_row(d) if d is not None and d.active else None
 
     async def list_okrugs(self) -> list[OkrugRow]:
         rows = (await self._s.execute(select(OkrugModel))).scalars().all()
@@ -171,17 +198,7 @@ class SqlDictionaryReader:
         if okrug:
             cond.append(DistrictModel.okrug_code == okrug)
         rows = (await self._s.execute(select(DistrictModel).where(and_(*cond)).order_by(DistrictModel.name))).scalars()
-        return [
-            DistrictRow(
-                code=d.code,
-                name=d.name,
-                okrug=d.okrug_code,
-                kind=d.kind,
-                dds=d.dds_service_code,
-                aliases=list(d.aliases or []),
-            )
-            for d in rows.all()
-        ]
+        return [_district_row(d) for d in rows.all()]
 
     async def list_enum(self, domain: str) -> list[EnumValueRow]:
         stmt = select(EnumValueModel).where(EnumValueModel.domain == domain).order_by(EnumValueModel.sort)

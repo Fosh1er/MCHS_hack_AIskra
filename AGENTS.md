@@ -78,6 +78,12 @@ cd backend && uv run python -m aiskra.cli create-user --login admin --full-name 
 - **Структура карточки 112:** `modules/incidents/domain/card.py:IncidentCardData`.
 - **API:** `/api/v1/dictionaries/*` (см. [спецификацию 0.2](specs/0.2-data-model.md) §6). Таблицы остальных модулей уже созданы миграцией 0002 — используйте их, а не создавайте новые.
 
+## Карточка 112 (п. 1.1) — что уже есть
+- **Экран:** `frontend/src/pages/card112/` — `Card112Page.tsx` (сборка, таймер, сохранение, горячие клавиши), `state.ts` (редьюсер и правила), блоки по зонам. Маршруты `/arm/112` (Insert — новая карточка) и `/arm/112/:id`.
+- **API:** `POST /api/v1/incidents/cards` → номер; `POST /cards/{id}/save` → «Зарегистрирована» или «Завершена» (пустая); `GET /cards/{id}`.
+- **Автоподбор служб:** `GET /api/v1/dictionaries/services/resolve?incident_type=…&flag=…&district=…` — основа п. 1.5.
+- **Правила сохранения** — `modules/incidents/domain/incident.py:missing_for_save` (сервер) и `state.ts:missingFields` (клиент). Меняете одно — меняйте и другое.
+
 ## Рецепты
 **Новая команда** (пример: `SaveCard` в `incidents`):
 1. `modules/incidents/application/commands/save_card.py` — `@dataclass(frozen=True, kw_only=True) class SaveCard(Command)` и `class SaveCardHandler` с зависимостями-портами в `__init__` и `async __call__(cmd) -> Result`.

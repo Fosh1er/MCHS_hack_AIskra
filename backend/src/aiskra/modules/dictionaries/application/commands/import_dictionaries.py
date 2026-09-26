@@ -194,6 +194,7 @@ def build_services(curated: CuratedDictionaries) -> list[dict[str, Any]]:
                 "phone": s.get("phone") or synthetic_phone(s["code"]),
                 "phone_synthetic": not s.get("phone"),
                 "confirmed": s.get("confirmed", True),
+                "integrated": s.get("integrated", True),
                 "source": s.get("source", "customer_screenshot"),
             }
         )

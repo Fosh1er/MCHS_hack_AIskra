@@ -35,6 +35,7 @@ from aiskra.modules.dictionaries.application.queries.reference import (
     ListServicesHandler,
     ListTerritoryHandler,
 )
+from aiskra.modules.dictionaries.application.queries.resolve_services import ResolveServicesHandler
 from aiskra.modules.dictionaries.infrastructure.reader import SqlDictionaryReader
 from aiskra.modules.dictionaries.infrastructure.sources import XlsxClassifierSource, YamlCuratedSource
 from aiskra.modules.dictionaries.infrastructure.writer import SqlDictionaryWriter
@@ -53,11 +54,18 @@ from aiskra.modules.identity.domain.user import LockoutPolicy
 from aiskra.modules.identity.infrastructure.reader import SqlSessionReader, SqlUserReader
 from aiskra.modules.identity.infrastructure.repositories import SqlSessionRepository, SqlUserRepository
 from aiskra.modules.identity.infrastructure.security import ScryptPasswordHasher, SessionTokenIssuer
+from aiskra.modules.incidents.api import deps as incidents_deps
+from aiskra.modules.incidents.application.commands.open_card import OpenCardHandler
+from aiskra.modules.incidents.application.commands.save_card import SaveCardHandler
+from aiskra.modules.incidents.application.queries.get_card import GetCardHandler
+from aiskra.modules.incidents.infrastructure.reader import SqlCardReader
+from aiskra.modules.incidents.infrastructure.repositories import SqlCardRepository
 from aiskra.modules.system.api import deps as system_deps
 from aiskra.modules.system.application.commands.probe_model import ProbeModelHandler
 from aiskra.modules.system.application.queries.get_ai_config import GetAIConfigHandler
 from aiskra.platform.db import SqlAlchemyUnitOfWork, create_engine, create_session_factory
 from aiskra.platform.deps import get_session
+from aiskra.platform.models_registry import metadata as _all_models  # noqa: F401 — все ORM-модели в одном реестре
 from aiskra.platform.services import Services
 from aiskra.platform.settings import Settings
 from aiskra.shared import web
@@ -208,6 +216,28 @@ def _wire_identity_and_audit(app: FastAPI, services: Services) -> None:
     ov[audit_deps.provide_event_types] = ListEventTypesHandler
 
 
+def _wire_incidents(app: FastAPI) -> None:
+    ov = app.dependency_overrides
+    clock = SystemClock()
+
+    def open_card(session: Session) -> OpenCardHandler:
+        return OpenCardHandler(
+            SqlCardRepository(session), SqlAuditRecorder(session), SqlAlchemyUnitOfWork(session), clock
+        )
+
+    def save_card(session: Session) -> SaveCardHandler:
+        return SaveCardHandler(
+            SqlCardRepository(session), SqlAuditRecorder(session), SqlAlchemyUnitOfWork(session), clock
+        )
+
+    def get_card(session: Session) -> GetCardHandler:
+        return GetCardHandler(SqlCardReader(session))
+
+    ov[incidents_deps.provide_open_card] = open_card
+    ov[incidents_deps.provide_save_card] = save_card
+    ov[incidents_deps.provide_get_card] = get_card
+
+
 def wire(app: FastAPI, services: Services) -> None:
     ov = app.dependency_overrides
     # --- system
@@ -230,7 +260,10 @@ def wire(app: FastAPI, services: Services) -> None:
     ov[dict_deps.provide_list_services] = _dict_query(ListServicesHandler)
     ov[dict_deps.provide_list_territory] = _dict_query(ListTerritoryHandler)
     ov[dict_deps.provide_list_enum] = _dict_query(ListEnumHandler)
+    ov[dict_deps.provide_resolve_services] = _dict_query(ResolveServicesHandler)
 
     # --- identity и audit (п. 0.3)
     _wire_identity_and_audit(app, services)
-    # --- сюда добавляются связывания модулей incidents, training … (п. 1.x)
+    # --- incidents: карточка 112 (п. 1.1)
+    _wire_incidents(app)
+    # --- сюда добавляются связывания модулей training, assessment … (п. 3.x, 4.x)
