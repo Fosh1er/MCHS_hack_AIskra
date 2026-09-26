@@ -37,6 +37,7 @@ class StatusHistoryItem:
     at: datetime | None
     operator: str | None
     comment: str | None
+    order_no: str | None = None  # «Номер наряда» (ДДС, п. 2.2)
 
 
 @dataclass(frozen=True, kw_only=True)

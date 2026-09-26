@@ -8,7 +8,7 @@ import { PERMISSIONS, type Me } from '../../shared/api/auth';
 import { useCardTypes, useEnum, useServices } from '../../shared/api/dictionaries';
 import {
   CARD_STATUS, SERVICE_STATUS, markCardViewed, useCardActions,
-  type CardServiceView, type CardView, type WorkoutBody,
+  type CardServiceView, type CardView, type ServiceStatusBody, type WorkoutBody,
 } from '../../shared/api/incidents';
 import { shortName } from '../../shared/ui/ArmTopBar';
 import { AddressMap } from './AddressMap';
@@ -155,7 +155,47 @@ function ReturnModal({ busy, onConfirm, onClose }: { busy: boolean; onConfirm: (
   );
 }
 
-export function CardViewer({ view, me }: { view: CardView; me: Me }) {
+/** Режим АРМ ДДС (п. 2.2): та же карточка только для чтения, своя служба — с карандашом и строкой статуса. */
+export interface DdsMode {
+  service: string;
+  next: string[];
+  busy: boolean;
+  onStatus: (b: ServiceStatusBody) => Promise<unknown>;
+  onClose: () => void;
+}
+
+/** Строка «Статус ▾ · Номер наряда · Комментарий · ✓ ✕» (dds/image8–9): в списке — только доступные переходы. */
+function DdsStatusEditor({ next, busy, lastOrderNo, onSave, onCancel }: {
+  next: string[]; busy: boolean; lastOrderNo: string; onSave: (b: ServiceStatusBody) => Promise<unknown>; onCancel: () => void;
+}) {
+  const [status, setStatus] = useState(next.length === 1 ? next[0] : '');
+  const [orderNo, setOrderNo] = useState(lastOrderNo);
+  const [comment, setComment] = useState('');
+  const [error, setError] = useState('');
+  const ref = useRef<HTMLSelectElement>(null);
+  useEffect(() => ref.current?.focus(), []);
+  const save = () => {
+    if (!status) { setError('Выберите статус'); return; }
+    setError('');
+    onSave({ status, order_no: orderNo, comment }).then(onCancel, (e: Error) => setError(e.message));
+  };
+  return (
+    <div className="arm-stateditor dds-editor" role="dialog" aria-label="Изменение статуса службы">
+      <select ref={ref} className="arm-uline arm-uline--select" style={{ width: 260 }} value={status} onChange={(e) => setStatus(e.target.value)} aria-label="Статус">
+        <option value="" disabled>Статус</option>
+        {next.map((st) => <option key={st} value={st}>{SERVICE_STATUS[st] ?? st}</option>)}
+      </select>
+      <input className="arm-uline" style={{ width: 160 }} placeholder="Номер наряда" value={orderNo} onChange={(e) => setOrderNo(e.target.value)} maxLength={32} />
+      <input className="arm-uline u-grow" placeholder="Комментарий" value={comment} maxLength={500} onChange={(e) => setComment(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Enter') save(); }} />
+      <button type="button" className="arm-iconsq" aria-label="Сохранить статус" disabled={busy} onClick={save}><Icon name="check" size="sm" /></button>
+      <button type="button" className="arm-iconsq" aria-label="Отмена" onClick={onCancel}><Icon name="close" size="sm" /></button>
+      {error && <div className="dds-editor__err" role="alert">{error}</div>}
+    </div>
+  );
+}
+
+export function CardViewer({ view, me, dds }: { view: CardView; me: Me; dds?: DdsMode }) {
   const navigate = useNavigate();
   const actions = useCardActions(view.id);
   const cardTypes = useCardTypes();
@@ -167,14 +207,15 @@ export function CardViewer({ view, me }: { view: CardView; me: Me }) {
   const [expanded, setExpanded] = useState(false);
   const [banner, setBanner] = useState<string | null>(null);
   const [showMap, setShowMap] = useState(false);
+  const [editor, setEditor] = useState(false);
 
   // «Просмотр карточки» — в аудит один раз за открытие экрана
   const viewed = useRef(false);
   useEffect(() => {
-    if (viewed.current) return;
+    if (viewed.current || dds) return; // в ДДС открытие фиксирует «Получена службой»
     viewed.current = true;
     markCardViewed(view.id).catch(() => undefined);
-  }, [view.id]);
+  }, [view.id, dds]);
   useEffect(() => {
     if (!banner) return;
     const t = setTimeout(() => setBanner(null), 8000);
@@ -182,8 +223,8 @@ export function CardViewer({ view, me }: { view: CardView; me: Me }) {
   }, [banner]);
 
   const d = view.data;
-  const isAuthor = view.author_id === me.user_id && me.permissions.includes(PERMISSIONS.trainingParticipate);
-  const canCheck = me.permissions.includes(CARDS_CHECK);
+  const isAuthor = !dds && view.author_id === me.user_id && me.permissions.includes(PERMISSIONS.trainingParticipate);
+  const canCheck = !dds && me.permissions.includes(CARDS_CHECK);
   const open = !['checked', 'completed'].includes(view.status);
   const canWorked = isAuthor && view.status === 'registered';
   const canChecked = canCheck && view.status === 'worked';
@@ -200,7 +241,11 @@ export function CardViewer({ view, me }: { view: CardView; me: Me }) {
   const operator = `${view.operator_number ?? ''}, АРМ ${view.arm_number ?? '—'}, ${view.author_name ? shortName(view.author_name) : ''}`;
   const victims = d.victims?.has ? (d.victims.count > 0 ? String(d.victims.count) : 'есть') : 'нет';
   const flagsSet = new Set(d.card_flags ?? []);
-  const services = [...view.services].sort((a, b) => Number(b.is_main) - Number(a.is_main));
+  // в ДДС своя служба — первой, чтобы плитка с карандашом была на виду
+  const services = [...view.services].sort((a, b) =>
+    Number(b.code === dds?.service) - Number(a.code === dds?.service) || Number(b.is_main) - Number(a.is_main));
+  const ownService = dds ? view.services.find((s) => s.code === dds.service) : undefined;
+  const lastOrderNo = [...(ownService?.history ?? [])].reverse().find((h) => h.order_no)?.order_no ?? '';
   const descriptionLines = (d.description ?? '').split('\n').filter(Boolean);
   const addressExtra = [
     d.address?.object && `объект: ${d.address.object}`,
@@ -217,13 +262,15 @@ export function CardViewer({ view, me }: { view: CardView; me: Me }) {
     const next = { emergency: view.is_emergency, incident: view.is_incident, [key]: !(key === 'emergency' ? view.is_emergency : view.is_incident) };
     actions.flags.mutate(next, { onError: fail });
   };
-  const close = () => navigate('/arm/112/journal');
+  const close = () => (dds ? dds.onClose() : navigate('/arm/112/journal'));
 
-  const alt: HotkeyMap = returning ? {} : {
+  const alt: HotkeyMap = returning || dds ? {} : {
     KeyS: worked, KeyY: checked, ...(canReturn && { KeyN: () => setReturning(true) }),
     KeyO: focusId('workout-message'),
   };
-  const plain: HotkeyMap = returning ? { Escape: () => setReturning(false) } : {
+  const plain: HotkeyMap = dds ? {
+    Escape: () => (editor ? setEditor(false) : history ? setHistory(null) : close()),
+  } : returning ? { Escape: () => setReturning(false) } : {
     Escape: () => (history ? setHistory(null) : mode === 'append' ? setMode('view') : close()),
     F1: () => setMode('view'),
     ...(canEdit && { F2: () => setMode('append') }),
@@ -232,6 +279,15 @@ export function CardViewer({ view, me }: { view: CardView; me: Me }) {
   const altHeld = useHotkeys(alt, plain);
 
   const historyService = services.find((s) => s.code === history);
+  const tab = (s: CardServiceView) => {
+    const mine = dds?.service === s.code;
+    return (
+      <ServiceTab key={s.code} name={s.short} main={s.is_main} noIntegration={!s.integrated} mine={mine}
+        status={`${s.status_at ? hhmm(new Date(s.status_at)) : ''} ${SERVICE_STATUS[s.status] ?? s.status}`}
+        onOpen={() => { setEditor(false); setHistory(history === s.code ? null : s.code); }}
+        onEdit={mine && dds && dds.next.length ? () => { setHistory(null); setEditor(true); } : undefined} />
+    );
+  };
   const statusLine = [
     `Статус: ${CARD_STATUS[view.display_status] ?? view.display_status}`,
     view.worked_at && `отработана ${fmtFull(new Date(view.worked_at))}`,
@@ -324,14 +380,14 @@ export function CardViewer({ view, me }: { view: CardView; me: Me }) {
           {view.incident_types.length > 0 && (
             <div className="arm-panel arm112v-class">Класс.: <b>{view.incident_types.map((t) => t.final_type ?? t.code).join('; ')};</b></div>
           )}
-          <div className="arm-panel arm112v-class arm112v-muted" data-testid="card-status">{statusLine}</div>
+          {!dds && <div className="arm-panel arm112v-class arm112v-muted" data-testid="card-status">{statusLine}</div>}
         </div>
       </div>
 
       {showMap && <AddressMap lat={d.address?.lat ?? null} lon={d.address?.lon ?? null} district={d.address?.district ?? null} readOnly onClose={() => setShowMap(false)} />}
       {banner && <div className="arm112-banner" role="alert" onClick={() => setBanner(null)}><b>Действие не выполнено</b><ul><li>{banner}</li></ul></div>}
 
-      <div className="arm112v-workouts arm112-rel">
+      {!dds && <div className="arm112v-workouts arm112-rel">
         <Hint k="Alt+O" />
         <div className="arm112v-wk arm112v-wk--head">
           <div>Опер.</div><div>Дата и время</div><div>Служба</div><div>Куда звонили</div><div>Телефон</div><div /><div>ФИО</div><div>Суть сообщения</div><div />
@@ -356,24 +412,23 @@ export function CardViewer({ view, me }: { view: CardView; me: Me }) {
           <WorkoutForm key={`${view.workouts.length}:${catalog.data ? 1 : 0}`} services={services} phoneOf={phoneOf} busy={actions.workout.isPending}
             onAdd={(b) => actions.workout.mutateAsync(b)} />
         )}
-      </div>
+      </div>}
 
       <ServiceBar
         variant="112"
         expanded={expanded}
         onToggleExpand={services.length > 6 ? () => setExpanded(!expanded) : undefined}
-        stack={services.length > 6 ? services.slice(6).map((s) => (
-          <ServiceTab key={s.code} name={s.short} main={s.is_main} noIntegration={!s.integrated}
-            status={`${s.status_at ? hhmm(new Date(s.status_at)) : ''} ${SERVICE_STATUS[s.status] ?? s.status}`} onOpen={() => setHistory(s.code)} />
-        )) : undefined}
-        overlay={historyService && (
+        stack={services.length > 6 ? services.slice(6).map(tab) : undefined}
+        overlay={(editor && dds) ? (
+          <DdsStatusEditor next={dds.next} busy={dds.busy} lastOrderNo={lastOrderNo} onSave={dds.onStatus} onCancel={() => setEditor(false)} />
+        ) : historyService && (
           <StatusHistory
             service={historyService.short} onClose={() => setHistory(null)} style={{ left: 90, bottom: 'calc(100% + 4px)' }}
             rows={historyService.history.map((h) => ({
               operator: h.operator ? `оп. ${h.operator}` : 'оп. 0',
               at: h.at ? `${new Date(h.at).toLocaleDateString('ru-RU')} ${hhmmss(new Date(h.at))}` : '',
               status: SERVICE_STATUS[h.status] ?? h.status,
-              comment: h.comment ?? undefined,
+              comment: [h.order_no && `наряд ${h.order_no}`, h.comment].filter(Boolean).join(' · ') || undefined,
             }))}
           />
         )}
@@ -382,6 +437,9 @@ export function CardViewer({ view, me }: { view: CardView; me: Me }) {
             {canWorked && <span className="arm112-rel"><Hint k="Alt+S" /><button type="button" className="arm-savebtn" disabled={actions.worked.isPending} onClick={worked}>отработана</button></span>}
             {canChecked && <span className="arm112-rel"><Hint k="Alt+Y" /><button type="button" className="arm-savebtn" disabled={actions.checked.isPending} onClick={checked}>Проверена</button></span>}
             {canReturn && <span className="arm112-rel"><Hint k="Alt+N" /><button type="button" className="arm-savebtn arm112v-return" onClick={() => setReturning(true)}>Вернуть на доработку</button></span>}
+            {dds && ownService && dds.next.length > 0 && (
+              <button type="button" className="arm-savebtn" onClick={() => { setHistory(null); setEditor(true); }}>изменить статус</button>
+            )}
             <button type="button" className="arm-sqbtn" disabled title="Связи карточек — п. 1.6" aria-label="Связи"><Icon name="link" /></button>
             <button type="button" className="arm-sqbtn" disabled title="Напоминание — появится в следующих пунктах плана" aria-label="Напоминание"><Icon name="timer" /></button>
             <button type="button" className="arm-sqbtn" disabled title="Важное происшествие — появится в следующих пунктах плана" aria-label="Важное происшествие"><Icon name="bell" /></button>
@@ -389,10 +447,7 @@ export function CardViewer({ view, me }: { view: CardView; me: Me }) {
           </>
         )}
       >
-        {services.slice(0, 6).map((s) => (
-          <ServiceTab key={s.code} name={s.short} main={s.is_main} noIntegration={!s.integrated}
-            status={`${s.status_at ? hhmm(new Date(s.status_at)) : ''} ${SERVICE_STATUS[s.status] ?? s.status}`} onOpen={() => setHistory(history === s.code ? null : s.code)} />
-        ))}
+        {services.slice(0, 6).map(tab)}
       </ServiceBar>
 
       {returning && (

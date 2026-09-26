@@ -140,7 +140,7 @@ class SqlCardReader:
         card, display, author_name, checker_name, okrug, district = found
 
         history: dict[str, list[StatusHistoryItem]] = {}
-        for code, status, at, comment, op in (
+        for code, status, at, comment, op, order_no in (
             await self._s.execute(
                 select(
                     CardServiceStatusModel.service_code,
@@ -148,6 +148,7 @@ class SqlCardReader:
                     CardServiceStatusModel.at,
                     CardServiceStatusModel.comment,
                     _users.c.operator_number,
+                    CardServiceStatusModel.order_no,
                 )
                 .outerjoin(_users, _users.c.id == CardServiceStatusModel.actor_id)
                 .where(CardServiceStatusModel.card_id == card_id)
@@ -155,7 +156,7 @@ class SqlCardReader:
             )
         ).all():
             history.setdefault(code, []).append(
-                StatusHistoryItem(status=status, at=as_utc(at), operator=op, comment=comment)
+                StatusHistoryItem(status=status, at=as_utc(at), operator=op, comment=comment, order_no=order_no)
             )
 
         services: list[CardServiceView] = []

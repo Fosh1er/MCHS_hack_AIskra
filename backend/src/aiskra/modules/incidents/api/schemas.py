@@ -10,6 +10,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
 from aiskra.modules.incidents.domain.card import AMBULANCE_VISIBLE_CHARS, DESCRIPTION_MAX, ApplicantStatus
+from aiskra.modules.incidents.domain.dds import ServiceStatus
 
 
 class _Strict(BaseModel):
@@ -160,3 +161,12 @@ class ChangedOut(BaseModel):
 
 class CreatedOut(BaseModel):
     id: UUID
+
+
+# ------------------------------------------------------------------ п. 2.2: АРМ ДДС
+
+
+class ServiceStatusIn(_Strict):
+    status: ServiceStatus
+    order_no: str = Field(default="", max_length=32, description="«Номер наряда»")
+    comment: str = Field(default="", max_length=500)
