@@ -1,0 +1,9 @@
+/* СМЕНА-112 UI Kit — все стили одним импортом.
+   В React-приложении шрифт подключается офлайн пакетом @fontsource/roboto:
+     import '@fontsource/roboto/300.css'; import '@fontsource/roboto/400.css';
+     import '@fontsource/roboto/500.css'; import '@fontsource/roboto/700.css';
+   Порядок важен: токены → база → скины. */
+@import './tokens/tokens.css';
+@import './css/base.css';
+@import './css/arm.css';
+@import './css/cabinet.css';

@@ -1,0 +1,1153 @@
+# СГЕНЕРИРОВАНО data/tools/build_territorial.py — правки вносите в генератор или исходники data/raw.
+services:
+- code: DDS_ARBAT
+  short: Поселение Арбат
+  full: ДДС района Арбат города Москвы
+  kind: district_dds
+  district: arbat
+  okrug: CAO
+  source: customer_screenshot
+- code: DDS_BASMANNYY
+  short: Поселение Басманный
+  full: ДДС Басманного района города Москвы
+  kind: district_dds
+  district: basmannyy
+  okrug: CAO
+  source: customer_screenshot
+- code: DDS_ZAMOSKVORECHE
+  short: Поселение Замоскворечье
+  full: ДДС района Замоскворечье города Москвы
+  kind: district_dds
+  district: zamoskvoreche
+  okrug: CAO
+  source: customer_screenshot
+- code: DDS_KRASNOSELSKIY
+  short: Поселение Красносельский
+  full: ДДС Красносельского района города Москвы
+  kind: district_dds
+  district: krasnoselskiy
+  okrug: CAO
+  source: customer_screenshot
+- code: DDS_MESHCHANSKIY
+  short: Поселение Мещанский
+  full: ДДС Мещанского района города Москвы
+  kind: district_dds
+  district: meshchanskiy
+  okrug: CAO
+  source: customer_screenshot
+- code: DDS_PRESNENSKIY
+  short: Поселение Пресненский
+  full: ДДС Пресненского района города Москвы
+  kind: district_dds
+  district: presnenskiy
+  okrug: CAO
+  source: customer_screenshot
+- code: DDS_TAGANSKIY
+  short: Поселение Таганский
+  full: ДДС района Таганский города Москвы
+  kind: district_dds
+  district: taganskiy
+  okrug: CAO
+  source: customer_screenshot
+- code: DDS_TVERSKOY
+  short: Поселение Тверской
+  full: ДДС Тверского района города Москвы
+  kind: district_dds
+  district: tverskoy
+  okrug: CAO
+  source: customer_screenshot
+- code: DDS_KHAMOVNIKI
+  short: Поселение Хамовники
+  full: ДДС района Хамовники города Москвы
+  kind: district_dds
+  district: khamovniki
+  okrug: CAO
+  source: customer_screenshot
+- code: DDS_YAKIMANKA
+  short: Поселение Якиманка
+  full: ДДС района Якиманка города Москвы
+  kind: district_dds
+  district: yakimanka
+  okrug: CAO
+  source: customer_screenshot
+- code: DDS_AEROPORT
+  short: Поселение Аэропорт
+  full: ДДС района Аэропорт города Москвы
+  kind: district_dds
+  district: aeroport
+  okrug: SAO
+  source: customer_screenshot
+- code: DDS_BEGOVOY
+  short: Поселение Беговой
+  full: ДДС района Беговой города Москвы
+  kind: district_dds
+  district: begovoy
+  okrug: SAO
+  source: customer_screenshot
+- code: DDS_BESKUDNIKOVSKIY
+  short: Поселение Бескудниково
+  full: ДДС Бескудниковского района города Москвы
+  kind: district_dds
+  district: beskudnikovskiy
+  okrug: SAO
+  source: customer_screenshot
+- code: DDS_VOYKOVSKIY
+  short: Поселение Войковский
+  full: ДДС Войковского района города Москвы
+  kind: district_dds
+  district: voykovskiy
+  okrug: SAO
+  source: customer_screenshot
+- code: DDS_VOSTOCHNOE_DEGUNINO
+  short: Поселение Восточное Дегунино
+  full: ДДС района Восточное Дегунино города Москвы
+  kind: district_dds
+  district: vostochnoe_degunino
+  okrug: SAO
+  source: customer_screenshot
+- code: DDS_GOLOVINSKIY
+  short: Поселение Головинский
+  full: ДДС Головинского района города Москвы
+  kind: district_dds
+  district: golovinskiy
+  okrug: SAO
+  source: customer_screenshot
+- code: DDS_DMITROVSKIY
+  short: Поселение Дмитровский
+  full: ДДС Дмитровского района города Москвы
+  kind: district_dds
+  district: dmitrovskiy
+  okrug: SAO
+  source: customer_screenshot
+- code: DDS_ZAPADNOE_DEGUNINO
+  short: Поселение Западное Дегунино
+  full: ДДС района Западное Дегунино города Москвы
+  kind: district_dds
+  district: zapadnoe_degunino
+  okrug: SAO
+  source: customer_screenshot
+- code: DDS_KOPTEVO
+  short: Поселение Коптево
+  full: ДДС района Коптево города Москвы
+  kind: district_dds
+  district: koptevo
+  okrug: SAO
+  source: customer_screenshot
+- code: DDS_LEVOBEREZHNYY
+  short: Поселение Левобережный
+  full: ДДС района Левобережный города Москвы
+  kind: district_dds
+  district: levoberezhnyy
+  okrug: SAO
+  source: customer_screenshot
+- code: DDS_MOLZHANINOVSKIY
+  short: Поселение Молжаниновский
+  full: ДДС Молжаниновского района города Москвы
+  kind: district_dds
+  district: molzhaninovskiy
+  okrug: SAO
+  source: customer_screenshot
+- code: DDS_SAVELOVSKIY
+  short: Поселение Савеловский
+  full: ДДС Савеловского района города Москвы
+  kind: district_dds
+  district: savelovskiy
+  okrug: SAO
+  source: customer_screenshot
+- code: DDS_SOKOL
+  short: Поселение Сокол
+  full: ДДС района Сокол города Москвы
+  kind: district_dds
+  district: sokol
+  okrug: SAO
+  source: customer_screenshot
+- code: DDS_TIMIRYAZEVSKIY
+  short: Поселение Тимирязевский
+  full: ДДС Тимирязевского района города Москвы
+  kind: district_dds
+  district: timiryazevskiy
+  okrug: SAO
+  source: customer_screenshot
+- code: DDS_KHOVRINO
+  short: Поселение Ховрино
+  full: ДДС района Ховрино города Москвы
+  kind: district_dds
+  district: khovrino
+  okrug: SAO
+  source: customer_screenshot
+- code: DDS_KHOROSHEVSKIY
+  short: Поселение Хорошевский
+  full: ДДС Хорошевского района города Москвы
+  kind: district_dds
+  district: khoroshevskiy
+  okrug: SAO
+  source: customer_screenshot
+- code: DDS_ALEKSEEVSKIY
+  short: Поселение Алексеевский
+  full: ДДС Алексеевского района города Москвы
+  kind: district_dds
+  district: alekseevskiy
+  okrug: SVAO
+  source: customer_screenshot
+- code: DDS_ALTUFEVSKIY
+  short: Поселение Алтуфьевский
+  full: ДДС Алтуфьевского района города Москвы
+  kind: district_dds
+  district: altufevskiy
+  okrug: SVAO
+  source: customer_screenshot
+- code: DDS_BABUSHKINSKIY
+  short: Поселение Бабушкинский
+  full: ДДС Бабушкинского района города Москвы
+  kind: district_dds
+  district: babushkinskiy
+  okrug: SVAO
+  source: customer_screenshot
+- code: DDS_BIBIREVO
+  short: Поселение Бибирево
+  full: ДДС района Бибирево города Москвы
+  kind: district_dds
+  district: bibirevo
+  okrug: SVAO
+  source: customer_screenshot
+- code: DDS_BUTYRSKIY
+  short: Поселение Бутырский
+  full: ДДС Бутырского района города Москвы
+  kind: district_dds
+  district: butyrskiy
+  okrug: SVAO
+  source: customer_screenshot
+- code: DDS_LIANOZOVO
+  short: Поселение Лианозово
+  full: ДДС района Лианозово города Москвы
+  kind: district_dds
+  district: lianozovo
+  okrug: SVAO
+  source: customer_screenshot
+- code: DDS_LOSINOOSTROVSKIY
+  short: Поселение Лосиноостровский
+  full: ДДС Лосиноостровского района города Москвы
+  kind: district_dds
+  district: losinoostrovskiy
+  okrug: SVAO
+  source: customer_screenshot
+- code: DDS_MARFINO
+  short: Поселение Марфино
+  full: ДДС района Марфино города Москвы
+  kind: district_dds
+  district: marfino
+  okrug: SVAO
+  source: customer_screenshot
+- code: DDS_MARINA_ROSHCHA
+  short: Поселение Марьина роща
+  full: ДДС района Марьина роща города Москвы
+  kind: district_dds
+  district: marina_roshcha
+  okrug: SVAO
+  source: customer_screenshot
+- code: DDS_OSTANKINSKIY
+  short: Поселение Останкинский
+  full: ДДС Останкинского района города Москвы
+  kind: district_dds
+  district: ostankinskiy
+  okrug: SVAO
+  source: customer_screenshot
+- code: DDS_OTRADNOE
+  short: Поселение Отрадное
+  full: ДДС района Отрадное города Москвы
+  kind: district_dds
+  district: otradnoe
+  okrug: SVAO
+  source: customer_screenshot
+- code: DDS_ROSTOKINO
+  short: Поселение Ростокино
+  full: ДДС района Ростокино города Москвы
+  kind: district_dds
+  district: rostokino
+  okrug: SVAO
+  source: customer_screenshot
+- code: DDS_SVIBLOVO
+  short: Поселение Свиблово
+  full: ДДС района Свиблово города Москвы
+  kind: district_dds
+  district: sviblovo
+  okrug: SVAO
+  source: customer_screenshot
+- code: DDS_SEVERNYY
+  short: Поселение Северный
+  full: ДДС района Северный города Москвы
+  kind: district_dds
+  district: severnyy
+  okrug: SVAO
+  source: customer_screenshot
+- code: DDS_SEVERNOE_MEDVEDKOVO
+  short: Поселение Северное Медведково
+  full: ДДС района Северное Медведково города Москвы
+  kind: district_dds
+  district: severnoe_medvedkovo
+  okrug: SVAO
+  source: customer_screenshot
+- code: DDS_YUZHNOE_MEDVEDKOVO
+  short: Поселение Южное Медведково
+  full: ДДС района Южное Медведково города Москвы
+  kind: district_dds
+  district: yuzhnoe_medvedkovo
+  okrug: SVAO
+  source: customer_screenshot
+- code: DDS_YAROSLAVSKIY
+  short: Поселение Ярославский
+  full: ДДС Ярославского района города Москвы
+  kind: district_dds
+  district: yaroslavskiy
+  okrug: SVAO
+  source: customer_screenshot
+- code: DDS_BOGORODSKOE
+  short: Поселение Богородское
+  full: ДДС района Богородское города Москвы
+  kind: district_dds
+  district: bogorodskoe
+  okrug: VAO
+  source: customer_screenshot
+- code: DDS_VESHNYAKI
+  short: Упр. района Вешняки
+  full: ДДС района Вешняки города Москвы
+  kind: district_dds
+  district: veshnyaki
+  okrug: VAO
+  source: customer_screenshot
+- code: DDS_VOSTOCHNYY
+  short: Поселение Восточный
+  full: ДДС района Восточный города Москвы
+  kind: district_dds
+  district: vostochnyy
+  okrug: VAO
+  source: customer_screenshot
+- code: DDS_VOSTOCHNOE_IZMAYLOVO
+  short: Поселение Восточное Измайлово
+  full: ДДС района Восточное Измайлово города Москвы
+  kind: district_dds
+  district: vostochnoe_izmaylovo
+  okrug: VAO
+  source: customer_screenshot
+- code: DDS_GOLYANOVO
+  short: Поселение Гольяново
+  full: ДДС района Гольяново города Москвы
+  kind: district_dds
+  district: golyanovo
+  okrug: VAO
+  source: customer_screenshot
+- code: DDS_IVANOVSKOE
+  short: Поселение Ивановский
+  full: ДДС Ивановского района города Москвы
+  kind: district_dds
+  district: ivanovskoe
+  okrug: VAO
+  source: customer_screenshot
+- code: DDS_IZMAYLOVO
+  short: Поселение Измайлово
+  full: ДДС района Измайлово города Москвы
+  kind: district_dds
+  district: izmaylovo
+  okrug: VAO
+  source: customer_screenshot
+- code: DDS_KOSINO_UKHTOMSKIY
+  short: Поселение Косино-Ухтомский
+  full: ДДС района Косино- Ухтомский города Москвы
+  kind: district_dds
+  district: kosino_ukhtomskiy
+  okrug: VAO
+  source: customer_screenshot
+- code: DDS_METROGORODOK
+  short: Поселение Метрогородок
+  full: ДДС района Метрогородок города Москвы
+  kind: district_dds
+  district: metrogorodok
+  okrug: VAO
+  source: customer_screenshot
+- code: DDS_NOVOGIREEVO
+  short: Поселение Новогиреево
+  full: ДДС района Новогиреево города Москвы
+  kind: district_dds
+  district: novogireevo
+  okrug: VAO
+  source: customer_screenshot
+- code: DDS_NOVOKOSINO
+  short: Поселение Новокосино
+  full: ДДС района Новокосино города Москвы
+  kind: district_dds
+  district: novokosino
+  okrug: VAO
+  source: customer_screenshot
+- code: DDS_PEROVO
+  short: Поселение Перово
+  full: ДДС района Перово города Москвы
+  kind: district_dds
+  district: perovo
+  okrug: VAO
+  source: customer_screenshot
+- code: DDS_PREOBRAZHENSKOE
+  short: Поселение Преображенский
+  full: ДДС района Преображенское города Москвы
+  kind: district_dds
+  district: preobrazhenskoe
+  okrug: VAO
+  source: customer_screenshot
+- code: DDS_SEVERNOE_IZMAYLOVO
+  short: Поселение Северное Измайлово
+  full: ДДС района Северное Измайлово города Москвы
+  kind: district_dds
+  district: severnoe_izmaylovo
+  okrug: VAO
+  source: customer_screenshot
+- code: DDS_SOKOLINAYA_GORA
+  short: Поселение Соколиная гора
+  full: ДДС района Соколиная гора города Москвы
+  kind: district_dds
+  district: sokolinaya_gora
+  okrug: VAO
+  source: customer_screenshot
+- code: DDS_SOKOLNIKI
+  short: Поселение Сокольники
+  full: ДДС района Сокольники города Москвы
+  kind: district_dds
+  district: sokolniki
+  okrug: VAO
+  source: customer_screenshot
+- code: DDS_VYKHINO_ZHULEBINO
+  short: Поселение Выхино-Жулебино
+  full: ДДС района Выхино- Жулебино города Москвы
+  kind: district_dds
+  district: vykhino_zhulebino
+  okrug: YUVAO
+  source: customer_screenshot
+- code: DDS_KAPOTNYA
+  short: Поселение Капотня
+  full: ДДС района Капотня города Москвы
+  kind: district_dds
+  district: kapotnya
+  okrug: YUVAO
+  source: customer_screenshot
+- code: DDS_KUZMINKI
+  short: Поселение Кузьминки
+  full: ДДС района Кузьминки города Москвы
+  kind: district_dds
+  district: kuzminki
+  okrug: YUVAO
+  source: customer_screenshot
+- code: DDS_LEFORTOVO
+  short: Поселение Лефортово
+  full: ДДС района Лефортово города Москвы
+  kind: district_dds
+  district: lefortovo
+  okrug: YUVAO
+  source: customer_screenshot
+- code: DDS_LYUBLINO
+  short: Поселение Люблино
+  full: ДДС района Люблино города Москвы
+  kind: district_dds
+  district: lyublino
+  okrug: YUVAO
+  source: customer_screenshot
+- code: DDS_MARINO
+  short: Поселение Марьино
+  full: ДДС района Марьино города Москвы
+  kind: district_dds
+  district: marino
+  okrug: YUVAO
+  source: customer_screenshot
+- code: DDS_NEKRASOVKA
+  short: Поселение Некрасовка
+  full: ДДС района Некрасовка города Москвы
+  kind: district_dds
+  district: nekrasovka
+  okrug: YUVAO
+  source: customer_screenshot
+- code: DDS_NIZHEGORODSKIY
+  short: Поселение Нижегородский
+  full: ДДС Нижегородского района города Москвы
+  kind: district_dds
+  district: nizhegorodskiy
+  okrug: YUVAO
+  source: customer_screenshot
+- code: DDS_PECHATNIKI
+  short: Поселение Печатники
+  full: ДДС района Печатники города Москвы
+  kind: district_dds
+  district: pechatniki
+  okrug: YUVAO
+  source: customer_screenshot
+- code: DDS_RYAZANSKIY
+  short: Поселение Рязанский
+  full: ДДС Рязанского района города Москвы
+  kind: district_dds
+  district: ryazanskiy
+  okrug: YUVAO
+  source: customer_screenshot
+- code: DDS_TEKSTILSHCHIKI
+  short: Поселение Текстильщики
+  full: ДДС района Текстильщики города Москвы
+  kind: district_dds
+  district: tekstilshchiki
+  okrug: YUVAO
+  source: customer_screenshot
+- code: DDS_YUZHNOPORTOVYY
+  short: Поселение Южнопортовый
+  full: ДДС Южнопортового района города Москвы
+  kind: district_dds
+  district: yuzhnoportovyy
+  okrug: YUVAO
+  source: customer_screenshot
+- code: DDS_BIRYULEVO_VOSTOCHNOE
+  short: Поселение Бирюлево Восточное
+  full: ДДС района Бирюлево Восточное города Москвы
+  kind: district_dds
+  district: biryulevo_vostochnoe
+  okrug: YUAO
+  source: customer_screenshot
+- code: DDS_BIRYULEVO_ZAPADNOE
+  short: Поселение Бирюлево Западное
+  full: ДДС района Бирюлево Западное города Москвы
+  kind: district_dds
+  district: biryulevo_zapadnoe
+  okrug: YUAO
+  source: customer_screenshot
+- code: DDS_BRATEEVO
+  short: Поселение Братеево
+  full: ДДС района Братеево города Москвы
+  kind: district_dds
+  district: brateevo
+  okrug: YUAO
+  source: customer_screenshot
+- code: DDS_DANILOVSKIY
+  short: Поселение Даниловский
+  full: ДДС Даниловского района города Москвы
+  kind: district_dds
+  district: danilovskiy
+  okrug: YUAO
+  source: customer_screenshot
+- code: DDS_DONSKOY
+  short: Поселение Донской
+  full: ДДС Донского района города Москвы
+  kind: district_dds
+  district: donskoy
+  okrug: YUAO
+  source: customer_screenshot
+- code: DDS_ZYABLIKOVO
+  short: Поселение Зябликово
+  full: ДДС района Зябликово города Москвы
+  kind: district_dds
+  district: zyablikovo
+  okrug: YUAO
+  source: customer_screenshot
+- code: DDS_MOSKVORECHE_SABUROVO
+  short: Поселение Москворечье-Сабурово
+  full: ДДС района Москворечье-Сабурово города Москвы
+  kind: district_dds
+  district: moskvoreche_saburovo
+  okrug: YUAO
+  source: customer_screenshot
+- code: DDS_NAGATINO_SADOVNIKI
+  short: Поселение Нагатино-Садовники
+  full: ДДС района Нагатино Садовники
+  kind: district_dds
+  district: nagatino_sadovniki
+  okrug: YUAO
+  source: customer_screenshot
+- code: DDS_NAGATINSKIY_ZATON
+  short: Поселение Нагатинский Затон
+  full: ДДС района Нагатинский Затон города Москвы
+  kind: district_dds
+  district: nagatinskiy_zaton
+  okrug: YUAO
+  source: customer_screenshot
+- code: DDS_NAGORNYY
+  short: Поселение Нагорный
+  full: ДДС района Нагорный города Москвы
+  kind: district_dds
+  district: nagornyy
+  okrug: YUAO
+  source: customer_screenshot
+- code: DDS_OREKHOVO_BORISOVO_SEVERNOE
+  short: Поселение Орехово-Борисово Северное
+  full: ДДС Орехово- Борисово Северное города Москвы
+  kind: district_dds
+  district: orekhovo_borisovo_severnoe
+  okrug: YUAO
+  source: customer_screenshot
+- code: DDS_OREKHOVO_BORISOVO_YUZHNOE
+  short: Поселение Орехово-Борисово Южное
+  full: ДДС района Орехово-Борисово Южное города Москвы
+  kind: district_dds
+  district: orekhovo_borisovo_yuzhnoe
+  okrug: YUAO
+  source: customer_screenshot
+- code: DDS_TSARITSYNO
+  short: Поселение Царицыно
+  full: ДДС района Царицыно города Москвы
+  kind: district_dds
+  district: tsaritsyno
+  okrug: YUAO
+  source: customer_screenshot
+- code: DDS_CHERTANOVO_SEVERNOE
+  short: Поселение Чертаново Северное
+  full: ДДС района Чертаново Северное города Москвы
+  kind: district_dds
+  district: chertanovo_severnoe
+  okrug: YUAO
+  source: customer_screenshot
+- code: DDS_CHERTANOVO_TSENTRALNOE
+  short: Поселение Чертаново Центральное
+  full: ДДС района Чертаново Центральное города Москвы
+  kind: district_dds
+  district: chertanovo_tsentralnoe
+  okrug: YUAO
+  source: customer_screenshot
+- code: DDS_CHERTANOVO_YUZHNOE
+  short: Поселение Чертаново Южное
+  full: ДДС района Чертаново Южное города Москвы
+  kind: district_dds
+  district: chertanovo_yuzhnoe
+  okrug: YUAO
+  source: customer_screenshot
+- code: DDS_AKADEMICHESKIY
+  short: Поселение Академический
+  full: ДДС Академического района города Москвы
+  kind: district_dds
+  district: akademicheskiy
+  okrug: YUZAO
+  source: customer_screenshot
+- code: DDS_GAGARINSKIY
+  short: Поселение Гагаринский
+  full: ДДС Гагаринского района города Москвы
+  kind: district_dds
+  district: gagarinskiy
+  okrug: YUZAO
+  source: customer_screenshot
+- code: DDS_ZYUZINO
+  short: Поселение Зюзино
+  full: ДДС района Зюзино города Москвы
+  kind: district_dds
+  district: zyuzino
+  okrug: YUZAO
+  source: customer_screenshot
+- code: DDS_KONKOVO
+  short: Поселение Коньково
+  full: ДДС района Коньково города Москвы
+  kind: district_dds
+  district: konkovo
+  okrug: YUZAO
+  source: customer_screenshot
+- code: DDS_KOTLOVKA
+  short: Поселение Котловка
+  full: ДДС района Котловка города Москвы
+  kind: district_dds
+  district: kotlovka
+  okrug: YUZAO
+  source: customer_screenshot
+- code: DDS_LOMONOSOVSKIY
+  short: Поселение Ломоносовский
+  full: ДДС Ломоносовского района города Москвы
+  kind: district_dds
+  district: lomonosovskiy
+  okrug: YUZAO
+  source: customer_screenshot
+- code: DDS_OBRUCHEVSKIY
+  short: Поселение Обручевский
+  full: ДДС Обручевского района города Москвы
+  kind: district_dds
+  district: obruchevskiy
+  okrug: YUZAO
+  source: customer_screenshot
+- code: DDS_SEVERNOE_BUTOVO
+  short: Поселение Северное Бутово
+  full: ДДС района Северное Бутово города Москвы
+  kind: district_dds
+  district: severnoe_butovo
+  okrug: YUZAO
+  source: customer_screenshot
+- code: DDS_TEPLYY_STAN
+  short: Поселение Теплый Стан
+  full: ДДС района Теплый Стан города Москвы
+  kind: district_dds
+  district: teplyy_stan
+  okrug: YUZAO
+  source: customer_screenshot
+- code: DDS_CHEREMUSHKI
+  short: Поселение Черемушки
+  full: ДДС района Черемушки города Москвы
+  kind: district_dds
+  district: cheremushki
+  okrug: YUZAO
+  source: customer_screenshot
+- code: DDS_YUZHNOE_BUTOVO
+  short: Поселение Южное Бутово
+  full: ДДС района Южное Бутово города Москвы
+  kind: district_dds
+  district: yuzhnoe_butovo
+  okrug: YUZAO
+  source: customer_screenshot
+- code: DDS_YASENEVO
+  short: Поселение Ясенево
+  full: ДДС района Ясенево города Москвы
+  kind: district_dds
+  district: yasenevo
+  okrug: YUZAO
+  source: customer_screenshot
+- code: DDS_DOROGOMILOVO
+  short: Поселение Дорогомилово
+  full: ДДС района Дорогомилово города Москвы
+  kind: district_dds
+  district: dorogomilovo
+  okrug: ZAO
+  source: customer_screenshot
+- code: DDS_KRYLATSKOE
+  short: Поселение Крылатское
+  full: ДДС района Крылатское города Москвы
+  kind: district_dds
+  district: krylatskoe
+  okrug: ZAO
+  source: customer_screenshot
+- code: DDS_KUNTSEVO
+  short: Поселение Кунцево
+  full: ДДС района Кунцево города Москвы
+  kind: district_dds
+  district: kuntsevo
+  okrug: ZAO
+  source: customer_screenshot
+- code: DDS_MOZHAYSKIY
+  short: Поселение Можайский
+  full: ДДС Можайского района города Москвы
+  kind: district_dds
+  district: mozhayskiy
+  okrug: ZAO
+  source: customer_screenshot
+- code: DDS_NOVO_PEREDELKINO
+  short: Поселение Ново-Переделкино
+  full: ДДС района Ново- Переделкино города Москвы
+  kind: district_dds
+  district: novo_peredelkino
+  okrug: ZAO
+  source: customer_screenshot
+- code: DDS_OCHAKOVO_MATVEEVSKOE
+  short: Поселение Очаково-Матвеевское
+  full: ДДС района Очаково- Матвеевское города Москвы
+  kind: district_dds
+  district: ochakovo_matveevskoe
+  okrug: ZAO
+  source: customer_screenshot
+- code: DDS_PROSPEKT_VERNADSKOGO
+  short: Поселение Проспект Вернадского
+  full: ДДС района Проспект Вернадского города Москвы
+  kind: district_dds
+  district: prospekt_vernadskogo
+  okrug: ZAO
+  source: customer_screenshot
+- code: DDS_RAMENKI
+  short: Поселение Раменки
+  full: ДДС района Раменки города Москвы
+  kind: district_dds
+  district: ramenki
+  okrug: ZAO
+  source: customer_screenshot
+- code: DDS_SOLNTSEVO
+  short: Поселение Солнцево
+  full: ДДС района Солнцево города Москвы
+  kind: district_dds
+  district: solntsevo
+  okrug: ZAO
+  source: customer_screenshot
+- code: DDS_TROPAREVO_NIKULINO
+  short: Поселение Тропарево-Никулино
+  full: ДДС района Тропарево- Никулино города Москвы
+  kind: district_dds
+  district: troparevo_nikulino
+  okrug: ZAO
+  source: customer_screenshot
+- code: DDS_FILEVSKIY_PARK
+  short: Поселение Филевский парк
+  full: ДДС района Филевский парк города Москвы
+  kind: district_dds
+  district: filevskiy_park
+  okrug: ZAO
+  source: customer_screenshot
+- code: DDS_FILI_DAVYDKOVO
+  short: Поселение Фили-Давыдково
+  full: ДДС района Фили- Давыдково города Москвы
+  kind: district_dds
+  district: fili_davydkovo
+  okrug: ZAO
+  source: customer_screenshot
+- code: DDS_KURKINO
+  short: Поселение Куркино
+  full: ДДС района Куркино города Москвы
+  kind: district_dds
+  district: kurkino
+  okrug: SZAO
+  source: customer_screenshot
+- code: DDS_MITINO
+  short: Поселение Митино
+  full: ДДС района Митино города Москвы
+  kind: district_dds
+  district: mitino
+  okrug: SZAO
+  source: customer_screenshot
+- code: DDS_POKROVSKOE_STRESHNEVO
+  short: Поселение Покровское-Стрешнево
+  full: ДДС района Покровское-Стрешнево города Москвы
+  kind: district_dds
+  district: pokrovskoe_streshnevo
+  okrug: SZAO
+  source: customer_screenshot
+- code: DDS_SEVERNOE_TUSHINO
+  short: Поселение Северное Тушино
+  full: ДДС района Северное Тушино города Москвы
+  kind: district_dds
+  district: severnoe_tushino
+  okrug: SZAO
+  source: customer_screenshot
+- code: DDS_STROGINO
+  short: Поселение Строгино
+  full: ДДС района Строгино города Москвы
+  kind: district_dds
+  district: strogino
+  okrug: SZAO
+  source: customer_screenshot
+- code: DDS_KHOROSHEVO_MNEVNIKI
+  short: Поселение Хорошево-Мневники
+  full: ДДС района Хорошево- Мневники города Москвы
+  kind: district_dds
+  district: khoroshevo_mnevniki
+  okrug: SZAO
+  source: customer_screenshot
+- code: DDS_SHCHUKINO
+  short: Поселение Щукино
+  full: ДДС района Щукино города Москвы
+  kind: district_dds
+  district: shchukino
+  okrug: SZAO
+  source: customer_screenshot
+- code: DDS_YUZHNOE_TUSHINO
+  short: Поселение Южное Тушино
+  full: ДДС района Южное Тушино города Москвы
+  kind: district_dds
+  district: yuzhnoe_tushino
+  okrug: SZAO
+  source: customer_screenshot
+- code: DDS_KRYUKOVO
+  short: Поселение Крюково
+  full: ДДС района Крюково города Москвы
+  kind: district_dds
+  district: kryukovo
+  okrug: ZELAO
+  source: customer_screenshot
+- code: DDS_MATUSHKINO
+  short: Поселение Матушкино
+  full: ДДС района Матушкино города Москвы
+  kind: district_dds
+  district: matushkino
+  okrug: ZELAO
+  source: customer_screenshot
+- code: DDS_SAVELKI
+  short: Поселение Савелки
+  full: ДДС района Савелки города Москвы
+  kind: district_dds
+  district: savelki
+  okrug: ZELAO
+  source: customer_screenshot
+- code: DDS_STAROE_KRYUKOVO
+  short: Поселение Старое Крюково
+  full: ДДС района Старое Крюково города Москвы
+  kind: district_dds
+  district: staroe_kryukovo
+  okrug: ZELAO
+  source: customer_screenshot
+- code: DDS_SILINO
+  short: Поселение Силино
+  full: ДДС района Силино города Москвы
+  kind: district_dds
+  district: silino
+  okrug: ZELAO
+  source: customer_screenshot
+- code: DDS_VNUKOVO
+  short: Поселение Внуково
+  full: ДДС района Внуково города Москвы
+  kind: district_dds
+  district: vnukovo
+  okrug: ZAO
+  source: customer_screenshot
+- code: DDS_VNUKOVSKOE
+  short: Поселение Внуковское
+  full: ДДС поселения Внуковское города Москвы
+  kind: district_dds
+  district: vnukovskoe
+  okrug: NAO
+  source: customer_screenshot
+- code: DDS_VOSKRESENSKOE
+  short: Поселение Воскресенское
+  full: ДДС поселения Воскресенское в городе Москве
+  kind: district_dds
+  district: voskresenskoe
+  okrug: NAO
+  source: customer_screenshot
+- code: DDS_DESENOVSKOE
+  short: Поселение Десеновское
+  full: ДДС поселения Десеновское в городе Москве
+  kind: district_dds
+  district: desenovskoe
+  okrug: NAO
+  source: customer_screenshot
+- code: DDS_KOKOSHKINO
+  short: Поселение Кокошкино
+  full: ДДС поселения Кокошкино в городе Москве
+  kind: district_dds
+  district: kokoshkino
+  okrug: NAO
+  source: customer_screenshot
+- code: DDS_MARUSHKINSKOE
+  short: Поселение Марушкинское
+  full: ДДС поселения Марушкинское в городе Москве
+  kind: district_dds
+  district: marushkinskoe
+  okrug: NAO
+  source: customer_screenshot
+- code: DDS_MOSKOVSKIY
+  short: Поселение Московский
+  full: ДДС поселения Московский города Москвы
+  kind: district_dds
+  district: moskovskiy
+  okrug: NAO
+  source: derived
+- code: DDS_MOSRENTGEN
+  short: Поселение Мосрентген
+  full: ДДС поселения «Мосрентген» в городе Москве
+  kind: district_dds
+  district: mosrentgen
+  okrug: NAO
+  source: customer_screenshot
+- code: DDS_RYAZANOVSKOE
+  short: Поселение Рязановское
+  full: ДДС поселения Рязановское в городе Москве
+  kind: district_dds
+  district: ryazanovskoe
+  okrug: NAO
+  source: customer_screenshot
+- code: DDS_SOSENSKOE
+  short: Поселение Сосенское
+  full: ДДС поселения Сосенское в городе Москве
+  kind: district_dds
+  district: sosenskoe
+  okrug: NAO
+  source: customer_screenshot
+- code: DDS_FILIMONKOVSKOE
+  short: Поселение Филимонковское
+  full: ДДС поселения Филимонковское в городе Москве
+  kind: district_dds
+  district: filimonkovskoe
+  okrug: NAO
+  source: customer_screenshot
+- code: DDS_SHCHERBINKA
+  short: Поселение Щербинка
+  full: ДДС городского округа Щербинка города Москвы
+  kind: district_dds
+  district: shcherbinka
+  okrug: NAO
+  source: customer_screenshot
+- code: DDS_VORONOVSKOE
+  short: Поселение Вороновское
+  full: ДДС поселения Вороновское в городе Москве
+  kind: district_dds
+  district: voronovskoe
+  okrug: TAO
+  source: customer_screenshot
+- code: DDS_KIEVSKIY
+  short: Поселение Киевский
+  full: ДДС поселения Киевский города Москвы
+  kind: district_dds
+  district: kievskiy
+  okrug: TAO
+  source: customer_screenshot
+- code: DDS_KLENOVSKOE
+  short: Поселение Клёновское
+  full: ДДС поселения Клёновское в городе Москве
+  kind: district_dds
+  district: klenovskoe
+  okrug: TAO
+  source: customer_screenshot
+- code: DDS_KRASNOPAKHORSKOE
+  short: Поселение Краснопахорское
+  full: ДДС поселени
+  kind: district_dds
+  district: krasnopakhorskoe
+  okrug: TAO
+  source: customer_screenshot
+- code: DDS_MIKHAYLOVO_YARTSEVSKOE
+  short: Поселение Михайлово-Ярцевское
+  full: ДДС поселения Михайлово-Ярцевское города Москвы
+  kind: district_dds
+  district: mikhaylovo_yartsevskoe
+  okrug: TAO
+  source: customer_screenshot
+- code: DDS_NOVOFEDOROVSKOE
+  short: Поселение Новофедоровское
+  full: ДДС поселения Новофедоровское города Москвы
+  kind: district_dds
+  district: novofedorovskoe
+  okrug: TAO
+  source: customer_screenshot
+- code: DDS_PERVOMAYSKOE
+  short: Поселение Первомайское
+  full: ДДС поселени
+  kind: district_dds
+  district: pervomayskoe
+  okrug: TAO
+  source: customer_screenshot
+- code: DDS_ROGOVSKOE
+  short: Поселение Роговское
+  full: ДДС поселения Роговское в городе Москве
+  kind: district_dds
+  district: rogovskoe
+  okrug: TAO
+  source: customer_screenshot
+- code: DDS_SHCHAPOVSKOE
+  short: Поселение Щаповское
+  full: ДДС поселения Щаповское в городе Москве
+  kind: district_dds
+  district: shchapovskoe
+  okrug: TAO
+  source: customer_screenshot
+- code: DDS_TROITSK
+  short: Поселение Троицк
+  full: ДДС городского округа Троицк города Москвы
+  kind: district_dds
+  district: troitsk
+  okrug: TAO
+  source: customer_screenshot
+- code: PREF_CAO
+  short: Поселение ЦАО
+  full: ДДС префектуры Центрального административного округа города Москвы
+  kind: prefecture_dds
+  okrug: CAO
+  source: customer_screenshot
+- code: PREF_SAO
+  short: Поселение САО
+  full: ДДС префектуры Северного административного округа города Москвы
+  kind: prefecture_dds
+  okrug: SAO
+  source: customer_screenshot
+- code: PREF_SVAO
+  short: Поселение СВАО
+  full: ДДС префектуры Северо-Восточного административного округа города Москвы
+  kind: prefecture_dds
+  okrug: SVAO
+  source: customer_screenshot
+- code: PREF_VAO
+  short: Поселение ВАО
+  full: ДДС префектуры Восточного административного округа города Москвы
+  kind: prefecture_dds
+  okrug: VAO
+  source: customer_screenshot
+- code: PREF_YUVAO
+  short: Поселение ЮВАО
+  full: ДДС префектуры Юго-Восточного административного округа города Москвы
+  kind: prefecture_dds
+  okrug: YUVAO
+  source: customer_screenshot
+- code: PREF_YUAO
+  short: Поселение ЮАО
+  full: ДДС префектуры Южного административного округа города Москвы
+  kind: prefecture_dds
+  okrug: YUAO
+  source: customer_screenshot
+- code: PREF_YUZAO
+  short: Поселение ЮЗАО
+  full: ДДС префектуры Юго-Западного административного округа города Москвы
+  kind: prefecture_dds
+  okrug: YUZAO
+  source: customer_screenshot
+- code: PREF_ZAO
+  short: Поселение ЗАО
+  full: ДДС префектуры Западного административного округа города Москвы
+  kind: prefecture_dds
+  okrug: ZAO
+  source: customer_screenshot
+- code: PREF_SZAO
+  short: Поселение СЗАО
+  full: ДДС префектуры Северо-Западного административного округа города Москвы
+  kind: prefecture_dds
+  okrug: SZAO
+  source: customer_screenshot
+- code: PREF_ZELAO
+  short: Поселение ЗелАО
+  full: ДДС префектуры Зеленоградского административного округа города Москвы
+  kind: prefecture_dds
+  okrug: ZELAO
+  source: customer_screenshot
+- code: PREF_TINAO
+  short: Поселение ТиНАО
+  full: ДДС префектуры Троицкого и Новомосковского округов города Москвы
+  kind: prefecture_dds
+  okrug: NAO
+  okrugs:
+  - NAO
+  - TAO
+  source: customer_screenshot
+- code: GBU_AD_CAO
+  short: ГБУ АД ЦАО
+  full: ГБУ Автодороги ЦАО
+  kind: okrug_roads
+  okrug: CAO
+  source: customer_screenshot
+- code: GBU_AD_SAO
+  short: ГБУ АД САО
+  full: ГБУ Автодороги САО
+  kind: okrug_roads
+  okrug: SAO
+  source: customer_screenshot
+- code: GBU_AD_SVAO
+  short: ГБУ АД СВАО
+  full: ГБУ Автодороги СВАО
+  kind: okrug_roads
+  okrug: SVAO
+  source: customer_screenshot
+- code: GBU_AD_VAO
+  short: ГБУ АД ВАО
+  full: ГБУ Автодороги ВАО
+  kind: okrug_roads
+  okrug: VAO
+  source: customer_screenshot
+- code: GBU_AD_YUVAO
+  short: ГБУ АД ЮВАО
+  full: ГБУ Автодороги ЮВАО
+  kind: okrug_roads
+  okrug: YUVAO
+  source: customer_screenshot
+- code: GBU_AD_YUAO
+  short: ГБУ АД ЮАО
+  full: ГБУ Автодороги ЮАО
+  kind: okrug_roads
+  okrug: YUAO
+  source: customer_screenshot
+- code: GBU_AD_YUZAO
+  short: ГБУ АД ЮЗАО
+  full: ГБУ Автодороги ЮЗАО
+  kind: okrug_roads
+  okrug: YUZAO
+  source: customer_screenshot
+- code: GBU_AD_ZAO
+  short: ГБУ АД ЗАО
+  full: ГБУ Автодороги ЗАО
+  kind: okrug_roads
+  okrug: ZAO
+  source: customer_screenshot
+- code: GBU_AD_SZAO
+  short: ГБУ АД СЗАО
+  full: ГБУ Автодороги СЗАО
+  kind: okrug_roads
+  okrug: SZAO
+  source: customer_screenshot
+- code: GBU_AD_ZELAO
+  short: ГБУ АД ЗелАО
+  full: ГБУ Автодороги ЗелАО
+  kind: okrug_roads
+  okrug: ZELAO
+  source: customer_screenshot

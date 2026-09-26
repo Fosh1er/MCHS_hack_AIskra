@@ -1,0 +1,14 @@
+# Каналы связи (поле «Канал связи», Alt+K). Подтверждены скриншотом инструкции image9 (список отфильтрован по «м»)
+# и текстом инструкции (автоопределение для Теле2, МТС, Мегафон, Билайн). confirmed: false — дополнено нами.
+channels:
+  - {code: essm,        name: ЕССМ,                                   confirmed: true}
+  - {code: dsp_line,    name: Линия ДСП (связь с руководством смены), confirmed: true}
+  - {code: mgts_112,    name: МГТС-112,                               confirmed: true}
+  - {code: megafon,     name: Мегафон,                                confirmed: true, auto_detect: true}
+  - {code: mobile_app,  name: Мобильное приложение,                   confirmed: true}
+  - {code: mts,         name: МТС,                                    confirmed: true, auto_detect: true}
+  - {code: mchs,        name: МЧС,                                    confirmed: true}
+  - {code: beeline,     name: Билайн,                                 confirmed: true, auto_detect: true}
+  - {code: tele2,       name: Теле2,                                  confirmed: true, auto_detect: true}
+  - {code: sms,         name: СМС,                                    confirmed: false}
+  - {code: other,       name: Прочие операторы,                       confirmed: false}

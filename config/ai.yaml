@@ -1,0 +1,20 @@
+# Конфигурация ИИ-слоя (ADR-0003, ADR-0006). По умолчанию — полностью офлайн: fake-модель.
+# Примеры подключения демо-API и локальной модели — config/ai.example.yaml.
+# Секреты и адреса — только через переменные окружения: ${VAR} или ${VAR:-значение_по_умолчанию}.
+ai:
+  allow_external: false          # изолированный контур: внешние адреса моделей запрещены
+  default_provider: fake
+  providers:
+    fake: {kind: fake, model: fake-llm}
+  cache:
+    backend: memory              # memory | off
+    max_items: 5000
+  tasks:
+    probe:               {provider: fake, temperature: 0,   cache: exact, cache_ttl: 1h}
+    scenario_generation: {provider: fake, temperature: 0.8, cache: off}
+    applicant_actor:     {provider: fake, temperature: 0.6, cache: task,  cache_ttl: 1d}
+    brigade_actor:       {provider: fake, temperature: 0.6, cache: task,  cache_ttl: 1d}
+    judge:               {provider: fake, temperature: 0,   cache: exact, cache_ttl: 7d}
+    insights:            {provider: fake, temperature: 0.3, cache: off}
+  tts: {kind: fake, cache_ttl: 30d}
+  stt: {kind: fake}

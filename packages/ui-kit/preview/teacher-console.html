@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Пульт занятия — Преподаватель · СМЕНА-112</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../tokens/tokens.css">
+  <link rel="stylesheet" href="../css/base.css">
+  <link rel="stylesheet" href="../css/cabinet.css">
+</head>
+<body>
+<script src="../icons/icons.js"></script>
+
+<div class="cab-app">
+
+  <!-- ============ Навигация ============ -->
+  <aside class="cab-sidebar">
+    <div class="cab-brand">
+      <span class="cab-brand__num">112</span>
+      <span><span class="cab-brand__name">СМЕНА</span><br><span class="cab-brand__role">Преподаватель</span></span>
+    </div>
+    <nav class="cab-nav" aria-label="Разделы">
+      <a class="cab-nav__item" href="#"><svg class="i"><use href="#i-dashboard"/></svg>Сегодня<span class="cab-nav__count cab-nav__count--alert">5</span></a>
+      <div class="cab-nav__group">Учебный процесс</div>
+      <a class="cab-nav__item cab-nav__item--active" href="#" aria-current="page"><svg class="i"><use href="#i-play"/></svg>Занятия · пульт</a>
+      <a class="cab-nav__item" href="#"><svg class="i"><use href="#i-group"/></svg>Группы</a>
+      <a class="cab-nav__item" href="#"><svg class="i"><use href="#i-library"/></svg>Сценарии<span class="cab-nav__count">12</span></a>
+      <a class="cab-nav__item" href="#"><svg class="i"><use href="#i-school"/></svg>Программа</a>
+      <div class="cab-nav__group">Результаты</div>
+      <a class="cab-nav__item" href="#"><svg class="i"><use href="#i-bar_chart"/></svg>Аналитика</a>
+      <a class="cab-nav__item" href="#"><svg class="i"><use href="#i-check_circle"/></svg>Аттестация</a>
+      <div class="cab-nav__group">Прочее</div>
+      <a class="cab-nav__item" href="#"><svg class="i"><use href="#i-description"/></svg>База знаний</a>
+      <a class="cab-nav__item" href="#"><svg class="i"><use href="#i-chat"/></svg>Сообщения<span class="cab-nav__count">2</span></a>
+    </nav>
+    <div class="cab-user">
+      <span class="cab-avatar">ОМ</span>
+      <span class="u-grow"><span class="cab-user__name">Орлова М. В.</span><br><span class="cab-user__sub">Гр. ДДС-3, 112-1</span></span>
+      <svg class="i i--sm"><use href="#i-logout"/></svg>
+    </div>
+  </aside>
+
+  <!-- ============ Основная часть ============ -->
+  <div class="cab-main">
+    <header class="cab-topbar">
+      <div class="cab-topbar__main">
+        <div class="cab-crumbs">Занятия / Гр. ДДС-3 / Смена</div>
+        <h1 class="cab-title">Пульт занятия «Статусы реагирования»<small>идёт 18 мин · норматив приёма 30 с</small></h1>
+      </div>
+      <div class="cab-topbar__actions">
+        <button class="cab-btn"><svg class="i i--sm"><use href="#i-bolt"/></svg>Вводная всем</button>
+        <button class="cab-btn"><svg class="i i--sm"><use href="#i-pause"/></svg>Пауза всем</button>
+        <button class="cab-btn cab-btn--dark"><svg class="i i--sm"><use href="#i-stop"/></svg>Завершить</button>
+      </div>
+      <div class="cab-clock">
+        <div>
+          <div class="cab-clock__label">Учебное время</div>
+          <div class="cab-clock__sub">Пт, 02 октября</div>
+          <span class="cab-clock__speed">×10</span>
+        </div>
+        <div class="cab-clock__time">11:24<span class="t-sec">26</span></div>
+      </div>
+    </header>
+
+    <main class="cab-content">
+      <div class="cab-banner cab-banner--critical" role="status">
+        <svg class="i"><use href="#i-error"/></svg>
+        <span><b>2 обучающихся превышают норматив</b> приёма карточки · Иванов И., Васильева О.</span>
+        <span class="cab-banner__actions"><button class="cab-btn cab-btn--sm">Показать</button></span>
+      </div>
+
+      <!-- KPI -->
+      <section class="cab-kpis" aria-label="Сводка по занятию">
+        <div class="cab-stat">
+          <span class="cab-stat__label">Участники онлайн</span>
+          <span class="cab-stat__value">11<small>из 12</small></span>
+          <span class="cab-stat__foot"><span>1 отключён · таймеры идут</span></span>
+        </div>
+        <div class="cab-stat">
+          <span class="cab-stat__label">В нормативе</span>
+          <span class="cab-stat__value">72%</span>
+          <span class="cab-stat__foot"><span class="cab-delta cab-delta--good"><svg class="i i--xs"><use href="#i-arrow_up"/></svg>+4 п.п.</span><span>к прошлому занятию</span><svg data-spark="64,66,65,68,70,69,72"></svg></span>
+        </div>
+        <div class="cab-stat">
+          <span class="cab-stat__label">Средний балл</span>
+          <span class="cab-stat__value">78</span>
+          <span class="cab-stat__foot"><span class="cab-delta cab-delta--bad"><svg class="i i--xs"><use href="#i-arrow_down"/></svg>−3</span><span>за 10 минут</span><svg data-spark="82,81,83,80,79,80,78"></svg></span>
+        </div>
+        <div class="cab-stat">
+          <span class="cab-stat__label">Карточек обработано</span>
+          <span class="cab-stat__value">42<small>из ~70</small></span>
+          <span class="cab-stat__foot"><span>2,3 карт./мин</span><svg data-spark="3,8,14,20,27,35,42"></svg></span>
+        </div>
+        <div class="cab-stat">
+          <span class="cab-stat__label">Требуют внимания</span>
+          <span class="cab-stat__value">3</span>
+          <span class="cab-stat__foot"><span class="cab-pill cab-pill--critical"><svg class="i"><use href="#i-error"/></svg>2 сверх нормы</span><span class="cab-pill cab-pill--warn"><svg class="i"><use href="#i-warning"/></svg>1</span></span>
+        </div>
+      </section>
+
+      <!-- Фильтры -->
+      <div class="cab-filters">
+        <div class="cab-seg" role="group" aria-label="Кого показать">
+          <button aria-pressed="true">Все · 12</button>
+          <button aria-pressed="false">Проблемы · 3</button>
+          <button aria-pressed="false">112 · 4</button>
+          <button aria-pressed="false">ДДС · 8</button>
+        </div>
+        <span class="cab-filters__label">Сортировка</span>
+        <select class="cab-select" aria-label="Сортировка"><option>по тревоге</option><option>по фамилии</option><option>по баллу</option></select>
+      </div>
+
+      <div class="cab-grid cab-grid--main-aside">
+        <!-- Мозаика обучающихся -->
+        <section class="cab-tiles" id="tiles" aria-label="Обучающиеся"></section>
+
+        <!-- Правая колонка -->
+        <div class="cab-grid">
+          <section class="cab-card">
+            <div class="cab-card__head">
+              <span class="cab-card__title">Лента событий</span>
+              <button class="cab-btn cab-btn--sm cab-btn--ghost"><svg class="i i--sm"><use href="#i-tune"/></svg>Фильтр</button>
+            </div>
+            <ul class="cab-feed" id="feed"></ul>
+          </section>
+
+          <section class="cab-card">
+            <div class="cab-card__head cab-card__head--dark"><span class="cab-card__title">Вводные</span><span class="u-muted" style="color:var(--text-inverse-muted); font-size:12px">кому: Васильева О.</span></div>
+            <div class="cab-card__body" style="padding-top:10px; display:grid; gap:8px;">
+              <button class="cab-btn" style="justify-content:flex-start"><svg class="i i--sm"><use href="#i-phone"/></svg>Бригада не выходит на связь</button>
+              <button class="cab-btn" style="justify-content:flex-start"><svg class="i i--sm"><use href="#i-timer"/></svg>Бригада задерживается (+15 мин)</button>
+              <button class="cab-btn" style="justify-content:flex-start"><svg class="i i--sm"><use href="#i-warning"/></svg>Осложнение: нет доступа</button>
+              <button class="cab-btn" style="justify-content:flex-start"><svg class="i i--sm"><use href="#i-close"/></svg>Карточка не по профилю</button>
+              <button class="cab-btn" style="justify-content:flex-start"><svg class="i i--sm"><use href="#i-bolt"/></svg>Массовое происшествие (+5)</button>
+              <button class="cab-btn cab-btn--primary" style="justify-content:flex-start"><svg class="i i--sm"><use href="#i-headset"/></svg>Взять роль старшего бригады</button>
+            </div>
+          </section>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Нижняя панель на телефоне/планшете (удалённый контроль) -->
+  <nav class="cab-tabbar" aria-label="Разделы">
+    <a href="#"><svg class="i"><use href="#i-dashboard"/></svg>Сегодня</a>
+    <a href="#" aria-current="page"><svg class="i"><use href="#i-play"/></svg>Пульт</a>
+    <a href="#"><svg class="i"><use href="#i-group"/></svg>Группы</a>
+    <a href="#"><svg class="i"><use href="#i-bar_chart"/></svg>Аналитика</a>
+  </nav>
+</div>
+
+<script src="../js/viz.js"></script>
+<script>
+  // Демо-данные пульта (синтетические)
+  var STATUS = {
+    ok:       { icon: 'check_circle', label: 'в норме' },
+    warn:     { icon: 'warning',      label: 'близко к норме' },
+    critical: { icon: 'error',        label: 'сверх нормы' },
+    idle:     { icon: 'timer',        label: 'ждёт карточку' },
+    offline:  { icon: 'close',        label: 'отключён' }
+  };
+  var students = [
+    { n: 'Иванов И.',    ini: 'ИИ', role: 'ДДС · Поселение Вороновское', card: '36814845 · 101',       t: '0:41', st: 'critical', score: 71, done: '4/10', err: 3, note: 'Приём 41 с при нормативе 30 с' },
+    { n: 'Васильева О.', ini: 'ВО', role: 'ДДС · Мосгаз (104)',          card: '36814862 · Запах газа', t: '0:52', st: 'critical', score: 63, done: '3/10', err: 4, note: '«Прибытие» до доклада бригады' },
+    { n: 'Сидоров К.',   ini: 'СК', role: '112 · оператор',              card: 'Звонок · ДТП',          t: '1:05', st: 'warn',     score: 74, done: '2/6',  err: 2, note: 'Не выяснено: есть ли пострадавшие' },
+    { n: 'Петрова А.',   ini: 'ПА', role: 'ДДС · Мосводоканал',          card: '36814855 · Прорыв трубы', t: '0:12', st: 'ok',     score: 84, done: '5/10', err: 1, note: 'В очереди 3 карточки', q: 3 },
+    { n: 'Лебедев С.',   ini: 'ЛС', role: '112 · оператор',              card: 'Звонок · Человек в опасности', t: '0:48', st: 'ok', score: 74, done: '3/6', err: 2, note: '' },
+    { n: 'Кузнецова М.', ini: 'КМ', role: 'ДДС · Мослифт',               card: '36814860 · Застревание в лифте', t: '0:08', st: 'ok', score: 92, done: '6/10', err: 0, note: '' },
+    { n: 'Смирнов Д.',   ini: 'СД', role: '112 · оператор',              card: 'Звонок · Пожар',        t: '0:37', st: 'ok',       score: 88, done: '4/6',  err: 1, note: '' },
+    { n: 'Волкова Т.',   ini: 'ВТ', role: 'ДДС · Поселение Вороновское', card: '36814871 · ДТП',        t: '0:15', st: 'ok',       score: 86, done: '5/10', err: 1, note: '' },
+    { n: 'Новикова Е.',  ini: 'НЕ', role: '112 · оператор',              card: 'Звонок · Скопление воды', t: '0:24', st: 'ok',     score: 81, done: '3/6',  err: 1, note: '' },
+    { n: 'Козлова Н.',   ini: 'КН', role: 'ДДС · Мослифт',               card: '36814874 · Застревание в лифте', t: '0:05', st: 'ok', score: 90, done: '6/10', err: 0, note: '' },
+    { n: 'Попов А.',     ini: 'ПА', role: 'ДДС · Поселение Вороновское', card: 'Нет активной карточки', t: '—',   st: 'idle',     score: 79, done: '5/10', err: 1, note: '' },
+    { n: 'Морозов П.',   ini: 'МП', role: 'ДДС · Мосводоканал',          card: 'Связь потеряна 0:34',   t: '—',    st: 'offline',  score: 77, done: '4/10', err: 2, note: 'Таймеры продолжают идти' }
+  ];
+  var feed = [
+    ['11:24', 'critical', 'Иванов И.', 'приём карточки 41 с при нормативе 30 с', 'Карточка 36814845 · 101 Пожар'],
+    ['11:23', 'info',     'Вы',        'вводная «Бригада не выходит на связь» → Васильева О.', 'V-11 · учтётся в разборе'],
+    ['11:23', 'warn',     'Петрова А.', 'в очереди 3 карточки, старшая ждёт 25 с', 'Мосводоканал'],
+    ['11:22', 'critical', 'Васильева О.', 'статус «Прибытие» поставлен до доклада бригады', 'E-STATUS-EARLY'],
+    ['11:22', 'neutral',  'Морозов П.', 'отключился — таймеры продолжают идти', 'Возобновится с места'],
+    ['11:21', 'ok',       'Кузнецова М.', 'карточка закрыта · 96 баллов', 'Застревание в лифте'],
+    ['11:21', 'info',     'ИИ',         'реплика заявителя по шаблону (LLM ответила за 4 с)', 'Сидоров К. · диалог 112'],
+    ['11:20', 'warn',     'Сидоров К.', 'подсказка уровня 2 (−5 баллов)', 'К3 · классификация']
+  ];
+
+  function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]; }); }
+  function icon(name, cls) { return '<svg class="i ' + (cls || '') + '"><use href="#i-' + name + '"/></svg>'; }
+
+  document.getElementById('tiles').innerHTML = students.map(function (s) {
+    var st = STATUS[s.st];
+    var pillCls = s.st === 'idle' || s.st === 'offline' ? 'neutral' : s.st;
+    var tileCls = s.st === 'idle' ? '' : (s.st === 'offline' ? 'cab-tile--offline' : 'cab-tile--' + s.st);
+    return '<article class="cab-tile ' + tileCls + '">' +
+      '<div class="cab-tile__head"><span class="cab-avatar cab-avatar--light">' + esc(s.ini) + '</span>' +
+        '<span class="u-grow"><span class="cab-tile__name">' + esc(s.n) + '</span><span class="cab-tile__role u-ellipsis">' + esc(s.role) + '</span></span></div>' +
+      '<div class="cab-tile__card">' + icon(s.role.indexOf('112') === 0 ? 'phone' : 'clipboard', 'i--sm') + '<b class="u-ellipsis">' + esc(s.card) + '</b>' +
+        (s.q ? '<span class="cab-tag cab-tag--dark">очередь ' + s.q + '</span>' : '') +
+        '<span class="cab-tile__timer' + (s.st === 'critical' ? ' cab-tile__timer--over' : '') + '">' + esc(s.t) + '</span></div>' +
+      '<div class="cab-tile__body"><span class="cab-tile__score">' + s.score + '<small>балл</small></span>' +
+        '<span class="cab-tile__meta"><span class="cab-pill cab-pill--' + pillCls + '">' + icon(st.icon) + esc(st.label) + '</span><br>карточек ' + esc(s.done) + ' · ошибок ' + s.err + '</span></div>' +
+      '<div class="cab-tile__note">' + (s.note ? (s.st === 'critical' ? icon('error') : '') + esc(s.note) : '') + '</div>' +
+      '<div class="cab-tile__actions">' +
+        '<button class="cab-iconbtn" title="Взгляд через плечо">' + icon('eye') + '</button>' +
+        '<button class="cab-iconbtn" title="Шёпот-подсказка">' + icon('chat') + '</button>' +
+        '<button class="cab-iconbtn" title="Вводная">' + icon('bolt') + '</button>' +
+        '<button class="cab-iconbtn" title="Пауза">' + icon('pause') + '</button>' +
+      '</div></article>';
+  }).join('');
+
+  var FEED_ICON = { critical: 'error', warn: 'warning', ok: 'check_circle', info: 'info', neutral: 'close' };
+  document.getElementById('feed').innerHTML = feed.map(function (f) {
+    return '<li class="cab-feed__item"><span class="cab-feed__time">' + f[0] + '</span>' +
+      '<span class="cab-feed__icon cab-feed__icon--' + f[1] + '">' + icon(FEED_ICON[f[1]]) + '</span>' +
+      '<span><span class="cab-feed__who">' + esc(f[2]) + '</span>: ' + esc(f[3]) + '<span class="cab-feed__sub">' + esc(f[4]) + '</span></span></li>';
+  }).join('');
+
+  document.querySelectorAll('[data-spark]').forEach(function (svg) {
+    SmenaViz.sparkline(svg, svg.getAttribute('data-spark').split(',').map(Number));
+  });
+</script>
+</body>
+</html>

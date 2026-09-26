@@ -1,0 +1,55 @@
+# Перечисления АРМ-112 / АРМ-ДДС. Источник — инструкция 2507ГСИ (docs/brief/03), скриншоты стенда, ответы заказчика.
+enums:
+  applicant_status:          # статус заявителя (строго 6 значений, после сохранения не меняется)
+    - {code: witness,   name: очевидец}
+    - {code: victim,    name: пострадавший}
+    - {code: relative,  name: родственник}
+    - {code: acquaintance, name: знакомый}
+    - {code: child,     name: ребенок}
+    - {code: participant, name: участник}
+
+  card_status:               # статус карточки 112 (журнал)
+    - {code: registered,    name: Зарегистрирована}
+    - {code: worked,        name: Отработана}
+    - {code: checked,       name: Проверена}
+    - {code: completed,     name: Завершена,      attrs: {note: "нет контакта / срыв звонка — сразу с признаком «Проверено»"}}
+    - {code: not_notified,  name: Не оповещено,   attrs: {error: true, color: red}}
+    - {code: not_completed, name: Не завершено,   attrs: {error: true, note: "48 ч без «Работы завершены» от службы"}}
+    - {code: refusal,       name: Отказ,          attrs: {error: true}}
+
+  service_status:            # статус службы по карточке (чип службы 112 и нижние поля карточки ДДС)
+    - {code: added,       name: Добавлена,                 attrs: {set_by: system, order: 1}}
+    - {code: received,    name: Получена службой,          attrs: {set_by: system, order: 2}}
+    - {code: accepted,    name: Принята,                   attrs: {set_by: dds, order: 3, needs: [order_no, comment]}}
+    - {code: rejected,    name: Не принята,                attrs: {set_by: dds, order: 3, final: true, needs: [comment]}}
+    - {code: response_started, name: Начало реагирования,  attrs: {set_by: dds, order: 4}}
+    - {code: arrived,     name: Прибытие,                  attrs: {set_by: dds, order: 5}}
+    - {code: works_in_progress, name: Проведение работ,    attrs: {set_by: dds, order: 6}}
+    - {code: works_completed,   name: Работы завершены,    attrs: {set_by: dds, order: 7, final: true, aliases: [Завершение работ]}}
+    - {code: works_refused,     name: Отказ от выполнения работ, attrs: {set_by: dds, final: true, needs: [comment]}}
+
+  telephony_status:          # статус оператора в телефонии
+    - {code: available,     name: доступен}
+    - {code: unavailable,   name: недоступен}
+    - {code: not_connected, name: не подключен}
+    - {code: error,         name: ошибка}
+
+  card_flag:                 # признаки карточки/опросной карты, влияющие на маршрутизацию (условные колонки классификатора)
+    - {code: no_access,         name: Нет доступа}
+    - {code: threat_to_people,  name: Угроза людям}
+    - {code: victims,           name: Пострадавшие / погибшие}
+    - {code: victims_not_on_site, name: Пострадавший не на месте}
+    - {code: offense,           name: Правонарушение}
+    - {code: gasified,          name: Проведена газификация}
+    - {code: medical_help,      name: Медицинская помощь}
+    - {code: evacuation,        name: Требуется эвакуация}
+    - {code: mass_casualties,   name: "Более 5 человек / ОД"}
+    - {code: traffic_blocked,   name: Перекрытие движения}
+    - {code: tunnel,            name: Тоннель}
+    - {code: pedestrian_crossing, name: Пешеходный переход}
+    - {code: road_structure,    name: "Автодорожное сооружение (мост, эстакада)"}
+    - {code: comm_object,       name: Объект связи}
+    - {code: construction_site, name: Стройка}
+    - {code: culture_object,    name: Объект культуры из перечня}
+    - {code: emergency,         name: ЧС}
+    - {code: incident_flag,     name: ЧП}

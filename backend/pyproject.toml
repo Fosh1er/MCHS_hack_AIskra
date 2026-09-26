@@ -1,0 +1,136 @@
+[project]
+name = "aiskra"
+version = "0.1.0"
+description = "Тренажёр оператора 112 / диспетчера ДДС с ИИ — backend"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "pydantic>=2.8",
+    "pydantic-settings>=2.4",
+    "sqlalchemy[asyncio]>=2.0.32",
+    "asyncpg>=0.29",
+    "alembic>=1.13",
+    "httpx>=0.27",
+    "pyyaml>=6.0",
+    "openpyxl>=3.1",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "aiosqlite>=0.20",
+    "ruff>=0.6",
+    "mypy>=1.11",
+    "import-linter>=2.1",
+    "types-PyYAML>=6.0",
+    "types-openpyxl>=3.1.5.20260827",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/aiskra"]
+
+# ---------------------------------------------------------------- pytest
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+# ---------------------------------------------------------------- ruff
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "ASYNC", "RUF"]
+ignore = ["RUF001", "RUF002", "RUF003"]  # кириллица в строках и комментариях — норма для проекта
+
+# ---------------------------------------------------------------- mypy
+[tool.mypy]
+python_version = "3.12"
+strict = true
+mypy_path = "src"
+packages = ["aiskra"]
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = ["asyncpg.*"]
+ignore_missing_imports = true
+
+# ---------------------------------------------------------------- import-linter
+# Архитектурные правила проверяются автоматически: `uv run lint-imports`.
+[tool.importlinter]
+root_package = "aiskra"
+include_external_packages = true
+exclude_type_checking_imports = true
+
+[[tool.importlinter.contracts]]
+name = "Слои модуля: api и infrastructure → application → domain"
+type = "layers"
+layers = ["api | infrastructure", "application", "domain"]
+containers = [
+    "aiskra.modules.system",
+    "aiskra.modules.identity",
+    "aiskra.modules.dictionaries",
+    "aiskra.modules.incidents",
+    "aiskra.modules.training",
+    "aiskra.modules.assessment",
+    "aiskra.modules.audit",
+]
+
+[[tool.importlinter.contracts]]
+name = "Домен чистый: без фреймворков, БД, HTTP и pydantic"
+type = "forbidden"
+source_modules = ["aiskra.modules.*.domain", "aiskra.shared.domain"]
+forbidden_modules = ["fastapi", "starlette", "sqlalchemy", "httpx", "pydantic", "aiskra.platform", "aiskra.ai"]
+
+[[tool.importlinter.contracts]]
+name = "Общее ядро чистое: права, аудит, ошибки и CQRS-примитивы без фреймворков (HTTP-часть — только shared.web)"
+type = "forbidden"
+source_modules = [
+    "aiskra.shared.security",
+    "aiskra.shared.audit",
+    "aiskra.shared.application",
+    "aiskra.shared.errors",
+    "aiskra.shared.text",
+]
+forbidden_modules = ["fastapi", "starlette", "sqlalchemy", "httpx", "pydantic", "aiskra.platform", "aiskra.modules"]
+
+[[tool.importlinter.contracts]]
+name = "Application зависит только от портов, не от адаптеров и фреймворков"
+type = "forbidden"
+source_modules = ["aiskra.modules.*.application"]
+forbidden_modules = ["fastapi", "starlette", "sqlalchemy", "httpx", "aiskra.ai.adapters", "aiskra.platform", "aiskra.bootstrap"]
+
+[[tool.importlinter.contracts]]
+name = "API модулей не знает о composition root и адаптерах"
+type = "forbidden"
+source_modules = ["aiskra.modules.*.api"]
+forbidden_modules = ["aiskra.bootstrap", "aiskra.ai.adapters", "sqlalchemy"]
+
+[[tool.importlinter.contracts]]
+name = "Порты ИИ не зависят от адаптеров"
+type = "forbidden"
+source_modules = ["aiskra.ai.ports", "aiskra.ai.router", "aiskra.ai.tasks"]
+forbidden_modules = ["aiskra.ai.adapters", "httpx"]
+
+[[tool.importlinter.contracts]]
+name = "Модули независимы (межмодульная связь — только через явное исключение ignore_imports + ADR)"
+type = "independence"
+modules = [
+    "aiskra.modules.system",
+    "aiskra.modules.identity",
+    "aiskra.modules.dictionaries",
+    "aiskra.modules.incidents",
+    "aiskra.modules.training",
+    "aiskra.modules.assessment",
+    "aiskra.modules.audit",
+]

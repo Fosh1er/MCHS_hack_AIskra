@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Стайлгайд — СМЕНА-112 UI Kit</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../tokens/tokens.css">
+  <link rel="stylesheet" href="../css/base.css">
+  <link rel="stylesheet" href="../css/arm.css">
+  <link rel="stylesheet" href="../css/cabinet.css">
+  <style>
+    /* Только для страницы стайлгайда */
+    .sg { max-width: 1480px; margin: 0 auto; padding: 0 24px 60px; }
+    .sg h2 { font-size: 22px; font-weight: 400; margin: 36px 0 12px; color: var(--text-strong); }
+    .sg h3 { font-size: 14px; font-weight: 700; margin: 18px 0 8px; color: var(--text-strong); }
+    .sg p.note { font-size: 13px; color: var(--text-muted-canvas); max-width: 860px; }
+    .sg-swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+    .sg-sw { background: var(--bg-panel); font-size: 12px; }
+    .sg-sw__chip { height: 54px; border-bottom: 1px solid rgba(0,0,0,.06); }
+    .sg-sw__meta { padding: 6px 8px; line-height: 1.35; }
+    .sg-sw__meta code { color: var(--text-muted); font-size: 11px; }
+    .sg-frame { position: relative; background: var(--bg-canvas); padding: 12px; border: 1px dashed #9aa3a9; overflow: hidden; }
+    .sg-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+    .sg-pages { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+    .sg-page { background: var(--bg-panel); padding: 14px 16px; text-decoration: none; color: var(--text-strong); border-top: 4px solid var(--accent); display: block; }
+    .sg-page:hover { background: #fff; }
+    .sg-page b { font-size: 16px; }
+    .sg-page span { display: block; color: var(--text-muted); font-size: 13px; margin-top: 4px; }
+    .sg-type > div { display: flex; gap: 16px; align-items: baseline; padding: 4px 0; border-bottom: 1px solid var(--border-subtle); }
+    .sg-type code { width: 170px; flex: none; font-size: 11px; color: var(--text-muted); }
+    @media (max-width: 900px) { .sg-pages { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+<script src="../icons/icons.js"></script>
+
+<header class="cab-topbar">
+  <div class="cab-topbar__main">
+    <div class="cab-crumbs">UI Kit · v0.1</div>
+    <h1 class="cab-title">СМЕНА-112 · библиотека стилей<small>палитра и формы сняты со скриншотов АРМ ГБУ «Система 112»</small></h1>
+  </div>
+  <div class="cab-clock"><div><div class="cab-clock__label">Шрифт</div><div class="cab-clock__sub">Roboto 300/400/500/700</div></div><div class="cab-clock__time">112</div></div>
+</header>
+
+<div class="sg">
+
+  <h2>Экраны по ролям</h2>
+  <div class="sg-pages">
+    <a class="sg-page" href="student-arm-dds.html"><b>Обучающийся · АРМ-ДДС</b><span>Копия карточки ДДС: панель служб, история и статусы. Учебный док: IP-телефон, диалог со старшим бригады, очередь с таймерами.</span></a>
+    <a class="sg-page" href="teacher-console.html"><b>Преподаватель · пульт занятия</b><span>Мозаика обучающихся, статусы нормативов, KPI со спарклайнами, лента событий, вводные.</span></a>
+    <a class="sg-page" href="admin-status.html"><b>Администратор · состояние системы</b><span>Сервисы, алерты, SLA-график отклика с порогом 2 с, ресурсы, очереди ИИ, аудит.</span></a>
+  </div>
+
+  <!-- ===================== Цвет ===================== -->
+  <h2>Цвет</h2>
+  <p class="note">Базовые цвета сняты пипеткой с реальных скриншотов; «derived» — производные для hover и подсветок. Статусные цвета никогда не используются без иконки и подписи.</p>
+  <h3>Интерфейс АРМ</h3>
+  <div class="sg-swatches" id="sw-base"></div>
+  <h3>Акценты</h3>
+  <div class="sg-swatches" id="sw-accent"></div>
+  <h3>Статусы (всегда иконка + подпись)</h3>
+  <div class="sg-swatches" id="sw-status"></div>
+
+  <!-- ===================== Типографика ===================== -->
+  <h2>Типографика</h2>
+  <div class="cab-card"><div class="cab-card__body sg-type" style="padding-top:10px">
+    <div><code>--fs-clock 56 / 700</code><span style="font-size:56px; font-weight:700; line-height:1">11:24<span class="t-sec" style="font-size:20px; vertical-align:1.5em">26</span></span></div>
+    <div><code>--fs-timer 38 / 700</code><span style="font-size:38px; font-weight:700">02:38</span></div>
+    <div><code>--fs-3xl 34 / 400</code><span style="font-size:34px">Поиск происшествий</span></div>
+    <div><code>--fs-2xl 28 / 400</code><span style="font-size:28px">Пульт занятия</span></div>
+    <div><code>--fs-xl 20 / 400</code><span style="font-size:20px">что случилось?</span></div>
+    <div><code>--fs-lg 16 / 700</code><span style="font-size:16px; font-weight:700">ДТП · заголовок строки журнала</span></div>
+    <div><code>--fs-md 13 / 400·700</code><span style="font-size:13px">Базовый текст АРМ · <b>Дом многоквартирный . квартира</b></span></div>
+    <div><code>--fs-sm 12</code><span style="font-size:12px">Подписи столбцов, метаданные</span></div>
+    <div><code>--fs-xs 11 · muted</code><span style="font-size:11px; color:var(--text-muted)">АОН · предоставленный · телефон на место</span></div>
+  </div></div>
+
+  <!-- ===================== АРМ-112 ===================== -->
+  <h2>АРМ-112 · элементы карточки</h2>
+  <div class="sg-frame">
+    <div class="arm-strip" style="height:64px">
+      <div class="arm-callctl">
+        <div class="arm-callctl__hang"><svg class="i i--lg"><use href="#i-call_end"/></svg></div>
+        <div class="arm-callctl__main"><div class="arm-callctl__title">Отключение</div><div class="arm-callctl__btns"><button class="arm-minibtn">записи звонков</button><button class="arm-minibtn">список SMS</button></div></div>
+      </div>
+      <div class="arm-phone arm-phone--active">
+        <div class="arm-phone__icons"><button><svg class="i i--sm"><use href="#i-phone"/></svg></button><button><svg class="i i--sm"><use href="#i-sms"/></svg></button></div>
+        <div class="arm-phone__field"><div class="arm-phone__label">АОН</div><div class="arm-phone__value">+7 (999) 000-12-34</div></div>
+      </div>
+      <div class="arm-phone">
+        <div class="arm-phone__icons"><button><svg class="i i--sm"><use href="#i-phone"/></svg></button><button><svg class="i i--sm"><use href="#i-sms"/></svg></button></div>
+        <div class="arm-phone__field"><div class="arm-phone__label">предоставленный</div><div class="arm-phone__value arm-phone__value--empty">+7 (   )   -  -</div></div>
+      </div>
+      <div class="arm-idbox"><div class="arm-idbox__title">Происшествие 36814851</div><div class="arm-idbox__meta">Сохр. 17.09.2026 в 11:38:33<br>Опер. , АРМ 4, УМЦ</div></div>
+      <div class="arm-timer"><span class="arm-timer__value">00:09</span><span class="arm-timer__units"><span>минут</span><span>секунд</span></span></div>
+      <div class="arm-timer arm-timer--over"><span class="arm-timer__value">02:38</span><span class="arm-timer__units"><span>минут</span><span>секунд</span></span></div>
+    </div>
+
+    <div class="cab-grid cab-grid--2" style="margin-top:8px; gap:8px">
+      <div class="arm-panel" style="display:grid; gap:10px; padding:12px">
+        <div class="sg-row"><div class="arm-field u-grow"><label class="arm-field__label">&nbsp;</label><input class="arm-field__input" placeholder="Фамилия и имя заявителя"></div><div class="arm-field" style="width:160px"><label class="arm-field__label">&nbsp;</label><input class="arm-field__input" placeholder="выберите статус"></div></div>
+        <div class="arm-field"><label class="arm-field__label">Адрес:</label><input class="arm-field__input" value="Москва"></div>
+        <div class="sg-row" style="flex-wrap:nowrap"><div class="arm-field u-grow"><label class="arm-field__label">Улица:</label><input class="arm-field__input"></div><div class="arm-field" style="width:90px"><label class="arm-field__label">Дом/Вл:</label><input class="arm-field__input"></div><div class="arm-field" style="width:90px"><label class="arm-field__label">Корпус:</label><input class="arm-field__input"></div></div>
+      </div>
+      <div class="arm-panel" style="padding:12px">
+        <div class="sg-row">
+          <button class="arm-bigbtn">Пострадавшие</button>
+          <button class="arm-bigbtn">Нет на месте/<br>Отказ от скорой</button>
+          <button class="arm-bigbtn">Нет доступа/<br>Заблокированные</button>
+          <button class="arm-bigbtn arm-bigbtn--alert">нет контакта</button>
+          <button class="arm-bigbtn arm-bigbtn--alert">срыв звонка</button>
+        </div>
+        <input class="arm-typeinput" style="margin-top:14px" placeholder="что случилось?">
+        <div class="arm-chips arm-chips--tight" style="margin-top:12px">
+          <button class="arm-chip arm-chip--flat">ДТП</button><button class="arm-chip arm-chip--flat">Ошибочно набран номер</button><button class="arm-chip arm-chip--flat">104</button><button class="arm-chip arm-chip--flat">Человек в опасности</button><button class="arm-chip arm-chip--flat">Отмена вызова</button><button class="arm-chip arm-chip--flat">Справка-101</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="arm-q" style="margin-top:8px">
+      <div class="arm-q__head"><span>Происшествие 101</span><svg class="i i--sm"><use href="#i-close"/></svg></div>
+      <div class="arm-q__row"><span class="arm-q__label">Где</span><span class="arm-chips arm-chips--tight"><button class="arm-chip">Улица</button><button class="arm-chip">Транспорт</button><button class="arm-chip arm-chip--selected">Дом</button><button class="arm-chip">Здание / объект</button><button class="arm-chip">Опасный объект</button></span></div>
+      <div class="arm-q__row"><span class="arm-q__label">Признак пожара (дом)</span><span class="arm-chips arm-chips--tight"><button class="arm-chip arm-chip--selected">Открытое пламя / Дым</button><button class="arm-chip">Запах гари</button><button class="arm-chip">Сработала пожарная сигнализация</button></span></div>
+      <div class="arm-q__row"><span class="arm-q__label">Угроза людям</span><span class="arm-chips arm-chips--tight"><button class="arm-chip arm-chip--selected">Да</button><button class="arm-chip">Нет</button></span></div>
+      <div class="arm-q__row"><span class="arm-q__label">Проведена ли газификация</span><span class="arm-chips arm-chips--tight"><button class="arm-chip">Да</button><button class="arm-chip">Нет</button><button class="arm-chip">Нет данных</button></span></div>
+    </div>
+
+    <div class="arm-svcbar arm-svcbar--112" style="margin-top:8px">
+      <div class="arm-svcbar__label">Службы:</div>
+      <div class="arm-svcbar__tabs">
+        <span class="arm-svc arm-svc--main"><svg class="i i--xs arm-svc__phone"><use href="#i-phone"/></svg><svg class="i i--xs arm-svc__x"><use href="#i-close"/></svg><span class="arm-svc__name">Служба 101</span></span>
+        <span class="arm-svc"><svg class="i i--xs arm-svc__phone"><use href="#i-phone"/></svg><svg class="i i--xs arm-svc__x"><use href="#i-close"/></svg><span class="arm-svc__name">Служба 104</span></span>
+        <span class="arm-svc"><svg class="i i--xs arm-svc__phone"><use href="#i-phone"/></svg><svg class="i i--xs arm-svc__x"><use href="#i-close"/></svg><span class="arm-svc__name">Служба 102</span></span>
+        <span class="arm-svc arm-svc--nointegr"><svg class="i i--xs arm-svc__phone"><use href="#i-phone"/></svg><svg class="i i--xs arm-svc__x"><use href="#i-close"/></svg><span class="arm-svc__name">Деп. ЖКХ</span></span>
+        <span class="arm-svc"><svg class="i i--xs arm-svc__phone"><use href="#i-phone"/></svg><svg class="i i--xs arm-svc__x"><use href="#i-close"/></svg><span class="arm-svc__name">ЦЭМП</span></span>
+        <div style="display:flex; align-items:center; gap:10px; padding-left:12px"><button class="arm-sqbtn"><svg class="i"><use href="#i-unfold_more"/></svg></button><button class="arm-sqbtn"><svg class="i"><use href="#i-close" transform="rotate(45 12 12)"/></svg></button></div>
+      </div>
+      <div class="arm-svcbar__end">
+        <button class="arm-savebtn">сохранить</button>
+        <button class="arm-sqbtn"><svg class="i"><use href="#i-link"/></svg></button>
+        <button class="arm-sqbtn"><svg class="i"><use href="#i-timer"/></svg></button>
+        <button class="arm-sqbtn"><svg class="i"><use href="#i-hand"/></svg></button>
+        <button class="arm-sqbtn"><svg class="i"><use href="#i-bell"/></svg></button>
+        <button class="arm-sqbtn"><svg class="i"><use href="#i-report"/></svg></button>
+        <button class="arm-sqbtn"><svg class="i"><use href="#i-close"/></svg></button>
+      </div>
+    </div>
+  </div>
+
+  <h3>Модальное окно «Добавьте службы» и редактор статуса ДДС</h3>
+  <div class="sg-frame" style="height:470px">
+    <div class="arm-overlay"></div>
+    <div class="arm-modal" style="position:absolute; left:40px; top:14px">
+      <button class="arm-modal__close" aria-label="Закрыть"><svg class="i i--sm"><use href="#i-close"/></svg></button>
+      <div class="arm-modal__title">Добавьте службы</div>
+      <div class="arm-modal__search"><input class="arm-typeinput" placeholder="Поиск ..."></div>
+      <div class="arm-modal__list u-scroll" style="max-height:220px">
+        <div class="arm-modal__item arm-modal__item--on">Служба 101 (ГУ МЧС России по г.Москве, ГКУ «Пожарно-спасательный центр» ОДС)</div>
+        <div class="arm-modal__item">ФСБ</div>
+        <div class="arm-modal__item arm-modal__item--on">ЦЭМП</div>
+        <div class="arm-modal__item">Служба 103 (ГБУ города Москвы Станция скорой и неотложной медицинской помощи им. А.С. Пучкова)</div>
+        <div class="arm-modal__item arm-modal__item--on">Служба 104 (АО «МОСГАЗ» Диспетчерское управление)</div>
+      </div>
+      <button class="arm-modal__btn">Сохранить и закрыть</button>
+    </div>
+    <div class="arm-stateditor" style="left:520px; top:200px; width:860px">
+      <select class="arm-uline arm-uline--select" style="width:280px" aria-label="Статус"><option>Принята</option><option>Не принята</option><option>Начало реагирования</option><option>Прибытие</option><option>Проведение работ</option><option>Работы завершены</option><option>Отказ от выполнения работ</option></select>
+      <input class="arm-uline" style="width:170px" placeholder="Номер наряда" value="23">
+      <input class="arm-uline u-grow" placeholder="Комментарий" value="Направлена бригада №23 (ст. Петров А. В.)">
+      <button class="arm-iconsq" aria-label="Сохранить"><svg class="i i--sm"><use href="#i-check"/></svg></button>
+      <button class="arm-iconsq" aria-label="Отмена"><svg class="i i--sm"><use href="#i-close"/></svg></button>
+    </div>
+  </div>
+
+  <!-- ===================== Журнал ДДС ===================== -->
+  <h2>АРМ-ДДС · журнал происшествий</h2>
+  <div class="arm-journal" style="height:auto">
+    <div class="arm-search">
+      <div class="arm-search__main">
+        <div style="position:relative"><input class="arm-search__input" placeholder="Поиск происшествий" aria-label="Поиск происшествий"><svg class="i i--xl" style="position:absolute; right:0; top:8px"><use href="#i-search"/></svg></div>
+        <div class="arm-search__row"><span>расширенный по параметрам <svg class="i i--xs"><use href="#i-expand_more"/></svg></span><button class="arm-search__reset">сбросить</button></div>
+      </div>
+      <div class="arm-clockpanel">
+        <div><div class="arm-clockpanel__date">Пятница, 02 Октябрь 2026</div><div class="arm-clockpanel__user">, УМЦ Оп <svg class="i i--xs"><use href="#i-settings"/></svg><svg class="i i--xs"><use href="#i-help"/></svg></div></div>
+        <div class="arm-clockpanel__time">11:24<span class="t-sec">26</span></div>
+      </div>
+    </div>
+    <div class="arm-list">
+      <div class="arm-list__head"><span class="arm-list__title">Список происшествий <svg class="i i--sm"><use href="#i-expand_less"/></svg></span><button class="arm-list__filter">выберите что показать</button></div>
+      <div class="arm-jgrid arm-jhead"><div>Связи</div><div></div><div>ЧС</div><div></div><div>Опер.</div><div>АРМ</div><div>Номер</div><div>Дата</div><div>Время</div><div>Тип происшествия</div><div>Постр.</div><div>Адрес</div><div>Статус службы</div><div>Ожидание</div><div></div></div>
+      <div class="arm-jitem">
+        <div class="arm-jgrid arm-jrow arm-jrow--new">
+          <div><svg class="i i--sm"><use href="#i-expand_more"/></svg></div><div class="c-slate"><svg class="i i--sm"><use href="#i-bookmark"/></svg></div><div><svg class="i i--sm"><use href="#i-bolt"/></svg></div><div><svg class="i i--sm"><use href="#i-timer"/></svg></div><div class="c-wine">0</div><div class="c-slate">4</div><div>36814848</div><div>02.10.26</div><div class="c-time">11:16<span class="t-sec">53</span></div><div class="c-type">ДТП</div><div class="c-slate">Есть</div><div class="c-addr">Москва, (ТАО, Вороновское), Троицкий административный округ</div><div class="c-status">Добавлена</div><div class="c-slate"><span class="arm-pill arm-pill--critical"><svg class="i"><use href="#i-error"/></svg>0:47</span></div><div class="c-slate"><svg class="i i--sm"><use href="#i-clipboard"/></svg></div>
+        </div>
+        <div class="arm-jdesc"><span class="arm-jdesc__label">Описание:</span><span class="arm-jdesc__meta">02.10.2026 11:18:12 УМЦ О. п. -</span><span class="arm-jdesc__text">ДТП, столкнулись 2 автомобиля, разлитие топлива, есть пострадавшие</span></div>
+      </div>
+      <div class="arm-jitem">
+        <div class="arm-jgrid arm-jrow">
+          <div><svg class="i i--sm"><use href="#i-expand_more"/></svg></div><div class="c-slate"><svg class="i i--sm"><use href="#i-bookmark"/></svg></div><div><svg class="i i--sm"><use href="#i-bolt"/></svg></div><div><svg class="i i--sm"><use href="#i-timer"/></svg></div><div class="c-wine">0</div><div class="c-slate">4</div><div>36814845</div><div>02.10.26</div><div class="c-time">11:12<span class="t-sec">43</span></div><div class="c-type">101</div><div class="c-slate">Нет</div><div class="c-addr">Москва, (ТАО, Вороновское), Троицкий административный округ</div><div class="c-status">Начало реагир.</div><div class="c-slate"><span class="arm-pill arm-pill--ok"><svg class="i"><use href="#i-check_circle"/></svg>в работе</span></div><div class="c-slate"><svg class="i i--sm"><use href="#i-clipboard"/></svg></div>
+        </div>
+        <div class="arm-jdesc"><span class="arm-jdesc__label">Описание:</span><span class="arm-jdesc__meta">02.10.2026 11:13:19 УМЦ О. п. -</span><span class="arm-jdesc__text">Пожар в квартире</span></div>
+      </div>
+      <div class="arm-pager"><span>Страница: 1 ▾</span><span>Записей на странице: 10 ▾</span><span>1–2 из 2</span><svg class="i i--sm" style="transform: scaleX(-1)"><use href="#i-chevron_right"/></svg><svg class="i i--sm"><use href="#i-chevron_right"/></svg></div>
+    </div>
+  </div>
+
+  <!-- ===================== Кабинеты ===================== -->
+  <h2>Кабинеты · кнопки, фильтры, статусы</h2>
+  <div class="cab-card"><div class="cab-card__body" style="padding-top:12px; display:grid; gap:14px">
+    <div class="sg-row">
+      <button class="cab-btn cab-btn--primary"><svg class="i i--sm"><use href="#i-play"/></svg>Старт занятия</button>
+      <button class="cab-btn">Вторичная</button>
+      <button class="cab-btn cab-btn--dark">Тёмная</button>
+      <button class="cab-btn cab-btn--danger">Завершить</button>
+      <button class="cab-btn cab-btn--ghost">Призрачная</button>
+      <button class="cab-btn cab-btn--sm">Малая</button>
+      <button class="cab-iconbtn" aria-label="Смотреть"><svg class="i"><use href="#i-eye"/></svg></button>
+      <button class="cab-iconbtn" aria-label="Шёпот"><svg class="i"><use href="#i-chat"/></svg></button>
+    </div>
+    <div class="sg-row">
+      <div class="cab-seg"><button aria-pressed="true">Все</button><button aria-pressed="false">112</button><button aria-pressed="false">ДДС</button></div>
+      <select class="cab-select"><option>по тревоге</option></select>
+      <span class="cab-tag">112 · оператор</span><span class="cab-tag cab-tag--dark">очередь 3</span><span class="cab-tag cab-tag--blue">утверждён</span>
+    </div>
+    <div class="sg-row">
+      <span class="cab-pill cab-pill--ok"><svg class="i"><use href="#i-check_circle"/></svg>в норме</span>
+      <span class="cab-pill cab-pill--warn"><svg class="i"><use href="#i-warning"/></svg>близко к норме</span>
+      <span class="cab-pill cab-pill--serious"><svg class="i"><use href="#i-warning"/></svg>серьёзно</span>
+      <span class="cab-pill cab-pill--critical"><svg class="i"><use href="#i-error"/></svg>сверх нормы</span>
+      <span class="cab-pill cab-pill--info"><svg class="i"><use href="#i-info"/></svg>инфо</span>
+      <span class="cab-pill cab-pill--neutral"><svg class="i"><use href="#i-close"/></svg>отключён</span>
+      <span class="u-grow"></span>
+      <span style="background:var(--bg-dark); padding:6px 8px; display:inline-flex; gap:8px">
+        <span class="arm-pill arm-pill--ok"><svg class="i"><use href="#i-check_circle"/></svg>в работе</span>
+        <span class="arm-pill arm-pill--warn"><svg class="i"><use href="#i-warning"/></svg>0:21</span>
+        <span class="arm-pill arm-pill--critical"><svg class="i"><use href="#i-error"/></svg>0:47</span>
+      </span>
+    </div>
+    <div class="cab-banner"><svg class="i"><use href="#i-warning"/></svg><span>Баннер предупреждения — ожидание в очереди LLM выше порога</span></div>
+    <div class="cab-banner cab-banner--critical"><svg class="i"><use href="#i-error"/></svg><span>Критичный баннер — 2 обучающихся превышают норматив</span></div>
+  </div></div>
+
+  <h2>Иконки</h2>
+  <div class="cab-card"><div class="cab-card__body sg-row" id="icons" style="padding-top:12px; gap:6px"></div></div>
+</div>
+
+<script>
+  var base = [
+    ['--c-graphite-700', '#2f353a', 'часы, строки журнала, таймер'], ['--c-graphite-750', '#303335', 'шапка «Происшествие»'],
+    ['--c-slate-600', '#49555d', 'панель служб, описание'], ['--c-steel-500', '#838f97', 'фон журнала'],
+    ['--c-grey-500', '#8e9091', 'служба без интеграции'], ['--c-grey-400', '#aeb1b3', 'рамки чипов'],
+    ['--c-canvas', '#c9ced1', 'фон карточки'], ['--c-paper-200', '#ebecec', 'шапка поиска'],
+    ['--c-paper-100', '#efefef', 'панели'], ['--c-wine-600', '#6c364b', 'ячейка «Опер.»']
+  ];
+  var accent = [
+    ['--c-blue-600', '#157dbd', 'бренд-синий, выбранное'], ['--c-blue-700', '#10689e', 'hover · derived'],
+    ['--c-orange-600', '#ec653b', 'АРМ-112, «ЧП»'], ['--c-red-timer', '#ff0000', 'таймер сверх нормы'],
+    ['--c-sky-500', '#67abd3', 'экран входа']
+  ];
+  var statusColors = [['--s-ok', '#0ca30c', 'в норме'], ['--s-warn', '#fab219', 'близко к норме'], ['--s-serious', '#ec835a', 'серьёзно'], ['--s-critical', '#d03b3b', 'сверх нормы / сбой']];
+  function sw(list, id) {
+    var host = document.getElementById(id);
+    list.forEach(function (c) {
+      var d = document.createElement('div'); d.className = 'sg-sw';
+      var chip = document.createElement('div'); chip.className = 'sg-sw__chip'; chip.style.background = 'var(' + c[0] + ')';
+      var meta = document.createElement('div'); meta.className = 'sg-sw__meta';
+      var b = document.createElement('b'); b.textContent = c[1];
+      var code = document.createElement('code'); code.textContent = c[0];
+      meta.appendChild(b); meta.appendChild(document.createElement('br')); meta.appendChild(code);
+      meta.appendChild(document.createElement('br')); meta.appendChild(document.createTextNode(c[2]));
+      d.appendChild(chip); d.appendChild(meta); host.appendChild(d);
+    });
+  }
+  sw(base, 'sw-base'); sw(accent, 'sw-accent'); sw(statusColors, 'sw-status');
+  // Иконки: берём id из спрайта
+  window.addEventListener('DOMContentLoaded', function () {
+    var host = document.getElementById('icons');
+    document.querySelectorAll('symbol[id^="i-"]').forEach(function (s) {
+      var name = s.id.slice(2);
+      var box = document.createElement('span'); box.className = 'cab-tag'; box.style.height = '28px'; box.title = name;
+      box.innerHTML = '<svg class="i i--sm"><use href="#' + s.id + '"/></svg>';
+      box.appendChild(document.createTextNode(name));
+      host.appendChild(box);
+    });
+  });
+</script>
+</body>
+</html>

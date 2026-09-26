@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Состояние системы — Администратор · СМЕНА-112</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../tokens/tokens.css">
+  <link rel="stylesheet" href="../css/base.css">
+  <link rel="stylesheet" href="../css/cabinet.css">
+</head>
+<body>
+<script src="../icons/icons.js"></script>
+
+<div class="cab-app">
+
+  <!-- ============ Навигация ============ -->
+  <aside class="cab-sidebar">
+    <div class="cab-brand">
+      <span class="cab-brand__num">112</span>
+      <span><span class="cab-brand__name">СМЕНА</span><br><span class="cab-brand__role">Администратор</span></span>
+    </div>
+    <nav class="cab-nav" aria-label="Разделы">
+      <a class="cab-nav__item cab-nav__item--active" href="#" aria-current="page"><svg class="i"><use href="#i-dashboard"/></svg>Состояние<span class="cab-nav__count cab-nav__count--alert">2</span></a>
+      <a class="cab-nav__item" href="#"><svg class="i"><use href="#i-storage"/></svg>Сервисы</a>
+      <a class="cab-nav__item" href="#"><svg class="i"><use href="#i-group"/></svg>Пользователи</a>
+      <a class="cab-nav__item" href="#"><svg class="i"><use href="#i-shield"/></svg>Безопасность</a>
+      <div class="cab-nav__group">Конфигурация</div>
+      <a class="cab-nav__item" href="#"><svg class="i"><use href="#i-memory"/></svg>ИИ-модели</a>
+      <a class="cab-nav__item" href="#"><svg class="i"><use href="#i-phone"/></svg>Телефония SIP</a>
+      <a class="cab-nav__item" href="#"><svg class="i"><use href="#i-save"/></svg>Резервное копирование</a>
+      <a class="cab-nav__item" href="#"><svg class="i"><use href="#i-library"/></svg>Справочники и ЕКП</a>
+      <div class="cab-nav__group">Контроль</div>
+      <a class="cab-nav__item" href="#"><svg class="i"><use href="#i-description"/></svg>Журналы и аудит</a>
+      <a class="cab-nav__item" href="#"><svg class="i"><use href="#i-refresh"/></svg>Обновления</a>
+    </nav>
+    <div class="cab-user">
+      <span class="cab-avatar">АК</span>
+      <span class="u-grow"><span class="cab-user__name">Ковалёв А. С.</span><br><span class="cab-user__sub">admin · 2FA включена</span></span>
+      <svg class="i i--sm"><use href="#i-logout"/></svg>
+    </div>
+  </aside>
+
+  <!-- ============ Основная часть ============ -->
+  <div class="cab-main">
+    <header class="cab-topbar">
+      <div class="cab-topbar__main">
+        <div class="cab-crumbs">Система · УМЦ «Система 112»</div>
+        <h1 class="cab-title">Состояние системы<small>v1.0.3 · аптайм 6 д 4 ч · обновлено 11:24:20</small></h1>
+      </div>
+      <div class="cab-topbar__actions">
+        <button class="cab-btn"><svg class="i i--sm"><use href="#i-refresh"/></svg>Обновить</button>
+        <button class="cab-btn cab-btn--primary"><svg class="i i--sm"><use href="#i-save"/></svg>Бэкап сейчас</button>
+      </div>
+      <div class="cab-clock">
+        <div>
+          <div class="cab-clock__label">Активные занятия</div>
+          <div class="cab-clock__sub">2 · онлайн 31</div>
+        </div>
+        <div class="cab-clock__time">11:24<span class="t-sec">20</span></div>
+      </div>
+    </header>
+
+    <main class="cab-content">
+      <div class="cab-banner" role="status">
+        <svg class="i"><use href="#i-warning"/></svg>
+        <span><b>2 алерта:</b> ожидание в очереди LLM 14 с (порог 10 с) · диск /data 86% (порог 85%)</span>
+        <span class="cab-banner__actions"><button class="cab-btn cab-btn--sm">Все алерты</button></span>
+      </div>
+
+      <!-- KPI -->
+      <section class="cab-kpis" aria-label="Ключевые показатели">
+        <div class="cab-stat">
+          <span class="cab-stat__label">Отклик API, p95</span>
+          <span class="cab-stat__value">180<small>мс</small></span>
+          <span class="cab-stat__foot"><span class="cab-pill cab-pill--ok"><svg class="i"><use href="#i-check_circle"/></svg>норма ≤ 2 000 мс</span><svg data-spark="210,190,230,560,240,200,180"></svg></span>
+        </div>
+        <div class="cab-stat">
+          <span class="cab-stat__label">Одновременных сессий</span>
+          <span class="cab-stat__value">14</span>
+          <span class="cab-stat__foot"><span>тест: 20 выдерживаем</span><svg data-spark="4,9,12,15,13,14,14"></svg></span>
+        </div>
+        <div class="cab-stat">
+          <span class="cab-stat__label">Пользователей онлайн</span>
+          <span class="cab-stat__value">31</span>
+          <span class="cab-stat__foot"><span class="cab-delta cab-delta--good"><svg class="i i--xs"><use href="#i-arrow_up"/></svg>+6</span><span>за час</span><svg data-spark="12,18,22,25,27,29,31"></svg></span>
+        </div>
+        <div class="cab-stat">
+          <span class="cab-stat__label">LLM · генерация</span>
+          <span class="cab-stat__value">7,8<small>ток/с</small></span>
+          <span class="cab-stat__foot"><span class="cab-pill cab-pill--warn"><svg class="i"><use href="#i-warning"/></svg>очередь 6 · ждут 14 с</span></span>
+        </div>
+        <div class="cab-stat">
+          <span class="cab-stat__label">Последний бэкап</span>
+          <span class="cab-stat__value">03:00</span>
+          <span class="cab-stat__foot"><span class="cab-pill cab-pill--ok"><svg class="i"><use href="#i-check_circle"/></svg>проверен · 1,4 ГБ</span><span>след. 03:00</span></span>
+        </div>
+      </section>
+
+      <!-- Сервисы -->
+      <section class="cab-card">
+        <div class="cab-card__head">
+          <span class="cab-card__title">Сервисы</span>
+          <span class="cab-card__sub">health-проверка каждые 10 с</span>
+        </div>
+        <div class="cab-card__body">
+          <div class="cab-svcs" id="svcs"></div>
+        </div>
+      </section>
+
+      <div class="cab-grid cab-grid--2">
+        <!-- График отклика -->
+        <section class="cab-card">
+          <div class="cab-card__head">
+            <span>
+              <span class="cab-card__title">Отклик API, p95</span><br>
+              <span class="cab-card__sub">последние 60 минут · порог ТЗ — 2 с при 100 пользователях</span>
+            </span>
+            <button class="cab-btn cab-btn--sm" data-viz-toggle aria-pressed="false"><svg class="i i--sm"><use href="#i-table"/></svg><span>Таблица</span></button>
+          </div>
+          <div class="cab-card__body">
+            <figure class="viz" id="latency" data-view="chart">
+              <svg class="viz__svg" role="presentation"></svg>
+              <div class="viz-table"></div>
+            </figure>
+          </div>
+        </section>
+
+        <!-- Ресурсы -->
+        <section class="cab-card">
+          <div class="cab-card__head">
+            <span>
+              <span class="cab-card__title">Ресурсы сервера</span><br>
+              <span class="cab-card__sub">Xeon 6 ядер · 32 ГБ · NVMe 512 ГБ · без GPU</span>
+            </span>
+          </div>
+          <div class="cab-card__body" style="padding-top: 14px;">
+            <div class="cab-meter"><span class="cab-meter__label">CPU</span><span class="cab-meter__track"><span class="cab-meter__fill" style="display:block; width:64%"></span></span><span class="cab-meter__value">64%</span></div>
+            <div class="cab-meter"><span class="cab-meter__label">RAM</span><span class="cab-meter__track"><span class="cab-meter__fill" style="display:block; width:66%"></span></span><span class="cab-meter__value">21 / 32 ГБ</span></div>
+            <div class="cab-meter cab-meter--critical"><span class="cab-meter__label">Диск /data</span><span class="cab-meter__track"><span class="cab-meter__fill" style="display:block; width:86%"></span></span><span class="cab-meter__value">86%</span></div>
+            <div class="cab-meter"><span class="cab-meter__label">Сеть</span><span class="cab-meter__track"><span class="cab-meter__fill" style="display:block; width:12%"></span></span><span class="cab-meter__value">12 Мбит/с</span></div>
+            <div style="margin-top: 14px;" class="u-row">
+              <span class="cab-pill cab-pill--critical"><svg class="i"><use href="#i-error"/></svg>Диск выше порога 85%</span>
+              <span class="cab-card__sub">освободить: старые логи 30+ дней — 9,2 ГБ</span>
+            </div>
+            <div class="cab-card__title" style="font-size: 14px; margin: 18px 0 4px;">Очереди ИИ-шлюза</div>
+            <table class="cab-table">
+              <thead><tr><th>Приоритет</th><th>Задача</th><th class="num">В очереди</th><th class="num">Ожидание</th><th>Состояние</th></tr></thead>
+              <tbody>
+                <tr><td>P0</td><td>Реплики актёров</td><td class="num">0</td><td class="num">0,8 с</td><td><span class="cab-pill cab-pill--ok"><svg class="i"><use href="#i-check_circle"/></svg>норма</span></td></tr>
+                <tr><td>P1</td><td>Оценка текста (судья)</td><td class="num">6</td><td class="num">14 с</td><td><span class="cab-pill cab-pill--warn"><svg class="i"><use href="#i-warning"/></svg>выше порога</span></td></tr>
+                <tr><td>P2</td><td>Генерация сценариев</td><td class="num">0</td><td class="num">—</td><td><span class="cab-pill cab-pill--neutral"><svg class="i"><use href="#i-pause"/></svg>ночное окно</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+
+      <div class="cab-grid cab-grid--2">
+        <section class="cab-card">
+          <div class="cab-card__head">
+            <span class="cab-card__title">Активные занятия</span>
+            <span class="cab-card__sub">изменения конфигурации применятся после их завершения</span>
+          </div>
+          <div class="cab-card__body cab-card__body--flush">
+            <table class="cab-table">
+              <thead><tr><th>Группа</th><th>Преподаватель</th><th>Режим</th><th class="num">Участники</th><th class="num">Идёт</th><th>Состояние</th></tr></thead>
+              <tbody>
+                <tr><td>Гр. ДДС-3</td><td>Орлова М. В.</td><td>Смена</td><td class="num">11 / 12</td><td class="num">18 мин</td><td><span class="cab-pill cab-pill--ok"><svg class="i"><use href="#i-check_circle"/></svg>штатно</span></td></tr>
+                <tr><td>Гр. 112-1</td><td>Лапин Д. О.</td><td>Живое занятие</td><td class="num">8 / 8</td><td class="num">6 мин</td><td><span class="cab-pill cab-pill--warn"><svg class="i"><use href="#i-warning"/></svg>LLM медленнее нормы</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="cab-card">
+          <div class="cab-card__head">
+            <span class="cab-card__title">Журнал аудита</span>
+            <span class="cab-pill cab-pill--ok"><svg class="i"><use href="#i-shield"/></svg>цепочка хешей целостна</span>
+          </div>
+          <div class="cab-card__body cab-card__body--flush">
+            <table class="cab-table">
+              <thead><tr><th>Время</th><th>Кто</th><th>Действие</th><th>Объект</th></tr></thead>
+              <tbody>
+                <tr><td class="u-num">11:23:40</td><td>Орлова М. В.</td><td>Вводная V-11</td><td>Занятие #482 · Васильева О.</td></tr>
+                <tr><td class="u-num">11:19:02</td><td>Лапин Д. О.</td><td>Изменение оценки (причина указана)</td><td>Попытка #9127</td></tr>
+                <tr><td class="u-num">11:05:12</td><td>Ковалёв А. С.</td><td>Бенчмарк LLM</td><td>ai.actor · qwen-3b-q4</td></tr>
+                <tr><td class="u-num">10:58:31</td><td>система</td><td>Неудачный вход ×3</td><td>login: student17 · 10.0.12.41</td></tr>
+                <tr><td class="u-num">03:00:04</td><td>система</td><td>Бэкап создан и проверен</td><td>backup-2026-10-02.dump</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <nav class="cab-tabbar" aria-label="Разделы">
+    <a href="#" aria-current="page"><svg class="i"><use href="#i-dashboard"/></svg>Состояние</a>
+    <a href="#"><svg class="i"><use href="#i-storage"/></svg>Сервисы</a>
+    <a href="#"><svg class="i"><use href="#i-group"/></svg>Люди</a>
+    <a href="#"><svg class="i"><use href="#i-description"/></svg>Аудит</a>
+  </nav>
+</div>
+
+<script src="../js/viz.js"></script>
+<script>
+  // Демо-данные (синтетические)
+  var PILL = { ok: ['check_circle', 'работает'], warn: ['warning', 'деградация'], critical: ['error', 'недоступен'], off: ['close', 'выключен'] };
+  var services = [
+    { name: 'API', icon: 'dashboard', st: 'ok', m: [['p95', '180 мс'], ['реплики', '2'], ['5xx за час', '0'], ['WS', '31']] },
+    { name: 'PostgreSQL', icon: 'storage', st: 'ok', m: [['соединений', '42'], ['размер', '1,2 ГБ'], ['запись', '310 оп/с'], ['версия', '15.8']] },
+    { name: 'Redis', icon: 'memory', st: 'ok', m: [['память', '3 МБ'], ['очереди', '4'], ['pub/sub', '12 кан.'], ['задержка', '1 мс']] },
+    { name: 'LLM · llama.cpp', icon: 'memory', st: 'warn', m: [['скорость', '7,8 ток/с'], ['очередь', '6'], ['ожидание', '14 с'], ['JSON ок', '99,2%']] },
+    { name: 'LanguageTool', icon: 'spellcheck', st: 'ok', m: [['отклик', '90 мс'], ['словарь', '+214 слов'], ['за час', '1 204'], ['язык', 'ru-RU']] },
+    { name: 'TTS · Silero', icon: 'volume', st: 'ok', m: [['RTF', '0,3'], ['кеш', '1 830 фраз'], ['голосов', '4'], ['за час', '312']] },
+    { name: 'SIP · Asterisk', icon: 'phone', st: 'off', m: [['профиль', 'sip'], ['номеров', '—'], ['кодеки', 'G.711/Opus'], ['задержка', '—']] },
+    { name: 'Резервное копирование', icon: 'save', st: 'ok', m: [['последний', '03:00'], ['размер', '1,4 ГБ'], ['хранится', '7+4+3'], ['проверка', 'успешно']] }
+  ];
+  function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]; }); }
+  document.getElementById('svcs').innerHTML = services.map(function (s) {
+    var p = PILL[s.st], mod = s.st === 'ok' ? '' : ' cab-svc--' + (s.st === 'off' ? 'off' : s.st);
+    var pillMod = s.st === 'off' ? 'neutral' : s.st;
+    return '<article class="cab-svc' + mod + '"><div class="cab-svc__head"><span class="cab-svc__name"><svg class="i i--sm"><use href="#i-' + s.icon + '"/></svg>' + esc(s.name) + '</span>' +
+      '<span class="cab-pill cab-pill--' + pillMod + '"><svg class="i"><use href="#i-' + p[0] + '"/></svg>' + p[1] + '</span></div>' +
+      '<div class="cab-svc__metrics">' + s.m.map(function (m) { return '<div class="cab-svc__metric"><span>' + esc(m[0]) + '</span><b>' + esc(m[1]) + '</b></div>'; }).join('') + '</div>' +
+      '<div class="u-row"><button class="cab-btn cab-btn--sm">Логи</button><button class="cab-btn cab-btn--sm">' + (s.st === 'off' ? 'Запустить' : 'Перезапустить') + '</button></div></article>';
+  }).join('');
+
+  // p95 отклика: 60 минутных точек 10:25–11:24 со всплеском во время пакетной генерации
+  var pts = [];
+  for (var i = 0; i < 60; i++) {
+    var mnt = 25 + i, hh = 10 + Math.floor(mnt / 60), mm = mnt % 60;
+    var base = 170 + 40 * Math.sin(i / 5) + (i % 7) * 6;
+    if (i >= 26 && i <= 29) base += [380, 820, 610, 240][i - 26];
+    pts.push({ t: hh + ':' + (mm < 10 ? '0' : '') + mm, v: Math.round(base) });
+  }
+  SmenaViz.lineChart(document.getElementById('latency'), {
+    points: pts, yMax: 2500, yStep: 500, unit: 'мс', seriesLabel: 'Отклик p95',
+    threshold: { value: 2000, label: 'SLA 2 с' }, height: 300, xEvery: 10
+  });
+  document.querySelectorAll('[data-spark]').forEach(function (svg) {
+    SmenaViz.sparkline(svg, svg.getAttribute('data-spark').split(',').map(Number));
+  });
+</script>
+</body>
+</html>

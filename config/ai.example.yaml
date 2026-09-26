@@ -1,0 +1,42 @@
+# Пример: демо на внешнем OpenAI-совместимом API + локальная модель в контуре заказчика.
+# Скопируйте в config/ai.yaml и задайте переменные окружения (.env).
+ai:
+  # На демо-стенде допускается внешний API (ответ заказчика #710). В контуре заказчика — false.
+  allow_external: ${AISKRA_AI_ALLOW_EXTERNAL:-false}
+  default_provider: local
+  providers:
+    # Локальная модель: Ollama / vLLM / llama.cpp server (профиль docker compose `local-llm`).
+    local:
+      kind: openai_compatible
+      base_url: ${LOCAL_LLM_URL:-http://ollama:11434/v1}
+      model: ${LOCAL_LLM_MODEL:-qwen2.5:7b-instruct}
+      timeout_s: 120
+      max_concurrency: 2            # CPU без GPU: не больше 2 параллельных генераций
+      structured_output: json_object
+    # Малая быстрая модель для реплик актёров (заявитель, старший группы).
+    local_small:
+      kind: openai_compatible
+      base_url: ${LOCAL_LLM_URL:-http://ollama:11434/v1}
+      model: ${LOCAL_SMALL_MODEL:-qwen2.5:3b-instruct}
+      timeout_s: 30
+      max_concurrency: 4
+      structured_output: json_object
+    # Внешний демо-API (любой OpenAI-совместимый). Ключ — в переменной окружения, не в файле.
+    demo:
+      kind: openai_compatible
+      base_url: ${DEMO_LLM_URL:-https://example.invalid/v1}
+      api_key_env: DEMO_LLM_API_KEY
+      model: ${DEMO_LLM_MODEL:-demo-model}
+      timeout_s: 60
+      max_concurrency: 8
+    fake: {kind: fake}
+  cache: {backend: memory, max_items: 20000}
+  tasks:
+    probe:               {provider: local,       temperature: 0,   cache: exact, cache_ttl: 1h}
+    scenario_generation: {provider: local,       temperature: 0.8, cache: off, max_tokens: 2000}
+    applicant_actor:     {provider: local_small, temperature: 0.6, cache: task,  cache_ttl: 1d, max_tokens: 160}
+    brigade_actor:       {provider: local_small, temperature: 0.6, cache: task,  cache_ttl: 1d, max_tokens: 160}
+    judge:               {provider: local,       temperature: 0,   cache: exact, cache_ttl: 7d, max_tokens: 600}
+    insights:            {provider: local,       temperature: 0.3, cache: off}
+  tts: {kind: fake, cache_ttl: 30d}
+  stt: {kind: fake}
