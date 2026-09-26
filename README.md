@@ -10,11 +10,11 @@
 | # | Майлстоун | Срок | Статус | Пункты плана | Что осталось |
 |---|---|---|---|---|---|
 | M0 | Анализ требований и план | 26.09 | ✅ | — | [docs/brief](docs/brief/00_README.md) |
-| M1 | Фундамент | 26.09 | ✅ | [0.1](specs/0.1-architecture.md) ✅ · [0.2](specs/0.2-data-model.md) ✅ · [0.3](specs/0.3-auth-rbac-audit.md) ✅ | проверка `docker compose` на машине с Docker; экран «Пользователи» → 5.2 |
+| M1 | Фундамент | 26.09 | ✅ | [0.1](specs/0.1-architecture.md) ✅ · [0.2](specs/0.2-data-model.md) ✅ · [0.3](specs/0.3-auth-rbac-audit.md) ✅ | проверка `docker compose` на машине с Docker |
 | M2 | Эмулятор АРМ-112 | 27.09 | 🟡 | [1.1](specs/1.1-card-112.md) ✅ · [1.2](specs/1.2-address-map.md) ✅ · [1.3](specs/1.3-journal.md) ✅ · [1.4](specs/1.4-incoming-call.md) 🟡 · [1.5](specs/1.5-auto-services.md) 🟡 · 1.6 ⏳ (P2) | голос оператора (распознавание), входящее СМС; подчинённость объектов в автоподборе |
 | M3 | Эмулятор АРМ ДДС | 27–28.09 | ✅ | [2.1](specs/2.1-dds-journal.md) ✅ · [2.2](specs/2.2-dds-card.md) ✅ · [2.3](specs/2.3-dds-phone.md) ✅ · 2.4 🟡 (P1) | — (источник карточек и темп — в 4.2) |
 | M4 | ИИ-модуль | 27–28.09 | ✅ | 3.1 ✅ · [3.2](specs/3.2-scenario-generation.md) ✅ · [3.3](specs/3.3-dialog-agents.md) ✅ · [3.4](specs/3.4-assessment.md) ✅ · 3.5 ⏳ (P1) | валидация качества ИИ (сравнение с экспертной оценкой) |
-| M5 | Преподаватель, обучающийся, админ | 28.09 | 🟡 | [4.1](specs/4.1-scenario-bank.md) ✅ · [4.2](specs/4.2-sessions.md) ✅ · [4.3](specs/4.3-reports.md) ✅ · 4.4 ⏳ (P1) · 5.1 ⏳ · 5.2 ⏳ | учебные материалы, кабинет обучающегося (история занятий), экран пользователей и групп |
+| M5 | Преподаватель, обучающийся, админ | 28.09 | ✅ | [4.1](specs/4.1-scenario-bank.md) ✅ · [4.2](specs/4.2-sessions.md) ✅ · [4.3](specs/4.3-reports.md) ✅ · 4.4 ⏳ (P1) · [5.1](specs/5.1-student-cabinet.md) ✅ · [5.2](specs/5.2-admin-panel.md) ✅ | учебные материалы PDF/DOCX (4.4, P1); автокопии по расписанию |
 | M6 | Сквозной сценарий | 28.09 вечер | ⏳ | — | «вводная → карточка 112 → очередь ДДС → статусы → отчёт преподавателя» на стенде |
 | M7 | Сдача | 29.09 до 22:00 | ⏳ | 6.1–6.3 · 7.1–7.4 | сопроводительная документация, презентация (слайды 7–11 по шаблону), стенд, скринкаст, заморозка |
 
@@ -24,7 +24,7 @@ cp .env.example .env
 docker compose up --build        # frontend :8080 · backend :8000/docs · PostgreSQL :5432
 ```
 Справочники (один раз после первого запуска): `docker compose exec backend python -m aiskra.cli import-dictionaries` и `docker compose exec backend python -m aiskra.cli import-addresses` (адреса и границы районов, п. 1.2), `docker compose exec backend python -m aiskra.cli generate-scenarios --count 30` (банк учебных вызовов, п. 3.2).
-Первый вход: задайте в `.env` пароль `AISKRA_BOOTSTRAP_ADMIN_PASSWORD` (не короче 8 символов) — при старте создаётся администратор `admin`. Преподавателей и обучающихся создаёт администратор (`POST /api/v1/users`) или команда `uv run python -m aiskra.cli create-user`.
+Первый вход: задайте в `.env` пароль `AISKRA_BOOTSTRAP_ADMIN_PASSWORD` (не короче 8 символов) — при старте создаётся администратор `admin`. Панель администратора — `/admin`: пользователи, группы, настройки, резервные копии (том `backups`), импорт справочников, логи. Пользователей можно завести и командой `uv run python -m aiskra.cli create-user`.
 По умолчанию ИИ работает офлайн (fake-модель). Подключение локальной модели или демо-API — в `config/ai.example.yaml` и [ADR-0003](docs/adr/0003-ports-adapters-ai.md).
 
 ## Разработка

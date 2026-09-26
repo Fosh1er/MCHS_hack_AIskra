@@ -67,6 +67,7 @@ export interface ProgressView {
   points: { t: string; v: number; role: string; card_number: number | null; passed: boolean }[];
   avg_score: number | null; weakest: { key: string; title: string; average: number }[]; recent_errors: string[];
   expert_comments: { card_number: number | null; score: number; comment: string }[];
+  recommendations: Recommendation[];
 }
 
 export const useSessionReport = (id: string) =>
@@ -94,3 +95,8 @@ export function useOverride(sessionId: string) {
 }
 
 export const useMyProgress = () => useQuery({ queryKey: ['my-progress'], queryFn: () => http<ProgressView>(`${A}/my/progress`) });
+
+export interface Recommendation { key: string; average: number; text: string }
+export interface MySessionReport { report: SessionReport; recommendations: Recommendation[] }
+export const useMySessionReport = (id: string) =>
+  useQuery({ queryKey: ['my-report', id], queryFn: () => http<MySessionReport>(`${A}/sessions/${id}/mine`) });

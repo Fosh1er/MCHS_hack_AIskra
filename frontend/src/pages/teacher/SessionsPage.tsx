@@ -1,13 +1,14 @@
 /** Занятия (п. 4.2): список и создание. ТЗ, сценарии 2–3: тип занятия, категории событий, источник карточек,
  *  обучающиеся и их роли (оператор 112 или диспетчер конкретной ДДС), нормативы и темп. */
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Banner, Button, Card, StatusPill } from '@smena112/ui-kit';
 import { useIncidentGroups, useServices } from '../../shared/api/dictionaries';
 import {
-  MODE_TITLE, SESSION_STATUS, SOURCE_TITLE, useCreateSession, useSessions, useStudents,
+  MODE_TITLE, SESSION_STATUS, SOURCE_TITLE, useCreateSession, useSessionDefaults, useSessions, useStudents,
   type CardSource, type CreateSessionBody, type SessionMode, type SessionSettings,
 } from '../../shared/api/training';
+import { useGroups } from '../../shared/api/admin';
 import { TeacherShell } from '../../shared/ui/TeacherShell';
 import { GroupPicker } from './ScenariosPage';
 
@@ -36,6 +37,17 @@ function CreateForm({ onCreated }: { onCreated: (id: string) => void }) {
   const [picked, setPicked] = useState<number[]>([]);
   const [roles, setRoles] = useState<Record<string, { role: Role; service: string }>>({});
   const [settings, setSettings] = useState<SessionSettings>(DEFAULTS);
+  // значения по умолчанию — из настроек администратора (п. 5.2)
+  const defaults = useSessionDefaults().data;
+  useEffect(() => { if (defaults) setSettings(defaults); }, [defaults]);
+  // группа (п. 5.2): роли и службы участников подставляются из состава группы
+  const groupList = useGroups().data ?? [];
+  const applyGroup = (id: string) => {
+    const g = groupList.find((x) => x.id === id);
+    if (!g) return;
+    setRoles(Object.fromEntries(g.members.map((m) => [m.user_id, { role: m.member_role, service: m.dds_service_code ?? '' }])));
+    if (!title.trim()) setTitle(g.name);
+  };
   const setRole = (id: string, patch: Partial<{ role: Role; service: string }>) =>
     setRoles((r) => ({ ...r, [id]: { ...(r[id] ?? { role: '', service: '' }), ...patch } }));
   const participants = Object.entries(roles).filter(([, v]) => v.role).map(([id, v]) => ({
@@ -62,6 +74,17 @@ function CreateForm({ onCreated }: { onCreated: (id: string) => void }) {
         </label>
       </div>
       <GroupPicker groups={groups.data ?? []} value={picked} onChange={setPicked} />
+      {groupList.length > 0 && (
+        <div className="cab-filters" style={{ marginTop: 10 }}>
+          <label className="cab-filters__label">Назначить группу{' '}
+            <select className="cab-select" defaultValue="" onChange={(e) => applyGroup(e.target.value)}>
+              <option value="">— выбрать —</option>
+              {groupList.map((g) => <option key={g.id} value={g.id}>{g.name} ({g.members.length})</option>)}
+            </select>
+          </label>
+          <span className="cab-filters__label">роли и службы подставятся из состава группы, их можно поправить</span>
+        </div>
+      )}
       <table className="cab-table" style={{ marginTop: 8 }}>
         <thead><tr><th>Обучающийся</th><th>Логин</th><th>Роль на занятии</th><th>Служба (для ДДС)</th></tr></thead>
         <tbody>

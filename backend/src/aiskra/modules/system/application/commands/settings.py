@@ -26,7 +26,6 @@ LIMITS: dict[str, dict[str, tuple[float, float, float]]] = {
     },
     "backup": {
         "keep": (10, 1, 100),  # сколько копий хранить
-        "auto_hours": (0, 0, 168),  # автокопия раз в N часов; 0 — только вручную
     },
 }
 

@@ -40,30 +40,21 @@ class SystemStatus:
             ],
         )
 
-    def _ai(self) -> list[ServiceState]:
-        out = []
+    def _ai(self) -> ServiceState:
         tasks = self._sv.model_router.describe()
         if not tasks:
             p = self._sv.ai_config.default_provider
-            return [
-                ServiceState(
-                    "ИИ-провайдер",
-                    "warn" if p == "fake" else "ok",
-                    [("провайдер", p)],
-                    "задачи не настроены (config/ai.yaml)",
-                )
-            ]
-        for t in tasks:
-            offline = t.provider == "fake"
-            out.append(
-                ServiceState(
-                    f"ИИ: {t.task}",
-                    "warn" if offline else "ok",
-                    [("провайдер", t.provider), ("модель", t.model)],
-                    "офлайн-режим: детерминированные ответы без модели" if offline else "",
-                )
+            return ServiceState(
+                "ИИ-модели", "warn" if p == "fake" else "ok", [("провайдер", p)], "задачи не настроены (config/ai.yaml)"
             )
-        return out
+        offline = [t.task for t in tasks if t.provider == "fake"]
+        state = "ok" if not offline else "warn"
+        note = ""
+        if offline:
+            note = "офлайн-режим (детерминированные ответы без модели): " + (
+                "все задачи" if len(offline) == len(tasks) else ", ".join(offline)
+            )
+        return ServiceState("ИИ-модели", state, [(t.task, f"{t.provider} · {t.model}") for t in tasks], note)
 
     def _cache(self) -> ServiceState:
         st = self._sv.cache.stats()
@@ -95,4 +86,4 @@ class SystemStatus:
         )
 
     async def services(self) -> list[ServiceState]:
-        return [await self._db(), *self._ai(), self._cache(), self._telephony(), self._backup()]
+        return [await self._db(), self._ai(), self._cache(), self._telephony(), self._backup()]

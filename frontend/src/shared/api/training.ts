@@ -107,3 +107,15 @@ export const useSessionState = (id: string) =>
 export const useMySession = (enabled = true) =>
   useQuery({ queryKey: ['my-session'], queryFn: () => http<MySession | null>(`${T}/sessions/my`), enabled, refetchInterval: 10_000 });
 export const feedDdsCard = () => post<{ card_id: string | null; waiting: number; reason: string }>('/sessions/feed');
+
+export interface MySessionRow {
+  session_id: string; title: string; mode: SessionMode; status: SessionView['status']; role: '112' | 'dds';
+  dds_service_code: string | null; started_at: string | null; finished_at: string | null; settings: SessionSettings;
+}
+export const useMySessions = () =>
+  useQuery({ queryKey: ['my-sessions'], queryFn: () => http<MySessionRow[]>(`${T}/sessions/mine`), refetchInterval: 15_000 });
+export const useSessionDefaults = () =>
+  useQuery({ queryKey: ['session-defaults'], queryFn: () => http<SessionSettings>(`${T}/session-defaults`) });
+/** Куда вести обучающегося в занятии: журнал 112 или АРМ своей ДДС. */
+export const armFor = (s: { role: '112' | 'dds'; dds_service_code: string | null }) =>
+  s.role === 'dds' && s.dds_service_code ? `/arm/dds/${encodeURIComponent(s.dds_service_code)}` : '/arm/112/journal';

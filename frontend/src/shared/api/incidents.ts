@@ -38,6 +38,7 @@ export interface CardView {
   id: string; number: number; status: string; display_status: string; author_id: string | null; author_name: string | null;
   operator_number: string | null; arm_number: string | null; opened_at: string | null; saved_at: string | null;
   worked_at: string | null; checked_at: string | null; checked_by_name: string | null;
+  rework: { comment: string; at: string | null; by: string | null } | null;
   processing_ms: number | null; is_emergency: boolean; is_incident: boolean; address_line: string | null;
   data: Partial<CardData>; services: CardServiceView[]; workouts: WorkoutView[]; incident_types: IncidentTypeInfo[];
 }

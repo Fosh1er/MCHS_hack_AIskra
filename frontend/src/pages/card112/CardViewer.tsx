@@ -393,6 +393,13 @@ export function CardViewer({ view, me, dds }: { view: CardView; me: Me; dds?: Dd
 
       {showMap && <AddressMap lat={d.address?.lat ?? null} lon={d.address?.lon ?? null} district={d.address?.district ?? null} readOnly onClose={() => setShowMap(false)} />}
       {banner && <div className="arm112-banner" role="alert" onClick={() => setBanner(null)}><b>Действие не выполнено</b><ul><li>{banner}</li></ul></div>}
+      {view.rework && (
+        <div className="arm112-rework" role="status">
+          <b>Возвращена на доработку</b>
+          {[view.rework.by && shortName(view.rework.by), view.rework.at && fmtFull(new Date(view.rework.at))].filter(Boolean).join(', ').replace(/^(.+)$/, ' ($1)')}
+          {view.rework.comment ? `: ${view.rework.comment}` : ''}
+        </div>
+      )}
 
       {!dds && <div className="arm112v-workouts arm112-rel">
         <Hint k="Alt+O" />
