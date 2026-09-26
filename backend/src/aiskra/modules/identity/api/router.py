@@ -38,8 +38,10 @@ from aiskra.modules.identity.application.commands.logout import Logout, LogoutHa
 from aiskra.modules.identity.application.commands.reset_password import ResetPassword, ResetPasswordHandler
 from aiskra.modules.identity.application.commands.set_user_blocked import SetUserBlocked, SetUserBlockedHandler
 from aiskra.modules.identity.application.commands.update_user import UpdateUser, UpdateUserHandler
+from aiskra.modules.identity.application.ports.auth import LoginThrottle
 from aiskra.modules.identity.application.ports.groups import GroupMember, GroupView
 from aiskra.modules.identity.application.queries.list_users import ListUsers, ListUsersHandler
+from aiskra.shared.errors import AuthenticationError
 from aiskra.shared.security import Permission, Principal, Role
 from aiskra.shared.web import CurrentPrincipal, Meta, require
 
@@ -57,8 +59,16 @@ async def login(
     response: Response,
     cookie: Cookie,
     handler: Annotated[LoginHandler, Depends(deps.provide_login)],
+    throttle: Annotated[LoginThrottle, Depends(deps.provide_login_throttle)],
 ) -> LoginOut:
-    result = await handler(Login(login=body.login, password=body.password, arm_number=body.arm_number, meta=meta))
+    key = meta.ip or "unknown"
+    throttle.check(key)
+    try:
+        result = await handler(Login(login=body.login, password=body.password, arm_number=body.arm_number, meta=meta))
+    except AuthenticationError:
+        throttle.failed(key)
+        raise
+    throttle.succeeded(key)
     cookie.set(response, result.token, result.expires_at)
     return LoginOut(**MeOut.of(result.principal).model_dump(), expires_at=result.expires_at)
 

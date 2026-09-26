@@ -5,15 +5,16 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { Banner, Button, Card } from '@smena112/ui-kit';
 import { useAIConfig } from '../../shared/api/system';
+import { http } from '../../shared/api/http';
 import { backupUrl, restoreBackup, useBackups, useCreateBackup, useLimits, useSaveSettings, useSettings } from '../../shared/api/admin';
 import { CabinetShell } from '../../shared/ui/CabinetShell';
 
 const LABELS: Record<string, string> = {
   norm_112: 'Норматив карточки 112, с', norm_dds: 'Норматив решения ДДС, с', threshold: 'Порог «зачтено», балл',
   difficulty: 'Сложность вызовов, 1–5', call_interval_s: 'Темп вызовов 112, с', feed_interval_s: 'Темп карточек ДДС, с',
-  max_waiting: 'Очередь ДДС, не больше', keep: 'Хранить копий',
+  max_waiting: 'Очередь ДДС, не больше', keep: 'Хранить копий', retention_days: 'Срок хранения журнала аудита, дней (от 183)',
 };
-const TITLES: Record<string, string> = { session_defaults: 'Занятие по умолчанию', backup: 'Хранение копий' };
+const TITLES: Record<string, string> = { session_defaults: 'Занятие по умолчанию', backup: 'Хранение копий', audit: 'Журнал аудита' };
 const size = (b: number) => (b > 2 ** 20 ? `${(b / 2 ** 20).toFixed(1)} МБ` : `${Math.max(1, Math.round(b / 1024))} КБ`);
 
 function Section({ k, values }: { k: string; values: Record<string, number> }) {
@@ -37,6 +38,26 @@ function Section({ k, values }: { k: string; values: Record<string, number> }) {
         {save.isSuccess && !dirty && <span className="cab-filters__label">сохранено, изменение в аудите</span>}
       </div>
       {save.isError && <Banner status="critical">{save.error.message}</Banner>}
+    </Card>
+  );
+}
+
+function AuditPurge() {
+  const [result, setResult] = useState<{ deleted: number; before: string; dry_run: boolean } | null>(null);
+  const [error, setError] = useState('');
+  const run = async (dry: boolean) => {
+    setError('');
+    try { setResult(await http<{ deleted: number; before: string; dry_run: boolean }>(`/api/v1/audit/purge?dry_run=${dry}`, { method: 'POST' })); }
+    catch (e) { setError((e as Error).message); }
+  };
+  return (
+    <Card title="Очистка журнала аудита" subtitle="Удаляются только записи старше срока хранения — не моложе 6 месяцев (ТЗ). Очистка пишется в аудит.">
+      <div className="cab-filters">
+        <Button onClick={() => { void run(true); }}>сколько будет удалено</Button>
+        <Button variant="danger" onClick={() => { if (window.confirm('Удалить записи журнала старше срока хранения?')) void run(false); }}>очистить</Button>
+        {result && <span className="cab-filters__label">записей старше {new Date(result.before).toLocaleDateString('ru-RU')}: {result.deleted}{result.dry_run ? ' (проверка)' : ' — удалено'}</span>}
+      </div>
+      {error && <Banner status="critical">{error}</Banner>}
     </Card>
   );
 }
@@ -115,6 +136,7 @@ export function SettingsPage() {
     <CabinetShell kind="admin" active="settings" title="Настройки и резервные копии">
       {s.isError && <Banner status="critical">{s.error.message}</Banner>}
       {s.data && Object.entries(s.data).map(([k, v]) => <Section key={k} k={k} values={v} />)}
+      <AuditPurge />
       <Backups />
       <AiModels />
     </CabinetShell>

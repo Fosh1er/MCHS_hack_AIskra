@@ -10,6 +10,7 @@ uv run python -m aiskra.cli ensure-admin             # администрато�
                                                      # без пароля в окружении ничего не делает
 uv run python -m aiskra.cli create-schema            # создать таблицы без Alembic (только для SQLite-демо)
 uv run python -m aiskra.cli demo-seed [--materials DIR]  # стенд одной командой (M6); пароль — AISKRA_DEMO_PASSWORD
+uv run python -m aiskra.cli purge-audit [--dry-run]   # журнал аудита старше срока хранения (≥183 дн., п. 6.2); для cron
 uv run python -m aiskra.cli import-materials FILE... --kind instruction --as admin --prompts
                                                      # учебные материалы (п. 4.4) от имени пользователя
 """
@@ -128,6 +129,20 @@ async def import_materials(
         await engine.dispose()
 
 
+async def purge_audit(settings: Settings, *, dry_run: bool) -> None:
+    from aiskra.bootstrap import build_purge_audit_handler
+    from aiskra.modules.audit.application.commands.purge import PurgeAudit
+
+    engine = create_engine(settings.database_url)
+    try:
+        async with create_session_factory(engine)() as session:
+            r = await build_purge_audit_handler(session)(PurgeAudit(actor=None, dry_run=dry_run))
+        verb = "будет удалено" if r.dry_run else "удалено"
+        print(f"Срок хранения {r.retention_days} дн.: записей старше {r.before[:10]} {verb} — {r.deleted}")
+    finally:
+        await engine.dispose()
+
+
 async def create_user(
     settings: Settings, *, login: str, full_name: str, role: Role, password: str, operator_number: str | None
 ) -> None:
@@ -213,6 +228,8 @@ def main() -> None:
     demo = sub.add_parser("demo-seed", help="подготовить стенд: справочники, сценарии, учётки ролей, группа (M6)")
     demo.add_argument("--scenarios", type=int, default=30, help="сколько утверждённых сценариев должно быть в банке")
     demo.add_argument("--materials", help="каталог с учебными материалами (DOCX, PDF, XLSX, TXT)")
+    purge = sub.add_parser("purge-audit", help="удалить записи журнала аудита старше срока хранения (п. 6.2)")
+    purge.add_argument("--dry-run", action="store_true", help="только посчитать")
     mat = sub.add_parser("import-materials", help="загрузить учебные материалы: PDF, DOCX, XLSX, TXT (п. 4.4)")
     mat.add_argument("files", nargs="+")
     mat.add_argument("--kind", default="other", choices=["instruction", "memo", "classifier", "regulation", "other"])
@@ -255,6 +272,8 @@ def main() -> None:
             if len(password) < 8:
                 sys.exit("Задайте пароль демо-учёток: AISKRA_DEMO_PASSWORD (не короче 8 символов)")
             asyncio.run(seed(settings, password=password, scenarios=args.scenarios, materials_dir=args.materials))
+        elif args.cmd == "purge-audit":
+            asyncio.run(purge_audit(settings, dry_run=args.dry_run))
         elif args.cmd == "import-materials":
             asyncio.run(
                 import_materials(

@@ -27,6 +27,9 @@ LIMITS: dict[str, dict[str, tuple[float, float, float]]] = {
     "backup": {
         "keep": (10, 1, 100),  # сколько копий хранить
     },
+    "audit": {
+        "retention_days": (365, 183, 3650),  # срок хранения журнала аудита; не меньше 6 месяцев (п. 6.2)
+    },
 }
 
 

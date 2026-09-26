@@ -62,3 +62,15 @@ class TokenIssuer(Protocol):
     def digest(self, token: str) -> str:
         """Необратимый отпечаток токена (хранится в БД)."""
         ...
+
+
+class LoginThrottle(Protocol):
+    """Ограничение неудачных входов с одного адреса (п. 6.2) — в дополнение к блокировке учётки."""
+
+    def check(self, key: str) -> None:
+        """Бросает TooManyRequestsError, если с адреса слишком много неудачных попыток."""
+        ...
+
+    def failed(self, key: str) -> None: ...
+
+    def succeeded(self, key: str) -> None: ...

@@ -21,7 +21,7 @@ from aiskra.ai.config import load_ai_config
 from aiskra.ai.router import ModelRouter
 from aiskra.integration.assessment_sources import IncidentAttempts
 from aiskra.integration.session_sources import IncidentSystemCards, SessionFactsReader, SessionProgress
-from aiskra.integration.system_sources import SystemSessionDefaults
+from aiskra.integration.system_sources import SystemRetentionPolicy, SystemSessionDefaults
 from aiskra.integration.training_sources import DictionaryScenarioFacts, IncidentCardContext
 from aiskra.modules.assessment.api import deps as assessment_deps
 from aiskra.modules.assessment.application.commands.assess import AssessCardHandler
@@ -36,7 +36,9 @@ from aiskra.modules.assessment.application.queries.reports import (
 )
 from aiskra.modules.assessment.infrastructure.repositories import SqlAssessmentRepository
 from aiskra.modules.audit.api import deps as audit_deps
+from aiskra.modules.audit.application.commands.purge import PurgeAuditHandler
 from aiskra.modules.audit.application.queries.search_audit import ListEventTypesHandler, SearchAuditHandler
+from aiskra.modules.audit.infrastructure.purger import SqlAuditPurger
 from aiskra.modules.audit.infrastructure.reader import SqlAuditReader
 from aiskra.modules.audit.infrastructure.recorder import IsolatedAuditRecorder, SqlAuditRecorder
 from aiskra.modules.dictionaries.api import deps as dict_deps
@@ -164,6 +166,7 @@ from aiskra.platform.backup import FileBackupStore
 from aiskra.platform.db import SqlAlchemyUnitOfWork, create_engine, create_session_factory
 from aiskra.platform.deps import get_session
 from aiskra.platform.models_registry import metadata as _all_models  # noqa: F401 — все ORM-модели в одном реестре
+from aiskra.platform.ratelimit import SlidingWindowThrottle
 from aiskra.platform.services import Services
 from aiskra.platform.settings import Settings
 from aiskra.platform.status import SystemStatus
@@ -261,6 +264,16 @@ def build_create_user_handler(ida: IdentityAdapters, session: AsyncSession) -> C
     )
 
 
+def build_purge_audit_handler(session: AsyncSession) -> PurgeAuditHandler:
+    return PurgeAuditHandler(
+        SqlAuditPurger(session),
+        SystemRetentionPolicy(session),
+        SqlAuditRecorder(session),
+        SqlAlchemyUnitOfWork(session),
+        SystemClock(),
+    )
+
+
 def _wire_identity_and_audit(app: FastAPI, services: Services) -> None:
     ov = app.dependency_overrides
     ida = build_identity_adapters(services.settings)
@@ -314,12 +327,17 @@ def _wire_identity_and_audit(app: FastAPI, services: Services) -> None:
     def list_users(session: Session) -> ListUsersHandler:
         return ListUsersHandler(SqlUserReader(session))
 
+    def purge_audit(session: Session) -> PurgeAuditHandler:
+        return build_purge_audit_handler(session)
+
     def search_audit(session: Session) -> SearchAuditHandler:
         return SearchAuditHandler(SqlAuditReader(session))
 
     ov[web.provide_principal] = current_principal
     ov[web.provide_isolated_audit] = lambda: IsolatedAuditRecorder(services.session_factory)
     ov[identity_deps.provide_session_cookie] = lambda: ida.cookie
+    throttle = SlidingWindowThrottle()
+    ov[identity_deps.provide_login_throttle] = lambda: throttle
     ov[identity_deps.provide_login] = login
     ov[identity_deps.provide_logout] = logout
     ov[identity_deps.provide_create_user] = create_user
@@ -329,6 +347,7 @@ def _wire_identity_and_audit(app: FastAPI, services: Services) -> None:
     ov[identity_deps.provide_list_users] = list_users
     ov[audit_deps.provide_search_audit] = search_audit
     ov[audit_deps.provide_event_types] = ListEventTypesHandler
+    ov[audit_deps.provide_purge] = purge_audit
 
 
 def _wire_incidents(app: FastAPI) -> None:

@@ -16,12 +16,12 @@
 | M4 | ИИ-модуль | 27–28.09 | ✅ | 3.1 ✅ · [3.2](specs/3.2-scenario-generation.md) ✅ · [3.3](specs/3.3-dialog-agents.md) ✅ · [3.4](specs/3.4-assessment.md) ✅ · 3.5 ⏳ (P1) | валидация качества ИИ (сравнение с экспертной оценкой) |
 | M5 | Преподаватель, обучающийся, админ | 28.09 | ✅ | [4.1](specs/4.1-scenario-bank.md) ✅ · [4.2](specs/4.2-sessions.md) ✅ · [4.3](specs/4.3-reports.md) ✅ · [4.4](specs/4.4-materials.md) ✅ · [5.1](specs/5.1-student-cabinet.md) ✅ · [5.2](specs/5.2-admin-panel.md) ✅ | автокопии по расписанию; RAG на эмбеддингах (P2) |
 | M6 | Сквозной сценарий | 28.09 вечер | ✅ | [M6](specs/M6-e2e.md) ✅ · [сценарий показа](docs/demo/M6_сквозной_сценарий.md) · `make demo-seed` | прогон в `docker compose` на сервере (M7) |
-| M7 | Сдача | 29.09 до 22:00 | ⏳ | 6.1–6.3 · 7.1–7.4 | сопроводительная документация, презентация (слайды 7–11 по шаблону), стенд, скринкаст, заморозка |
+| M7 | Сдача | 29.09 до 22:00 | ⏳ | 6.1 ⏳ · [6.2](specs/6.2-security.md) ✅ · 6.3 ⏳ · 7.1–7.4 ⏳ | запуск `docker compose` с TLS на сервере; сопроводительная документация, презентация (слайды 7–11), стенд, скринкаст, заморозка |
 
 ## Быстрый старт
 ```bash
 cp .env.example .env
-docker compose up --build        # frontend :8080 · backend :8000/docs · PostgreSQL :5432
+docker compose up --build        # https://localhost:8443 (http :8080 → https) · API и БД — только локально на сервере
 ```
 Справочники (один раз после первого запуска): `docker compose exec backend python -m aiskra.cli import-dictionaries` и `docker compose exec backend python -m aiskra.cli import-addresses` (адреса и границы районов, п. 1.2), `docker compose exec backend python -m aiskra.cli generate-scenarios --count 30` (банк учебных вызовов, п. 3.2). Учебные материалы (инструкция, памятки, п. 4.4) — страница «Учебные материалы» у преподавателя или `python -m aiskra.cli import-materials ФАЙЛ --kind instruction --as admin --prompts`.
 Стенд для показа одной командой: `AISKRA_DEMO_PASSWORD=… make demo-seed` (учётки teacher, op1, op2, dds1, dds2 и группа; [сценарий показа](docs/demo/M6_сквозной_сценарий.md)).

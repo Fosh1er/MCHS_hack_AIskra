@@ -19,6 +19,7 @@ from aiskra.modules.incidents.api.router import router as incidents_router
 from aiskra.modules.system.api.router import router as system_router
 from aiskra.modules.training.api.router import router as training_router
 from aiskra.platform.health import router as health_router
+from aiskra.platform.security_headers import SecurityHeadersMiddleware
 from aiskra.platform.services import Services
 from aiskra.platform.settings import Settings
 from aiskra.shared.errors import (
@@ -28,8 +29,11 @@ from aiskra.shared.errors import (
     ExternalServiceError,
     NotFoundError,
     PermissionDeniedError,
+    TooManyRequestsError,
 )
 from aiskra.shared.web import provide_principal
+
+log = logging.getLogger(__name__)
 
 _STATUS: dict[type[AppError], int] = {
     AuthenticationError: 401,
@@ -37,6 +41,7 @@ _STATUS: dict[type[AppError], int] = {
     NotFoundError: 404,
     PermissionDeniedError: 403,
     ExternalServiceError: 503,
+    TooManyRequestsError: 429,
 }
 
 
@@ -56,8 +61,8 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
         title="АИскра — тренажёр оператора 112 / ДДС",
         version="0.1.0",
         lifespan=lifespan,
-        docs_url="/docs",
-        openapi_url="/openapi.json",
+        docs_url="/docs" if settings.expose_docs else None,
+        openapi_url="/openapi.json" if settings.expose_docs else None,
     )
     app.add_middleware(
         CORSMiddleware,
@@ -66,6 +71,16 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    app.add_middleware(SecurityHeadersMiddleware)
+
+    @app.exception_handler(Exception)
+    async def _unexpected(request: Request, exc: Exception) -> JSONResponse:
+        # п. 6.2: внутренности (трассировка, SQL, пути) — только в лог, клиенту — единый ответ
+        log.exception("Необработанная ошибка %s %s", request.method, request.url.path)
+        return JSONResponse(
+            status_code=500, content={"error": "internal_error", "message": "Внутренняя ошибка сервера"}
+        )
 
     @app.exception_handler(AppError)
     async def _app_error(_: Request, exc: AppError) -> JSONResponse:
