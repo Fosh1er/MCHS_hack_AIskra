@@ -20,6 +20,7 @@ from aiskra.modules.incidents.api.schemas import (
     CreatedOut,
     OpenCardIn,
     SaveCardIn,
+    ServiceStatusIn,
     StatusCommentIn,
     StatusOut,
     WorkoutIn,
@@ -31,11 +32,25 @@ from aiskra.modules.incidents.application.commands.change_card_status import (
     ChangeCardStatusHandler,
     StatusAction,
 )
+from aiskra.modules.incidents.application.commands.dds import (
+    ChangeServiceStatus,
+    ChangeServiceStatusHandler,
+    MarkServiceReceived,
+    MarkServiceReceivedHandler,
+)
 from aiskra.modules.incidents.application.commands.open_card import OpenCard, OpenCardHandler
 from aiskra.modules.incidents.application.commands.record_card_view import RecordCardView, RecordCardViewHandler
 from aiskra.modules.incidents.application.commands.save_card import SaveCard, SaveCardHandler
 from aiskra.modules.incidents.application.commands.set_card_flags import SetCardFlags, SetCardFlagsHandler
 from aiskra.modules.incidents.application.ports.cards import CardView
+from aiskra.modules.incidents.application.queries.dds import (
+    DdsCardView,
+    DdsJournalPage,
+    GetDdsCard,
+    GetDdsCardHandler,
+    SearchDdsJournal,
+    SearchDdsJournalHandler,
+)
 from aiskra.modules.incidents.application.queries.get_card import GetCard, GetCardHandler
 from aiskra.modules.incidents.application.queries.search_journal import JournalPage, SearchJournal, SearchJournalHandler
 from aiskra.modules.incidents.domain.incident import AddedBy, Appendix, CardService
@@ -224,3 +239,85 @@ async def add_workout(
 ) -> CreatedOut:
     workout_id = await handler(AddWorkout(actor=actor, card_id=card_id, meta=meta, **body.model_dump()))
     return CreatedOut(id=workout_id)
+
+
+# ------------------------------------------------------------------ п. 2.1, 2.2: АРМ ДДС
+
+
+@router.get(
+    "/dds/{service_code}/journal",
+    response_model=DdsJournalPage,
+    summary="Реестр ДДС «Список происшествий»: карточки, поступившие в службу (dds/image3)",
+)
+async def dds_journal(
+    service_code: str,
+    actor: CurrentPrincipal,
+    handler: Annotated[SearchDdsJournalHandler, Depends(deps.provide_dds_journal)],
+    q: str = "",
+    status: Annotated[list[str] | None, Query(description="Статусы службы (enums.service_status)")] = None,
+    page: int = 1,
+    page_size: int = 10,
+) -> DdsJournalPage:
+    return await handler(
+        SearchDdsJournal(
+            actor=actor, service_code=service_code, q=q, statuses=status or [], page=page, page_size=page_size
+        )
+    )
+
+
+@router.get(
+    "/dds/{service_code}/cards/{card_id}",
+    response_model=DdsCardView,
+    summary="Карточка глазами ДДС: содержимое, своя служба, доступные статусы",
+)
+async def dds_card(
+    service_code: str,
+    card_id: UUID,
+    actor: CurrentPrincipal,
+    handler: Annotated[GetDdsCardHandler, Depends(deps.provide_dds_card)],
+) -> DdsCardView:
+    return await handler(GetDdsCard(actor=actor, card_id=card_id, service_code=service_code))
+
+
+@router.post(
+    "/dds/{service_code}/cards/{card_id}/received",
+    response_model=StatusOut,
+    summary="«Получена службой» — при первом открытии карточки в ДДС",
+)
+async def dds_received(
+    service_code: str,
+    card_id: UUID,
+    actor: Trainee,
+    meta: Meta,
+    handler: Annotated[MarkServiceReceivedHandler, Depends(deps.provide_dds_received)],
+) -> StatusOut:
+    return StatusOut(
+        status=await handler(MarkServiceReceived(actor=actor, card_id=card_id, service_code=service_code, meta=meta))
+    )
+
+
+@router.post(
+    "/dds/{service_code}/cards/{card_id}/status",
+    response_model=StatusOut,
+    summary="Статус своей службы: Принята / Не принята → … → Работы завершены (карандаш, dds/image8)",
+)
+async def dds_status(
+    service_code: str,
+    card_id: UUID,
+    body: ServiceStatusIn,
+    actor: Trainee,
+    meta: Meta,
+    handler: Annotated[ChangeServiceStatusHandler, Depends(deps.provide_dds_status)],
+) -> StatusOut:
+    status = await handler(
+        ChangeServiceStatus(
+            actor=actor,
+            card_id=card_id,
+            service_code=service_code,
+            status=body.status,
+            order_no=body.order_no,
+            comment=body.comment,
+            meta=meta,
+        )
+    )
+    return StatusOut(status=status)

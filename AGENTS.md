@@ -96,6 +96,11 @@ cd backend && uv run python -m aiskra.cli create-user --login admin --full-name 
 - **Статусы:** хранимый `status` и вычисляемый `display_status` (`not_notified`). Подписи — `incidents.ts:CARD_STATUS`, `SERVICE_STATUS`.
 - **Дополняемые поля** — `domain/incident.py:APPENDABLE_FIELDS` (сервер) и `CardViewer.tsx:APPENDABLE` (клиент). Меняете одно — меняйте и другое.
 
+## АРМ ДДС (п. 2.1, 2.2) — что уже есть
+- **Экраны:** `frontend/src/pages/dds/` — `DdsSelectPage` (`/arm/dds`, выбор службы), `DdsJournalPage` (`/arm/dds/:service`, реестр с таймерами), `DdsCardPage` (`/arm/dds/:service/:id` → `CardViewer` с `dds`).
+- **API:** `GET /api/v1/incidents/dds/{service}/journal`, `GET …/cards/{id}` (с `next_statuses`), `POST …/cards/{id}/received`, `POST …/cards/{id}/status`.
+- **Правила статусов** — `modules/incidents/domain/dds.py` (`NEXT`, `check_transition`). Очередь ДДС = `card_services` сохранённых карточек; `dds_queue_items` — для потока по расписанию (4.2).
+
 ## Рецепты
 **Новая команда** (пример: `SaveCard` в `incidents`):
 1. `modules/incidents/application/commands/save_card.py` — `@dataclass(frozen=True, kw_only=True) class SaveCard(Command)` и `class SaveCardHandler` с зависимостями-портами в `__init__` и `async __call__(cmd) -> Result`.

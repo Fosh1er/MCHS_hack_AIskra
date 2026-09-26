@@ -66,12 +66,15 @@ from aiskra.modules.incidents.api import deps as incidents_deps
 from aiskra.modules.incidents.application.commands.add_workout import AddWorkoutHandler
 from aiskra.modules.incidents.application.commands.append_card import AppendCardHandler
 from aiskra.modules.incidents.application.commands.change_card_status import ChangeCardStatusHandler
+from aiskra.modules.incidents.application.commands.dds import ChangeServiceStatusHandler, MarkServiceReceivedHandler
 from aiskra.modules.incidents.application.commands.open_card import OpenCardHandler
 from aiskra.modules.incidents.application.commands.record_card_view import RecordCardViewHandler
 from aiskra.modules.incidents.application.commands.save_card import SaveCardHandler
 from aiskra.modules.incidents.application.commands.set_card_flags import SetCardFlagsHandler
+from aiskra.modules.incidents.application.queries.dds import GetDdsCardHandler, SearchDdsJournalHandler
 from aiskra.modules.incidents.application.queries.get_card import GetCardHandler
 from aiskra.modules.incidents.application.queries.search_journal import SearchJournalHandler
+from aiskra.modules.incidents.infrastructure.dds import SqlDdsReader, SqlDdsRepository
 from aiskra.modules.incidents.infrastructure.reader import SqlCardReader
 from aiskra.modules.incidents.infrastructure.repositories import SqlCardRepository
 from aiskra.modules.system.api import deps as system_deps
@@ -298,6 +301,28 @@ def _wire_incidents(app: FastAPI) -> None:
     ov[incidents_deps.provide_append] = append
     ov[incidents_deps.provide_add_workout] = add_workout
     ov[incidents_deps.provide_record_view] = record_view
+
+    # п. 2.1, 2.2: АРМ ДДС
+    def dds_received(session: Session) -> MarkServiceReceivedHandler:
+        return MarkServiceReceivedHandler(
+            SqlDdsRepository(session), SqlAuditRecorder(session), SqlAlchemyUnitOfWork(session), clock
+        )
+
+    def dds_status(session: Session) -> ChangeServiceStatusHandler:
+        return ChangeServiceStatusHandler(
+            SqlDdsRepository(session), SqlAuditRecorder(session), SqlAlchemyUnitOfWork(session), clock
+        )
+
+    def dds_journal(session: Session) -> SearchDdsJournalHandler:
+        return SearchDdsJournalHandler(SqlDdsReader(session))
+
+    def dds_card(session: Session) -> GetDdsCardHandler:
+        return GetDdsCardHandler(SqlCardReader(session))
+
+    ov[incidents_deps.provide_dds_journal] = dds_journal
+    ov[incidents_deps.provide_dds_card] = dds_card
+    ov[incidents_deps.provide_dds_received] = dds_received
+    ov[incidents_deps.provide_dds_status] = dds_status
 
 
 def wire(app: FastAPI, services: Services) -> None:

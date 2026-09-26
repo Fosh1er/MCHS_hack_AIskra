@@ -34,6 +34,8 @@ class AuditEvent(StrEnum):
     DICTIONARIES_IMPORTED = "dictionaries.imported"
     ADDRESSES_IMPORTED = "dictionaries.addresses_imported"
     CARD_CREATED = "card.created"
+    SERVICE_RECEIVED = "dds.received"
+    SERVICE_STATUS_CHANGED = "dds.status_changed"
     CARD_SAVED = "card.saved"
     CARD_VIEWED = "card.viewed"
     CARD_WORKED = "card.worked"
@@ -62,6 +64,8 @@ AUDIT_EVENT_TITLES: Mapping[AuditEvent, str] = {
     AuditEvent.DICTIONARIES_IMPORTED: "Импорт справочников",
     AuditEvent.ADDRESSES_IMPORTED: "Импорт адресного справочника",
     AuditEvent.CARD_CREATED: "Создание карточки происшествия",
+    AuditEvent.SERVICE_RECEIVED: "Карточка получена службой (ДДС)",
+    AuditEvent.SERVICE_STATUS_CHANGED: "Изменение статуса службы (ДДС)",
     AuditEvent.CARD_SAVED: "Сохранение карточки происшествия",
     AuditEvent.CARD_VIEWED: "Просмотр карточки",
     AuditEvent.CARD_WORKED: "Переход в Отработана",

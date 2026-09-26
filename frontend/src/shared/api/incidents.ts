@@ -24,7 +24,7 @@ export interface CardData {
 export interface CardServiceIn { code: string; is_main: boolean; added_by: 'auto' | 'manual'; service_type?: string | null }
 export interface CardOpened { id: string; number: number; opened_at: string }
 export interface CardSaved { id: string; number: number; status: string; saved_at: string; processing_ms: number; services: CardServiceIn[] }
-export interface StatusHistoryItem { status: string; at: string | null; operator: string | null; comment: string | null }
+export interface StatusHistoryItem { status: string; at: string | null; operator: string | null; comment: string | null; order_no?: string | null }
 export interface CardServiceView {
   code: string; short: string; integrated: boolean; is_main: boolean; added_by: string;
   status: string; status_at: string | null; history: StatusHistoryItem[];
@@ -126,3 +126,56 @@ export function useCardActions(id: string) {
 
 /** «Просмотр карточки» в аудите — один раз при открытии (а не при каждом обновлении экрана). */
 export const markCardViewed = (id: string) => http<void>(`${I}/${id}/viewed`, { method: 'POST' });
+
+// ------------------------------------------------------------------ п. 2.1, 2.2: АРМ ДДС
+
+/** Строка реестра ДДС (dds/image3–5). */
+export interface DdsJournalRow {
+  id: string; number: number; is_emergency: boolean; is_incident: boolean; operator_number: string | null;
+  arm_number: string | null; channel: string | null; registered_at: string | null; card_types: string[];
+  empty_call: 'no_contact' | 'call_dropped' | null; has_victims: boolean; victims_count: number;
+  address_line: string | null; description: string | null; author_name: string | null;
+  service_status: string; service_status_at: string | null; added_at: string | null;
+}
+export interface DdsJournalPage { items: DdsJournalRow[]; total: number; page: number; page_size: number }
+export interface DdsCardView { card: CardView; service_code: string; service_status: string; next_statuses: string[] }
+export interface ServiceStatusBody { status: string; order_no: string; comment: string }
+
+const DDS = '/api/v1/incidents/dds';
+
+export const useDdsJournal = (service: string, q: { q: string; statuses: string[]; page: number; page_size: number }, autoRefresh: boolean) =>
+  useQuery({
+    queryKey: ['dds-journal', service, q],
+    queryFn: () => {
+      const p = new URLSearchParams({ page: String(q.page), page_size: String(q.page_size) });
+      if (q.q) p.set('q', q.q);
+      q.statuses.forEach((s) => p.append('status', s));
+      return http<DdsJournalPage>(`${DDS}/${encodeURIComponent(service)}/journal?${p}`);
+    },
+    placeholderData: keepPreviousData,
+    refetchInterval: autoRefresh ? 5000 : false,
+  });
+
+export const useDdsCard = (service: string, id: string | undefined) =>
+  useQuery({
+    queryKey: ['dds-card', service, id],
+    queryFn: () => http<DdsCardView>(`${DDS}/${encodeURIComponent(service)}/cards/${id}`),
+    enabled: !!id,
+    refetchInterval: 5000, // статусы других служб меняются, пока карточка открыта
+  });
+
+export function useDdsActions(service: string, id: string) {
+  const qc = useQueryClient();
+  const refresh = () => {
+    qc.invalidateQueries({ queryKey: ['dds-card', service, id] });
+    qc.invalidateQueries({ queryKey: ['dds-journal', service] });
+  };
+  const base = `${DDS}/${encodeURIComponent(service)}/cards/${id}`;
+  return {
+    received: useMutation({ mutationFn: () => http<{ status: string }>(`${base}/received`, { method: 'POST' }), onSuccess: refresh }),
+    status: useMutation({
+      mutationFn: (b: ServiceStatusBody) => http<{ status: string }>(`${base}/status`, { method: 'POST', body: JSON.stringify(b) }),
+      onSuccess: refresh,
+    }),
+  };
+}
