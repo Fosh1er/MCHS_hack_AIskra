@@ -1,3 +1,6 @@
+/** Маршруты SPA. Права проверяет сервер (ADR-0010); здесь — навигация: RequireAuth не показывает недоступные
+ *  экраны, ArmScreenGuard объясняет, что эмулятор АРМ — для экрана от 1000 px (п. 6.3).
+ *  /arm/* — эмулятор АРМ-112 и АРМ ДДС; /teacher, /student, /admin — кабинеты ролей. */
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { LoginPage } from '../pages/LoginPage';
 import { AiDiagnosticsPage } from '../pages/AiDiagnosticsPage';

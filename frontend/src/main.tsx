@@ -1,3 +1,5 @@
+/** Точка входа SPA: шрифты и стили ui-kit, клиент запросов (повторы только при сбое связи, работа в фоновом окне —
+ *  п. 6.1), баннер «нет связи» и маршрутизатор. */
 import '@fontsource/roboto/300.css';
 import '@fontsource/roboto/400.css';
 import '@fontsource/roboto/500.css';
