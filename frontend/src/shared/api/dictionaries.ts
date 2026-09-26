@@ -1,5 +1,6 @@
 /** Модуль dictionaries: типы «Что случилось?», опросные карты, службы, территория, перечисления. */
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import type { MultiPolygon, Polygon } from 'geojson';
 import { http } from './http';
 
 export interface CardType {
@@ -64,3 +65,40 @@ export const useResolvedServices = (types: string[], flags: string[], okrug: str
 export const useServices = () => useQuery({ queryKey: ['dict', 'services'], queryFn: () => http<ServiceRow[]>(`${D}/services`), ...forever });
 export const useTerritory = () => useQuery({ queryKey: ['dict', 'territory'], queryFn: () => http<Territory>(`${D}/territory`), ...forever });
 export const useEnum = (domain: string) => useQuery({ queryKey: ['dict', 'enum', domain], queryFn: () => http<EnumValue[]>(`${D}/enums/${domain}`), ...forever });
+
+// ------------------------------------------------------------------ п. 1.2: адресный справочник и карта (OpenStreetMap)
+
+export interface AddressSuggestion {
+  label: string; street: string; house: string; building: string; structure: string;
+  district: string | null; okrug: string | null; lat: number | null; lon: number | null; source: string;
+}
+export interface GeocodeResult {
+  lat: number; lon: number; district: string | null; okrug: string | null;
+  address: AddressSuggestion | null; distance_m: number | null;
+}
+export interface HousePoint { label: string; lat: number; lon: number }
+export interface DistrictFeature {
+  type: 'Feature';
+  properties: { code: string; name: string; okrug: string; label: [number, number] };
+  geometry: Polygon | MultiPolygon;
+}
+export interface DistrictShapes { type: 'FeatureCollection'; features: DistrictFeature[]; attribution: string }
+
+/** Подсказки единой адресной строки: с третьего символа, пока пользователь печатает — прежний список. */
+export const useAddressSuggest = (q: string) =>
+  useQuery({
+    queryKey: ['dict', 'addresses', q],
+    queryFn: () => http<AddressSuggestion[]>(`${D}/addresses/suggest?${qs({ q, limit: '8' })}`),
+    enabled: q.trim().length >= 3,
+    placeholderData: keepPreviousData,
+    staleTime: 5 * 60_000,
+  });
+
+export const reverseGeocode = (lat: number, lon: number) =>
+  http<GeocodeResult>(`${D}/addresses/reverse?${qs({ lat: String(lat), lon: String(lon) })}`);
+
+export const fetchHouses = (b: { min_lat: number; min_lon: number; max_lat: number; max_lon: number }) =>
+  http<HousePoint[]>(`${D}/addresses/houses?${qs(Object.fromEntries(Object.entries(b).map(([k, v]) => [k, v.toFixed(6)])))}`);
+
+export const useDistrictShapes = () =>
+  useQuery({ queryKey: ['dict', 'district-shapes'], queryFn: () => http<DistrictShapes>(`${D}/territory/shapes`), ...forever });

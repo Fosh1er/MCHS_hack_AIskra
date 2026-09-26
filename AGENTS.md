@@ -38,6 +38,7 @@ make be-install && make be-check     # uv sync; ruff + mypy --strict + import-li
 make fe-install && make fe-build     # npm install; tsc + vite build
 docker compose up --build            # db + backend (:8000/docs) + frontend (:8080)
 cd backend && uv run alembic upgrade head && uv run python -m aiskra.cli import-dictionaries   # схема + справочники
+cd backend && uv run python -m aiskra.cli import-addresses   # адресный справочник и границы районов (п. 1.2)
 cd backend && uv run python -m aiskra.cli create-user --login admin --full-name "…" --role admin   # пользователь
 ```
 **Перед каждым коммитом зелёными должны быть `make be-check` и `make fe-build`.**
@@ -83,6 +84,11 @@ cd backend && uv run python -m aiskra.cli create-user --login admin --full-name 
 - **API:** `POST /api/v1/incidents/cards` → номер; `POST /cards/{id}/save` → «Зарегистрирована» или «Завершена» (пустая); `GET /cards/{id}`.
 - **Автоподбор служб:** `GET /api/v1/dictionaries/services/resolve?incident_type=…&flag=…&district=…` — основа п. 1.5.
 - **Правила сохранения** — `modules/incidents/domain/incident.py:missing_for_save` (сервер) и `state.ts:missingFields` (клиент). Меняете одно — меняйте и другое.
+
+## Адрес и карта (п. 1.2) — что уже есть
+- **Данные:** `data/dictionaries/addresses.csv.gz` и `districts_geo.json` из OpenStreetMap, генератор `data/tools/build_addresses.py`. Таблицы `dict_streets`, `dict_addresses`, `dict_district_shapes`; импорт — отдельная команда `import-addresses` (в тестах других модулей адресов нет).
+- **API:** `GET /api/v1/dictionaries/addresses/suggest?q=`, `/addresses/reverse?lat=&lon=`, `/addresses/houses?min_lat=…`, `/territory/shapes`. Разбор строки и геометрия — `modules/dictionaries/domain/address.py`.
+- **Фронт:** подсказки в `pages/card112/AddressBlock.tsx`, окно карты `AddressMap.tsx` (Leaflet без тайлов). Esc в окне карты закрывает карту — слушатель в фазе захвата.
 
 ## Журнал и сохранённая карточка (п. 1.3) — что уже есть
 - **Журнал:** `frontend/src/pages/journal/JournalPage.tsx`, маршрут `/arm/112/journal` — стартовый экран обучающегося (`auth.ts:homeFor`). API `GET /api/v1/incidents/journal` (свои — обучающемуся, все — преподавателю). Сетка `.arm-j112` в ui-kit.
