@@ -32,6 +32,8 @@ class AuditEvent(StrEnum):
     USER_UNBLOCKED = "users.unblocked"
     PASSWORD_RESET = "users.password_reset"
     DICTIONARIES_IMPORTED = "dictionaries.imported"
+    CARD_CREATED = "card.created"
+    CARD_SAVED = "card.saved"
 
     @property
     def label(self) -> str:
@@ -50,6 +52,8 @@ AUDIT_EVENT_TITLES: Mapping[AuditEvent, str] = {
     AuditEvent.USER_UNBLOCKED: "Разблокировка пользователя",
     AuditEvent.PASSWORD_RESET: "Сброс пароля",
     AuditEvent.DICTIONARIES_IMPORTED: "Импорт справочников",
+    AuditEvent.CARD_CREATED: "Создание карточки происшествия",
+    AuditEvent.CARD_SAVED: "Сохранение карточки происшествия",
 }
 
 

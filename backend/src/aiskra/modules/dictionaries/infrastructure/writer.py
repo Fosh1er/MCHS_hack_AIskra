@@ -104,6 +104,7 @@ class SqlDictionaryWriter:
                 "phone": x["phone"],
                 "phone_synthetic": x["phone_synthetic"],
                 "confirmed": x["confirmed"],
+                "integrated": x.get("integrated", True),
                 "source": x["source"],
                 "search_text": search_form(f"{x['short']} {x['full']}"),
                 "active": True,

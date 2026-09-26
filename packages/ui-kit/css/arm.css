@@ -219,7 +219,7 @@
   background: var(--bg-dark-2);
   color: var(--text-inverse);
 }
-.arm-svcbar__label { display: flex; align-items: center; padding: 0 8px; font-size: var(--fs-md); }
+.arm-svcbar__label { width: var(--arm-svclabel-w, 66px); flex: none; display: flex; align-items: center; padding: 0 8px; font-size: var(--fs-md); }
 .arm-svcbar__tabs { display: flex; align-items: stretch; min-width: 0; overflow-x: auto; scrollbar-width: none; }
 .arm-svcbar__end { margin-left: auto; display: flex; align-items: center; gap: 6px; padding-right: 8px; }
 
@@ -262,7 +262,7 @@
 .arm-svcstack {
   position: absolute;
   bottom: 100%;
-  left: 66px;
+  left: var(--arm-svclabel-w, 66px);
   height: var(--arm-svcbar-h);
   display: flex;
 }
@@ -461,6 +461,7 @@
   padding: 4px 0;
 }
 .arm-typeinput::placeholder { color: #7d8286; }
+.arm-typeinput:focus { outline: none; box-shadow: none; border-bottom: 2px solid var(--accent); } /* как на стенде: синеет линия */
 
 .arm-chip {
   height: 32px;
@@ -745,3 +746,188 @@
   .arm-list { overflow-x: auto; }
   .arm-agrid { min-width: 900px; }
 }
+
+/* ==========================================================================
+   Карточка происшествия АРМ-112 (п. 1.1): раскладка стенда 2026 (СКРИНШОТ КАРТОЧКИ 112ГСИ)
+   ========================================================================== */
+/* Масштаб по замерам стенда 2026 (снимки при масштабе браузера 90 %): шрифты и элементы карточки
+   в ~1,2 раза крупнее токенов UI-кита, снятых со снимков ДДС при 80 %. Переопределяем токены только внутри карточки. */
+.arm112 {
+  --fs-2xs: 12px;
+  --fs-xs: 13.5px;
+  --fs-sm: 14px;
+  --fs-md: 16px;
+  --fs-base: 16px;
+  --fs-lg: 18px;
+  --fs-xl: 24px;
+  --fs-timer: 40px;
+  --arm-strip-h: 80px;
+  --arm-svcbar-h: 80px;
+  --arm-svclabel-w: 80px;
+}
+.arm112 { position: relative; height: 100vh; display: flex; flex-direction: column; background: var(--bg-canvas); color: var(--text-strong); font-size: var(--fs-md); overflow: hidden; }
+.arm112__top { flex: none; height: var(--arm-strip-h); display: flex; gap: var(--arm-gap); padding: var(--arm-gap) var(--arm-gap) 0; min-width: 0; }
+.arm112__body { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: minmax(0, 45fr) minmax(0, 55fr); grid-template-rows: auto minmax(0, 1fr); gap: var(--arm-gap); padding: var(--arm-gap); }
+.arm112__col { display: flex; flex-direction: column; gap: var(--arm-gap); min-height: 0; min-width: 0; }
+.arm112__scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: var(--arm-gap); }
+.arm112__row2 { display: flex; gap: var(--arm-gap); min-width: 0; }
+
+/* Телефоны с вводом */
+.arm-phone__input { width: 100%; margin-top: 4px; border: 0; border-bottom: 1px solid var(--line-input); background: transparent; font-size: var(--fs-xl); color: var(--text-strong); letter-spacing: .02em; padding: 0; }
+.arm-phone__input::placeholder { color: var(--text-placeholder); }
+.arm-phone__input:focus { outline: none; border-bottom: 2px solid var(--accent); }
+.arm-phone__input[readonly] { border-bottom-color: transparent; }
+.arm-phone__head { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+.arm-phone__tools { display: flex; gap: 6px; align-items: center; color: var(--text-strong); }
+.arm-phone__tools button { border: 0; background: none; padding: 0; color: inherit; display: flex; }
+.arm-phone__tools button[aria-pressed="true"] { color: var(--accent); }
+.arm-phone__row { display: flex; gap: 8px; align-items: flex-end; }
+.arm-aonbtn { height: 20px; padding: 0 8px; border: 1px solid var(--border); background: var(--c-white); font-size: var(--fs-2xs); color: var(--text); flex: none; }
+
+/* Заявитель, пострадавшие, нерезультативный вызов */
+.arm112-applicant { flex: 1; display: flex; align-items: flex-end; gap: 14px; }
+.arm112-applicant select { min-width: 150px; }
+.arm112-toggle { width: 30px; height: 30px; flex: none; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--border); background: var(--c-white); color: var(--text-strong); }
+.arm112-toggle[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--text-inverse); }
+.arm112-victims { flex: 1; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.arm-bigbtn[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--text-inverse); }
+.arm112-count { width: 90px; }
+.arm112-empty { display: flex; align-items: center; gap: 4px; }
+
+/* Адрес и описание */
+.arm112-address { position: relative; }
+.arm112-address__line { display: flex; align-items: flex-end; gap: 8px; }
+.arm112-address__line input { flex: 1; font-size: var(--fs-lg); }
+.arm112-grid { display: grid; gap: 10px 16px; margin-top: 10px; }
+.arm112-grid--3 { grid-template-columns: 1fr 1fr 1.9fr; }
+.arm112-grid--addr2 { grid-template-columns: 1.9fr 1fr 1fr; }
+.arm112-grid--5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.arm112-address select, .arm112-applicant select { width: 100%; }
+.arm112-textarea { width: 100%; min-height: 40px; border: 0; border-bottom: 1px solid var(--line-input); background: transparent; resize: vertical; font: inherit; font-size: 15px; color: var(--text-strong); padding: 2px 0; }
+.arm112-textarea:focus { outline: none; border-bottom: 2px solid var(--accent); }
+.arm112-textarea::placeholder { color: var(--text-placeholder); }
+.arm112-counter { text-align: right; font-size: var(--fs-2xs); color: var(--text-muted); margin-top: 4px; }
+.arm112-warn { margin-top: 6px; font-size: var(--fs-xs); color: #c0461f; }
+.arm112-minibtn { float: right; margin-top: 8px; }
+
+/* Подсказки (адрес, «что случилось?») */
+.arm112-suggest { position: absolute; z-index: var(--z-popover); left: 10px; right: 10px; max-height: 320px; overflow-y: auto; background: var(--c-white); box-shadow: var(--shadow-popover); }
+.arm112-suggest button { display: block; width: 100%; padding: 12px 14px; border: 0; border-bottom: 1px solid var(--border-subtle); background: none; text-align: left; font-size: var(--fs-md); color: var(--text-strong); }
+.arm112-suggest button:hover, .arm112-suggest button[aria-selected="true"] { background: var(--c-blue-100); }
+.arm112-suggest small { color: var(--text-muted); margin-left: 8px; }
+
+/* «Что случилось?» и опросные карты */
+.arm112-types { position: relative; background: var(--c-white); padding: 10px 14px 14px; }
+.arm112-types__label { font-size: var(--fs-xs); color: var(--text-muted); }
+.arm112-types__label--active { color: var(--accent); }
+.arm112-significant { margin-top: 14px; font-size: var(--fs-sm); color: var(--text-muted); display: flex; flex-wrap: wrap; gap: 6px 14px; }
+.arm112-significant button { border: 0; background: none; padding: 0; color: var(--accent); font-size: var(--fs-sm); text-decoration: underline; }
+.arm112-tabs { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px; background: var(--bg-panel); }
+.arm112-tab { height: 30px; padding: 0 12px; border: 1px solid var(--border); background: var(--c-white); font-size: var(--fs-sm); color: var(--text-strong); }
+.arm112-tab--pending { border-color: var(--accent-112); }
+.arm-q__head button { border: 0; background: none; color: inherit; display: flex; padding: 0; }
+.arm-q__note { padding: 8px 12px 12px; font-size: var(--fs-sm); color: var(--text-muted); }
+
+/* Нижняя панель: режим просмотра (после сохранения) — тёмная, как в инструкции */
+.arm112-saved .arm-svcbar--112 { background: var(--bg-dark-2); }
+.arm112-saved .arm-svcbar--112 .arm-svc { background: var(--bg-dark-2); flex-direction: column; }
+.arm-sqbtn:disabled { opacity: .45; cursor: default; }
+.arm-savebtn:disabled { opacity: .6; }
+.arm112 .arm-savebtn { white-space: nowrap; }
+.arm112-textarea:focus-visible { box-shadow: none; outline: none; }
+
+/* Модальные окна карточки */
+.arm112-modalwrap { position: fixed; inset: 0; z-index: var(--z-modal); display: grid; place-items: center; }
+.arm112-modalwrap .arm-overlay { position: fixed; z-index: 0; } /* затемнение под окном: клик по кнопкам не должен попадать в него */
+.arm112-modal { position: relative; z-index: 1; min-width: 520px; max-width: 900px; background: var(--c-white); padding: 18px 22px 22px; box-shadow: var(--shadow-popover); }
+.arm112-modal h2 { margin: 0 0 20px; font-size: 26px; font-weight: var(--fw-bold); color: var(--text-strong); }
+.arm112-modal__chips { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 18px; }
+.arm112-modal__chip { padding: 8px 26px; border: 1px solid var(--border); font-weight: var(--fw-bold); }
+.arm112-modal__chip--main { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 5px; }
+.arm112-modal__btns { display: flex; gap: 14px; flex-wrap: wrap; }
+.arm112-btn { height: 40px; padding: 0 16px; border: 1px solid var(--accent-112); background: var(--c-white); color: #c0461f; font-size: var(--fs-lg); font-weight: var(--fw-bold); }
+.arm112-btn:focus-visible, .arm112-btn--primary { border-color: var(--accent); }
+.arm112-modal .arm-modal__close { top: 12px; right: 14px; }
+
+/* Баннер ошибок и подсказки горячих клавиш (зажатый Alt) */
+.arm112-banner { position: absolute; z-index: var(--z-popover); top: calc(var(--arm-strip-h) + 6px); left: 50%; transform: translateX(-50%); max-width: 80%; padding: 10px 16px; background: var(--c-wine-600); color: var(--text-inverse); box-shadow: var(--shadow-popover); }
+.arm112-banner ul { margin: 6px 0 0; padding-left: 18px; }
+.arm112-hint { display: none; position: absolute; z-index: var(--z-popover); padding: 1px 5px; background: var(--c-graphite-800); color: var(--text-inverse); font-size: 10px; font-weight: var(--fw-bold); pointer-events: none; }
+.arm112--alt .arm112-hint { display: inline-block; }
+.arm112-rel { position: relative; }
+
+@media (max-width: 1100px) {
+  .arm112 { height: auto; min-height: 100vh; overflow: visible; }
+  .arm112__top { height: auto; flex-wrap: wrap; }
+  .arm112__top > * { min-width: 240px; }
+  .arm112__body { grid-template-columns: 1fr; }
+  .arm112__row2 { flex-wrap: wrap; }
+  .arm112 .arm-svcbar { position: sticky; bottom: 0; height: auto; flex-wrap: wrap; }
+  .arm112-modal { min-width: 0; width: calc(100vw - 32px); }
+  .arm112-grid--5 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* ---- Карточка 112: размеры элементов по стенду (px — CSS-пиксели при масштабе 100 %) ---- */
+.arm112 .arm-callctl { width: 350px; }
+.arm112 .arm-callctl__hang { width: 72px; }
+.arm112 .arm-callctl__title { font-size: 16px; }
+.arm112 .arm-callctl__btns { gap: 10px; }
+.arm112 .arm-minibtn { height: 23px; padding: 0 14px; font-size: 12px; }
+.arm112 .arm-phone__icons { width: 40px; }
+.arm112 .arm-phone__icons .i { width: 24px; height: 24px; }
+.arm112 .arm-phone__field { padding: 8px 12px; }
+.arm112 .arm-phone__label { font-size: 13.5px; }
+.arm112 .arm-phone__input { font-size: 23px; }
+.arm112 .arm-phone__tools .i { width: 16px; height: 16px; }
+.arm112 .arm-aonbtn { height: 23px; font-size: 12px; }
+.arm112 .arm-idbox { width: 260px !important; padding: 10px 12px; }
+.arm112 .arm-idbox__title { font-size: 19px; }
+.arm112 .arm-idbox__meta { font-size: 13.5px; }
+.arm112 .arm-timer { width: 119px; }
+.arm112 .arm-timer__units { font-size: 10px; }
+
+.arm112 .arm-field__input { height: 30px; font-size: 17px; }
+.arm112-applicant .arm-field__input, .arm112-applicant .arm-uline { height: 32px; font-size: 18px; }
+.arm112 .arm-uline { height: 30px; font-size: 17px; }
+.arm112-textarea { font-size: 17px; }
+.arm112 .arm-bigbtn { min-height: 50px; padding: 4px 14px; }
+.arm112-count { width: auto; flex-direction: row; align-items: center; gap: 8px; }
+.arm112-count .arm-field__input { width: 64px; }
+.arm112-toggle { width: 36px; height: 36px; }
+.arm112-toggle .i { width: 22px; height: 22px; }
+
+.arm112 .arm-typeinput { padding: 6px 0; }
+.arm112 .arm-chip { height: 35px; padding: 0 15px; }
+.arm112-types .arm-chips { gap: 14px 24px !important; }
+.arm112 .arm-chips--tight { gap: 12px 12px; }
+.arm112-tab { height: 34px; padding: 0 14px; font-size: 14px; }
+.arm112 .arm-q__head { padding: 7px 14px; font-size: 16px; }
+.arm112 .arm-q__row { grid-template-columns: 330px minmax(0, 1fr); padding: 9px 14px; }
+.arm112 .arm-q__label { padding-top: 8px; color: #7d8286; }
+.arm112-suggest button { padding: 13px 16px; }
+
+/* Панель служб стенда: чип 129 px — трубка слева сверху, «×» справа сверху, название ниже центра;
+   основная служба — одна линия под названием (как на стенде 2026, рис. 4); без интеграции — серый. */
+.arm112 .arm-svcbar__label { font-size: 16px; }
+.arm112 .arm-svcbar--112 .arm-svc { width: 129px; padding: 22px 8px 0; border-left-color: rgba(255, 255, 255, .6); }
+.arm112 .arm-svc__name { font-size: 16px; }
+.arm112 .arm-svc__phone { top: 9px; left: 14px; width: 14px; height: 14px; }
+.arm112 .arm-svc__x { top: 9px; right: 12px; }
+.arm112 .arm-svc__x .i { width: 14px; height: 14px; }
+.arm112 .arm-svc--main .arm-svc__name { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 5px; padding-bottom: 8px; } /* запас под линию: имя обрезается многоточием */
+.arm112 .arm-svcbar--112 .arm-svc--nointegr { background: var(--c-grey-500); }
+.arm112 .arm-svcstack { background: var(--accent-112); border-bottom: 1px solid rgba(255, 255, 255, .6); }
+.arm112-saved .arm-svcstack { background: var(--bg-dark-2); }
+.arm112 .arm-svcbar__tabs { overflow: hidden; } /* лишние чипы уходят во второй ряд (⇕), а не в прокрутку */
+.arm112-svcbtns { display: flex; align-items: center; gap: 16px; padding: 0 16px 0 14px; }
+.arm112 .arm-sqbtn { width: 50px; height: 48px; }
+.arm112 .arm-sqbtn:disabled { opacity: 1; cursor: not-allowed; } /* на стенде кнопки яркие; что они появятся позже — в подсказке */
+.arm112 .arm-sqbtn .i { width: 28px; height: 28px; }
+.arm112 .arm-svcbar__end { gap: 5px; padding-right: 10px; }
+.arm112 .arm-savebtn { height: 48px; padding: 0 18px; font-size: 24px; }
+.arm112-modal__chip { padding: 10px 26px; font-size: 18px; }
+.arm112-btn { height: 44px; }
+.arm112 .arm-modal { width: 500px; }
+.arm112 .arm-modal__title { font-size: 34px; }
+.arm112 .arm-modal__item { font-size: 15px; }
+

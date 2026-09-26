@@ -14,6 +14,7 @@ from aiskra.bootstrap import build_services, wire
 from aiskra.modules.audit.api.router import router as audit_router
 from aiskra.modules.dictionaries.api.router import router as dictionaries_router
 from aiskra.modules.identity.api.router import auth_router, users_router
+from aiskra.modules.incidents.api.router import router as incidents_router
 from aiskra.modules.system.api.router import router as system_router
 from aiskra.platform.health import router as health_router
 from aiskra.platform.services import Services
@@ -78,6 +79,7 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
     app.include_router(audit_router, prefix=settings.api_prefix, dependencies=signed_in)
     app.include_router(system_router, prefix=settings.api_prefix, dependencies=signed_in)
     app.include_router(dictionaries_router, prefix=settings.api_prefix, dependencies=signed_in)
+    app.include_router(incidents_router, prefix=settings.api_prefix, dependencies=signed_in)
     return app
 
 

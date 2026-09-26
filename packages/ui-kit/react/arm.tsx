@@ -217,15 +217,17 @@ export interface ServiceBarProps {
   overlay?: ReactNode;
   /** Правая часть: сохранить, связь, будильник, ✕ … */
   end?: ReactNode;
+  /** Кнопки сразу после служб и ⇕ (АРМ-112: «+» — добавить службу) */
+  actions?: ReactNode;
   expanded?: boolean;
   onToggleExpand?: () => void;
 }
-export function ServiceBar({ variant = 'dds', children, stack, overlay, end, expanded, onToggleExpand }: ServiceBarProps) {
+export function ServiceBar({ variant = 'dds', children, stack, overlay, end, actions, expanded, onToggleExpand }: ServiceBarProps) {
   return (
     <footer className={cx('arm-svcbar', variant === '112' && 'arm-svcbar--112')}>
       {overlay}
       {expanded && stack && <div className="arm-svcstack">{stack}</div>}
-      <div className="arm-svcbar__label" style={{ width: 66 }}>Службы:</div>
+      <div className="arm-svcbar__label">Службы:</div>
       <div className="arm-svcbar__tabs">
         {children}
         {onToggleExpand && (
@@ -235,6 +237,7 @@ export function ServiceBar({ variant = 'dds', children, stack, overlay, end, exp
             </button>
           </div>
         )}
+        {actions}
       </div>
       {end && <div className="arm-svcbar__end">{end}</div>}
     </footer>

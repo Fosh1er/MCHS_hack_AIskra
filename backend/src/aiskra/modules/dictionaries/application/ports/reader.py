@@ -59,6 +59,8 @@ class ServiceRow:
     phone_synthetic: bool
     confirmed: bool
     source: str
+    main_codes: list[str] = field(default_factory=list)  # коды «Главной службы» классификатора (колонка 14)
+    integrated: bool = True  # False — служба без интеграции с системой 112 (серая плашка)
 
 
 @dataclass(frozen=True)
@@ -111,6 +113,14 @@ class DictionaryReader(Protocol):
     async def list_services(
         self, *, kinds: list[str] | None, okrug: str | None, terms: list[str], limit: int
     ) -> list[ServiceRow]: ...
+
+    async def get_services(self, codes: list[str]) -> list[ServiceRow]: ...
+
+    async def list_main_services(self) -> list[ServiceRow]:
+        """Службы, у которых есть коды «Главной службы» классификатора."""
+        ...
+
+    async def get_district(self, code: str) -> DistrictRow | None: ...
 
     async def list_okrugs(self) -> list[OkrugRow]: ...
 
