@@ -5,6 +5,7 @@ import { useParams } from 'react-router-dom';
 import { Banner, Button, Card, LineChart, StatTile, StatusPill } from '@smena112/ui-kit';
 import { reportCsvUrl, useEvaluateSession, useOverride, useSessionReport, type CardResult, type SessionReport } from '../../shared/api/assessment';
 import { TeacherShell } from '../../shared/ui/TeacherShell';
+import { num } from '../../shared/format';
 
 const pct = (x: number | null) => (x === null ? '—' : `${Math.round(x * 100)} %`);
 const heatClass = (v: number | undefined) => (v === undefined ? 'na' : v >= 0.85 ? 'h4' : v >= 0.7 ? 'h3' : v >= 0.5 ? 'h2' : v >= 0.3 ? 'h1' : 'h0');
@@ -50,9 +51,9 @@ function StudentsTable({ r }: { r: SessionReport }) {
                 <td><b>{s.full_name}</b></td>
                 <td>{s.role === '112' ? 'оператор 112' : `ДДС ${s.service_code}`}</td>
                 <td className="num">{s.cards.length}</td>
-                <td className="num">{s.avg_score ?? '—'}</td>
+                <td className="num">{num(s.avg_score)}</td>
                 <td className="num">{pct(s.passed_share)}</td>
-                <td className="num">{s.avg_time_s ?? '—'}</td>
+                <td className="num">{num(s.avg_time_s)}</td>
                 <td className="num">{s.not_assessed || ''}</td>
               </tr>
               {(all || open === s.student_id) && s.cards.map((c) => (
@@ -67,7 +68,7 @@ function StudentsTable({ r }: { r: SessionReport }) {
                         </span>
                       )}
                       {c.score !== null
-                        ? <StatusPill status={c.passed ? 'ok' : 'critical'}>{c.score} {c.expert ? '· эксперт' : ''}</StatusPill>
+                        ? <StatusPill status={c.passed ? 'ok' : 'critical'}>{num(c.score)} {c.expert ? '· эксперт' : ''}</StatusPill>
                         : <StatusPill status="neutral">не оценена</StatusPill>}
                       {c.assessment_id && <Button size="sm" variant="ghost" icon="edit" onClick={() => setEditing(editing === c.card_id ? null : c.card_id)}>правка</Button>}
                     </div>
@@ -168,7 +169,7 @@ export function SessionReportPage() {
       {r && (
         <>
           <section className="cab-kpis">
-            <StatTile label="Средний балл" value={r.avg_score ?? '—'} note={`порог ${r.settings.threshold}`} />
+            <StatTile label="Средний балл" value={num(r.avg_score)} note={`порог ${r.settings.threshold}`} />
             <StatTile label="Зачтено" value={pct(r.passed_share)} />
             <StatTile label="Карточек" value={r.cards_count} />
             <StatTile label="Обучающихся" value={r.students.length} />

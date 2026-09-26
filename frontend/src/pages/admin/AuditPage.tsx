@@ -90,9 +90,9 @@ export function AuditPage() {
     <div className="arm-journal" style={{ minHeight: '100vh' }}>
       <div className="arm-search">
         <form className="arm-search__main" onSubmit={onSearch}>
-          <div style={{ display: 'flex', gap: 24, alignItems: 'flex-end' }}>
+          <div className="arm-audit__row">
             <input className="arm-search__input" placeholder="Поиск события" aria-label="Поиск события" value={draft.q} onChange={(e) => set('q', e.target.value)} />
-            <select className="arm-uline arm-uline--select" aria-label="Тип события" value={draft.event} onChange={(e) => set('event', e.target.value)} style={{ minWidth: 200 }}>
+            <select className="arm-uline arm-uline--select" aria-label="Тип события" value={draft.event} onChange={(e) => set('event', e.target.value)} style={{ minWidth: 0 }}>
               <option value="">Тип события</option>
               {types.data?.map((t) => <option key={t.code} value={t.code}>{t.title}</option>)}
             </select>

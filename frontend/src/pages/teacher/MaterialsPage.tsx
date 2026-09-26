@@ -6,9 +6,10 @@ import { useMe } from '../../shared/api/auth';
 import { KIND_TITLE, useDeleteMaterial, useMaterials, useUpdateMaterial, useUploadMaterial, type MaterialKind } from '../../shared/api/materials';
 import { CabinetShell } from '../../shared/ui/CabinetShell';
 import { MaterialViewer } from '../../shared/ui/MaterialViewer';
+import { bytes } from '../../shared/format';
 
 const KINDS = Object.keys(KIND_TITLE) as MaterialKind[];
-const size = (b: number) => (b > 2 ** 20 ? `${(b / 2 ** 20).toFixed(1)} МБ` : `${Math.max(1, Math.round(b / 1024))} КБ`);
+const size = bytes;
 
 function UploadForm() {
   const up = useUploadMaterial();

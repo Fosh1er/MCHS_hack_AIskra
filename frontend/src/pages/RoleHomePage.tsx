@@ -4,6 +4,7 @@ import { useInsights } from '../shared/api/assessment';
 import { Button, Card, StatusPill } from '@smena112/ui-kit';
 import { MODE_TITLE, SESSION_STATUS, useSessions } from '../shared/api/training';
 import { TeacherShell } from '../shared/ui/TeacherShell';
+import { num } from '../shared/format';
 
 /** Пульт преподавателя (п. 4.x): идущие и последние занятия, переходы, инсайты по группе. */
 function TeacherHome() {
@@ -46,7 +47,7 @@ function GroupInsights() {
     <div className="insights">
       <div className="arm-panel">
         <div className="arm-panel__label">Оценок</div><div className="insights__kpi">{d.assessments}</div>
-        <div className="arm-panel__label">Средний балл</div><div className="insights__kpi">{d.average_score}</div>
+        <div className="arm-panel__label">Средний балл</div><div className="insights__kpi">{num(d.average_score)}</div>
         <div className="arm-panel__label">Зачтено</div><div className="insights__kpi">{Math.round(d.passed_share * 100)} %</div>
       </div>
       <div className="arm-panel">

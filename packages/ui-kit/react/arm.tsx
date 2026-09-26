@@ -203,7 +203,7 @@ export function ServiceTab({ name, status, main, noIntegration, mine, variant = 
         <Icon name="expand_less" size="xs" className="arm-svc__caret" />
       )}
       <span className="arm-svc__name u-ellipsis" style={mine ? { marginTop: 14 } : undefined}>{name}</span>
-      {status && <span className="arm-svc__status">{status}</span>}
+      {status && <span className="arm-svc__status" title={status}>{status}</span>}
     </div>
   );
 }

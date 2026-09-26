@@ -143,6 +143,11 @@ cd backend && uv run python -m aiskra.cli create-user --login admin --full-name 
 - **Подсчёт `total`** — отдельным лёгким запросом, без вычисляемых столбцов страницы.
 - **Фронт:** запись — с `WRITE_RETRY` (`shared/api/resilience.ts`); ошибка «уже выполнено» при повторе = успех. Приложение считается всегда активным (`focusManager` в `main.tsx`).
 
+## Адаптивность и локализация (п. 6.3) — что уже есть
+- **Кабинеты** — телефон от 360 px: нижняя панель со всеми разделами (`CabinetShell`), таблицы листаются внутри `.cab-card__body`. Новая страница кабинета — проверьте на 375 px, что у страницы нет горизонтальной прокрутки.
+- **Эмулятор АРМ** — от 1000 px; маршрут `/arm/*` оборачивайте в `ArmScreenGuard` (как в `app/router.tsx`).
+- **Числа и размеры** — `shared/format.ts` (`num`, `bytes`), не `toFixed` и не «как есть». Ошибки проверки 422 переводит `platform/validation_ru.py`; новый тип ошибки pydantic — строка в `MESSAGES`.
+
 ## Рецепты
 **Новая команда** (пример: `SaveCard` в `incidents`):
 1. `modules/incidents/application/commands/save_card.py` — `@dataclass(frozen=True, kw_only=True) class SaveCard(Command)` и `class SaveCardHandler` с зависимостями-портами в `__init__` и `async __call__(cmd) -> Result`.
