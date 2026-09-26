@@ -12,6 +12,7 @@ import {
 } from '../../shared/api/incidents';
 import { shortName } from '../../shared/ui/ArmTopBar';
 import { AddressMap } from './AddressMap';
+import { AssessmentPanel } from '../../shared/ui/AssessmentPanel';
 import { Hint } from './Hint';
 import { focusId, useHotkeys, type HotkeyMap } from './useHotkeys';
 
@@ -381,6 +382,12 @@ export function CardViewer({ view, me, dds }: { view: CardView; me: Me; dds?: Dd
             <div className="arm-panel arm112v-class">Класс.: <b>{view.incident_types.map((t) => t.final_type ?? t.code).join('; ')};</b></div>
           )}
           {!dds && <div className="arm-panel arm112v-class arm112v-muted" data-testid="card-status">{statusLine}</div>}
+          {!dds && view.status !== 'draft' && (view.author_id === me.user_id || me.permissions.includes(CARDS_CHECK)) && (
+            <AssessmentPanel cardId={view.id} role="112" auto={view.author_id === me.user_id} />
+          )}
+          {dds && ownService && ownService.status !== 'added' && ownService.status !== 'received' && (
+            <AssessmentPanel cardId={view.id} role="dds" service={dds.service} auto={false} />
+          )}
         </div>
       </div>
 

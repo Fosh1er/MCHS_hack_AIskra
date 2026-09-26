@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from aiskra.bootstrap import build_services, wire
+from aiskra.modules.assessment.api.router import router as assessment_router
 from aiskra.modules.audit.api.router import router as audit_router
 from aiskra.modules.dictionaries.api.router import router as dictionaries_router
 from aiskra.modules.identity.api.router import auth_router, users_router
@@ -82,6 +83,7 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
     app.include_router(dictionaries_router, prefix=settings.api_prefix, dependencies=signed_in)
     app.include_router(incidents_router, prefix=settings.api_prefix, dependencies=signed_in)
     app.include_router(training_router, prefix=settings.api_prefix, dependencies=signed_in)
+    app.include_router(assessment_router, prefix=settings.api_prefix, dependencies=signed_in)
     return app
 
 
