@@ -125,7 +125,7 @@ class PreviewScenarioHandler:
         signs = ", ".join((ref.get("questionnaire") or {}).get(s.card_type_code, {}).values())
         expected = [
             f"Тип: {ref.get('final_type')}; признаки: {signs}",
-            f"Адрес: {a.get('street')}, {a.get('house')} ({a.get('district') or 'район —'})",
+            f"Адрес: {(s.legend.get('address') or {}).get('label') or f'{a.get("street")}, {a.get("house")}'}",
             f"Этаж {a.get('floor') or '—'}, квартира {a.get('flat') or '—'}",
             f"Пострадавшие: {'есть, ' + str(victims.get('count')) if victims.get('has') else 'нет'}",
             f"ФИО заявителя: {(ref.get('applicant') or {}).get('name')}",

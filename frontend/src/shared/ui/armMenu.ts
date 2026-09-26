@@ -2,9 +2,10 @@ import { PERMISSIONS } from '../api/auth';
 import type { MenuItem } from './ArmTopBar';
 
 /** Меню АРМ-112 для обучающегося и преподавателя (шапка оригинала: журнал, экран, статистика…).
- *  Остальные разделы появятся с пунктами 4.x и 5.1. */
+ *  Банк сценариев и занятия — в кабинете преподавателя (/teacher). */
 export const ARM_MENU: MenuItem[] = [
   { to: '/arm/112/journal', label: 'журнал 112', icon: 'table' },
   { to: '/arm/dds', label: 'АРМ ДДС', icon: 'headset' },
+  { to: '/student/progress', label: 'мои результаты', icon: 'bar_chart', permission: PERMISSIONS.trainingParticipate },
   { to: '/teacher', label: 'пульт преподавателя', icon: 'school', permission: PERMISSIONS.lessonsConduct },
 ];

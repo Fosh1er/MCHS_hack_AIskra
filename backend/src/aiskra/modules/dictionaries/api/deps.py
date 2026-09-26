@@ -16,3 +16,4 @@ provide_suggest_addresses = provider_stub("dictionaries.SuggestAddressesHandler"
 provide_reverse_geocode = provider_stub("dictionaries.ReverseGeocodeHandler")
 provide_houses_in_box = provider_stub("dictionaries.HousesInBoxHandler")
 provide_district_shapes = provider_stub("dictionaries.DistrictShapesHandler")
+provide_list_groups = provider_stub("dictionaries.ListGroupsHandler")

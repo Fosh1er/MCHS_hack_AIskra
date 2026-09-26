@@ -102,3 +102,7 @@ export const fetchHouses = (b: { min_lat: number; min_lon: number; max_lat: numb
 
 export const useDistrictShapes = () =>
   useQuery({ queryKey: ['dict', 'district-shapes'], queryFn: () => http<DistrictShapes>(`${D}/territory/shapes`), ...forever });
+
+export interface IncidentGroup { id: number; title: string }
+export const useIncidentGroups = () =>
+  useQuery({ queryKey: ['dict', 'incident-groups'], queryFn: () => http<IncidentGroup[]>(`${D}/incident-groups`), ...forever });

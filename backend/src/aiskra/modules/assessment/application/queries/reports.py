@@ -43,6 +43,7 @@ class CardResult:
     score: float | None
     passed: bool | None
     expert: bool
+    expert_comment: str
     errors: list[str]
     criteria: dict[str, float | None]
 
@@ -101,6 +102,7 @@ def _result(card: ReportCard, rec: AssessmentRecord | None, norm: float, role: s
         score=rec.score if rec else None,
         passed=rec.passed if rec else None,
         expert=bool(rec and rec.details.get("expert")),
+        expert_comment=str((rec.details.get("expert") or {}).get("comment", "")) if rec else "",
         errors=list(rec.details.get("errors", [])) if rec else [],
         criteria={c["key"]: c.get("score") for c in rec.details.get("criteria", [])} if rec else {},
     )
@@ -196,7 +198,8 @@ def report_csv(r: SessionReport) -> str:
     """CSV для Excel: разделитель «;», BOM — чтобы кириллица открылась без мастера импорта."""
     buf = io.StringIO()
     w = csv.writer(buf, delimiter=";")
-    w.writerow(["Занятие", r.title, "Средний балл", r.avg_score, "Зачтено", r.passed_share])
+    share = f"{round(r.passed_share * 100)} %" if r.passed_share is not None else ""
+    w.writerow(["Занятие", r.title, "Средний балл", r.avg_score, "Зачтено", share])
     w.writerow([])
     w.writerow(
         [
@@ -211,6 +214,7 @@ def report_csv(r: SessionReport) -> str:
             "Балл",
             "Зачтено",
             "Экспертная правка",
+            "Комментарий эксперта",
             "Замечания",
         ]
     )
@@ -229,6 +233,7 @@ def report_csv(r: SessionReport) -> str:
                     c.score if c.score is not None else "не оценена",
                     "" if c.passed is None else ("да" if c.passed else "нет"),
                     "да" if c.expert else "",
+                    c.expert_comment,
                     " | ".join(c.errors),
                 ]
             )
@@ -247,6 +252,7 @@ class ProgressView:
     avg_score: float | None
     weakest: list[dict[str, Any]]  # [{key, title, average}]
     recent_errors: list[str]
+    expert_comments: list[dict[str, Any]] = field(default_factory=list)  # [{card_number, score, comment}]
 
 
 class MyProgressHandler:
@@ -280,4 +286,13 @@ class MyProgressHandler:
             avg_score=_avg([r.score for r in ordered]),
             weakest=weakest,
             recent_errors=[e for r in reversed(ordered[-3:]) for e in r.details.get("errors", [])][:6],
+            expert_comments=[
+                {
+                    "card_number": r.details.get("card_number"),
+                    "score": r.score,
+                    "comment": r.details["expert"]["comment"],
+                }
+                for r in reversed(ordered)
+                if r.details.get("expert")
+            ][:5],
         )

@@ -46,6 +46,8 @@ def test_session_lifecycle_monitor_report(app_client: Callable[[], TestClient]) 
     scenario = teacher.get(f"/api/v1/training/scenarios/{ids[0]}").json()
     dds_code = scenario["reference_card"]["services"][0]["code"]
 
+    groups = teacher.get("/api/v1/dictionaries/incident-groups").json()
+    assert groups[0]["id"] == 1 and groups[0]["title"]
     people = {s["login"]: s["id"] for s in teacher.get("/api/v1/training/students").json()}
     assert {"student", "petrov"} <= people.keys() and "teacher" not in people
     body = {
@@ -135,7 +137,15 @@ def test_session_lifecycle_monitor_report(app_client: Callable[[], TestClient]) 
     again = teacher.get(f"/api/v1/assessment/sessions/{session_id}/report").json()
     assert next(s for s in again["students"] if s["role"] == "112")["cards"][0]["expert"] is True
 
+    # повторная автопроверка не затирает экспертную оценку
+    redo = student.post(f"/api/v1/assessment/cards/{card['id']}/evaluate", json={"role": "112"}).json()
+    assert redo["score"] == 55 and redo["grader"] == "expert" and redo["details"]["expert"]["auto_score"] == op["score"]
+    csv2 = teacher.get(f"/api/v1/assessment/sessions/{session_id}/report.csv").text
+    header = csv2.splitlines()[2].split(";")
+    row = next(line.split(";") for line in csv2.splitlines() if str(card["number"]) in line)
+    assert len(header) == len(row) and row[header.index("Комментарий эксперта")] == "Описание не отражает обстановку"
     progress = student.get("/api/v1/assessment/my/progress").json()
+    assert progress["expert_comments"][0]["comment"] == "Описание не отражает обстановку"
     assert progress["points"] and progress["points"][-1]["v"] == 55
 
     assert teacher.post(f"/api/v1/training/sessions/{session_id}/finish").json()["status"] == "finished"

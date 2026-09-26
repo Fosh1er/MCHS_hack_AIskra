@@ -112,6 +112,14 @@ cd backend && uv run python -m aiskra.cli create-user --login admin --full-name 
 - **Правила** — `modules/assessment/domain/scoring.py` (формулы и веса описаны в `specs/3.4-assessment.md`); ИИ-судья — `application/judge.py` (без модели критерии «не проверено»).
 - **Попытка** (карточка, сценарий, статусы, звонки) — `aiskra/integration/assessment_sources.py`.
 - **API:** `POST /api/v1/assessment/cards/{id}/evaluate {role: 112|dds, service_code?, weights?, norm_seconds?, threshold?}`, `GET /assessment/cards/{id}?role=`, `GET /assessment/insights`. Фронт — `shared/ui/AssessmentPanel.tsx`, инсайты — `RoleHomePage`.
+- **Экспертная оценка окончательна:** `details.expert` переносится в каждую новую версию автооценки (`AssessCardHandler`), меняются только критерии и `auto_score`.
+
+## Кабинет преподавателя: банк, занятия, отчёты (п. 4.1–4.3) — что уже есть
+- **Каркас** — `shared/ui/TeacherShell.tsx` (ui-kit `AppShell`, `Sidebar`, `Topbar`); страницы — `pages/teacher/` (`/teacher/scenarios`, `/teacher/sessions`, `/teacher/sessions/:id`, `/teacher/sessions/:id/report`). Стили — `tch-*` в `packages/ui-kit/css/cabinet.css`.
+- **Занятие** — домен `training/domain/session.py` (тип, источник карточек, участники с ролями, `DEFAULT_SETTINGS`); категории хранятся в `training_sessions.settings.groups`, участники — `assignments`. Карточка 112 привязывается к занятию через `session_id` в `POST /incidents/cards`.
+- **Поток карточек ДДС** решает сервер: `POST /training/sessions/feed` (темп `feed_interval_s`, предел `max_waiting`); системная карточка — `integration/session_sources.py::IncidentSystemCards` (`origin = system`, автор — преподаватель).
+- **Мониторинг** — `GET /training/sessions/{id}/monitor` (`SessionProgress`), **отчёт** — `GET /assessment/sessions/{id}/report` и `report.csv` (факты — `SessionFactsReader`), **правка** — `POST /assessment/{id}/override`, **прогресс** — `GET /assessment/my/progress`.
+- **Обучающийся** — `GET /training/sessions/my` (для всех ролей, `null` вне занятия); баннер — `shared/ui/SessionBanner.tsx`.
 
 ## Рецепты
 **Новая команда** (пример: `SaveCard` в `incidents`):

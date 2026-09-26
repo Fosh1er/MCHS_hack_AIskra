@@ -23,7 +23,6 @@ from aiskra.modules.training.infrastructure.sessions import SqlSessionRepository
 from aiskra.platform.types import as_utc
 
 WAITING = ("added", "received")
-FINAL = ("works_completed", "rejected", "works_refused")
 
 
 def card_data_from_scenario(s: Scenario) -> dict[str, Any]:
@@ -144,7 +143,7 @@ class SessionProgress:
                 draft = next((c for c in reversed(mine) if c.status == "draft"), None)
                 waiting: list[IncidentCardModel] = []
                 marks = await self._assessments([c.id for c in done], "112", None)
-                current = draft or (done[-1] if done else None)
+                current = draft  # нет черновика — оператор ждёт следующий вызов
                 since = draft.opened_at if draft else None
             else:
                 svc = p.dds_service_code or ""
@@ -163,7 +162,7 @@ class SessionProgress:
                     else {}
                 )
                 mine = [c for c in cards if c.id in statuses]
-                done = [c for c in mine if statuses[c.id] in FINAL]
+                done = [c for c in mine if statuses[c.id] not in WAITING]  # решение принято
                 waiting = [c for c in mine if statuses[c.id] in WAITING]
                 marks = await self._assessments([c.id for c in mine], "dds", svc)
                 current = waiting[0] if waiting else None

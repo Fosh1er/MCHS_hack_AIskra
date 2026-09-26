@@ -51,6 +51,7 @@ from aiskra.modules.dictionaries.application.queries.incident_types import (
 )
 from aiskra.modules.dictionaries.application.queries.reference import (
     ListEnumHandler,
+    ListGroupsHandler,
     ListServicesHandler,
     ListTerritoryHandler,
 )
@@ -575,6 +576,7 @@ def wire(app: FastAPI, services: Services) -> None:
     ov[dict_deps.provide_search_incident_types] = _dict_query(SearchIncidentTypesHandler)
     ov[dict_deps.provide_get_incident_type] = _dict_query(GetIncidentTypeHandler)
     ov[dict_deps.provide_list_services] = _dict_query(ListServicesHandler)
+    ov[dict_deps.provide_list_groups] = _dict_query(ListGroupsHandler)
     ov[dict_deps.provide_list_territory] = _dict_query(ListTerritoryHandler)
     ov[dict_deps.provide_list_enum] = _dict_query(ListEnumHandler)
     ov[dict_deps.provide_resolve_services] = _dict_query(ResolveServicesHandler)

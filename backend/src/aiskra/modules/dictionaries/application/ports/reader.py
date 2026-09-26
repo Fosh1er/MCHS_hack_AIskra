@@ -64,6 +64,12 @@ class ServiceRow:
 
 
 @dataclass(frozen=True)
+class GroupRow:
+    id: int
+    title: str
+
+
+@dataclass(frozen=True)
 class OkrugRow:
     code: str
     short: str
@@ -123,6 +129,8 @@ class DictionaryReader(Protocol):
     async def get_district(self, code: str) -> DistrictRow | None: ...
 
     async def list_okrugs(self) -> list[OkrugRow]: ...
+
+    async def list_groups(self) -> list[GroupRow]: ...
 
     async def list_districts(self, *, okrug: str | None, terms: list[str]) -> list[DistrictRow]: ...
 

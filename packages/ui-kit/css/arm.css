@@ -1113,3 +1113,14 @@
 .assess__errors { grid-column: 1 / -1; margin: 0; padding-left: 18px; font-size: var(--fs-xs); color: #8a3a1c; }
 .insights { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; margin-top: 16px; }
 .insights__kpi { font-size: 28px; font-weight: var(--fw-bold); }
+
+/* ---- Баннер идущего занятия в АРМ обучающегося (п. 4.2) ---------------------------------------- */
+.session-banner {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin: 0 16px; padding: 8px 14px; font-size: 14px;
+  background: var(--c-blue-100); color: var(--text-strong); border-left: 4px solid var(--accent);
+}
+.session-banner__go { margin-left: auto; color: var(--accent); font-weight: 500; }
+.progress-page { display: flex; flex-direction: column; gap: 12px; }
+.assess__expert { margin: 6px 0; padding: 6px 10px; font-size: 13px; background: var(--c-blue-100); border-left: 3px solid var(--accent); }
+.progress-page .cab-card, .progress-page .cab-stat { color: var(--text); }

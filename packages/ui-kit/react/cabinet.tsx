@@ -169,7 +169,10 @@ const TILE_STATE: Record<TileState, { pill: Status; icon: IconName; label: strin
 export interface StudentTileProps {
   name: string; initials: string; role: string; state: TileState;
   cardLabel: string; cardKind: '112' | 'dds'; timer?: string; queue?: number;
-  score: number; done: string; errors: number; note?: string;
+  /** null — ещё нет оценок (показывается «—») */
+  score: number | null; done: string; errors: number; note?: string;
+  /** false — без панели действий (пока действия пульта не подключены) */
+  actions?: boolean;
   onWatch?: () => void; onWhisper?: () => void; onInject?: () => void; onPause?: () => void;
 }
 export function StudentTile(p: StudentTileProps) {
@@ -188,19 +191,19 @@ export function StudentTile(p: StudentTileProps) {
         <span className={cx('cab-tile__timer', p.state === 'critical' && 'cab-tile__timer--over')}>{p.timer ?? '—'}</span>
       </div>
       <div className="cab-tile__body">
-        <span className="cab-tile__score">{p.score}<small>балл</small></span>
+        <span className="cab-tile__score">{p.score ?? '—'}<small>балл</small></span>
         <span className="cab-tile__meta">
           <StatusPill status={st.pill} icon={st.icon}>{st.label}</StatusPill><br />
           карточек {p.done} · ошибок {p.errors}
         </span>
       </div>
       <div className="cab-tile__note">{p.note && p.state === 'critical' && <Icon name="error" />}{p.note}</div>
-      <div className="cab-tile__actions">
+      {p.actions !== false && <div className="cab-tile__actions">
         <IconButton icon="eye" label="Взгляд через плечо" onClick={p.onWatch} />
         <IconButton icon="chat" label="Шёпот-подсказка" onClick={p.onWhisper} />
         <IconButton icon="bolt" label="Вводная" onClick={p.onInject} />
         <IconButton icon="pause" label="Пауза" onClick={p.onPause} />
-      </div>
+      </div>}
     </article>
   );
 }
