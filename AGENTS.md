@@ -148,6 +148,9 @@ cd backend && uv run python -m aiskra.cli create-user --login admin --full-name 
 - **Эмулятор АРМ** — от 1000 px; маршрут `/arm/*` оборачивайте в `ArmScreenGuard` (как в `app/router.tsx`).
 - **Числа и размеры** — `shared/format.ts` (`num`, `bytes`), не `toFixed` и не «как есть». Ошибки проверки 422 переводит `platform/validation_ru.py`; новый тип ошибки pydantic — строка в `MESSAGES`.
 
+## Пояснительная записка (п. 7.2) — что уже есть
+- `docs/delivery/Пояснительная_записка.md` — исходник; модель данных, API, матрица ТЗ и библиотеки подставляются сборщиком `docs/delivery/build.py` из кода. Закрыли пункт плана — обновите статус требования в `MATRIX` и пересоберите: `cd backend && uv run --with python-docx --with pypandoc_binary --with pypdfium2 python ../docs/delivery/build.py` (нужен LibreOffice). Готовые файлы — `docs/delivery/out/`, коммитятся.
+
 ## Рецепты
 **Новая команда** (пример: `SaveCard` в `incidents`):
 1. `modules/incidents/application/commands/save_card.py` — `@dataclass(frozen=True, kw_only=True) class SaveCard(Command)` и `class SaveCardHandler` с зависимостями-портами в `__init__` и `async __call__(cmd) -> Result`.
