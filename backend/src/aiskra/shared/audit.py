@@ -35,6 +35,10 @@ class AuditEvent(StrEnum):
     ADDRESSES_IMPORTED = "dictionaries.addresses_imported"
     CARD_CREATED = "card.created"
     SERVICE_RECEIVED = "dds.received"
+    SCENARIOS_GENERATED = "scenarios.generated"
+    SCENARIO_APPROVED = "scenarios.approved"
+    SCENARIO_ARCHIVED = "scenarios.archived"
+    CALL_ENDED = "calls.ended"
     SERVICE_STATUS_CHANGED = "dds.status_changed"
     CARD_SAVED = "card.saved"
     CARD_VIEWED = "card.viewed"
@@ -65,6 +69,10 @@ AUDIT_EVENT_TITLES: Mapping[AuditEvent, str] = {
     AuditEvent.ADDRESSES_IMPORTED: "Импорт адресного справочника",
     AuditEvent.CARD_CREATED: "Создание карточки происшествия",
     AuditEvent.SERVICE_RECEIVED: "Карточка получена службой (ДДС)",
+    AuditEvent.SCENARIOS_GENERATED: "Генерация сценариев",
+    AuditEvent.SCENARIO_APPROVED: "Утверждение сценария",
+    AuditEvent.SCENARIO_ARCHIVED: "Сценарий в архив",
+    AuditEvent.CALL_ENDED: "Учебный звонок завершён",
     AuditEvent.SERVICE_STATUS_CHANGED: "Изменение статуса службы (ДДС)",
     AuditEvent.CARD_SAVED: "Сохранение карточки происшествия",
     AuditEvent.CARD_VIEWED: "Просмотр карточки",

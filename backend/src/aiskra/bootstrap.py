@@ -18,6 +18,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from aiskra.ai.adapters.factory import build_router, build_stt, build_tts
 from aiskra.ai.config import load_ai_config
+from aiskra.ai.router import ModelRouter
+from aiskra.integration.training_sources import DictionaryScenarioFacts, IncidentCardContext
 from aiskra.modules.audit.api import deps as audit_deps
 from aiskra.modules.audit.application.queries.search_audit import ListEventTypesHandler, SearchAuditHandler
 from aiskra.modules.audit.infrastructure.reader import SqlAuditReader
@@ -80,6 +82,23 @@ from aiskra.modules.incidents.infrastructure.repositories import SqlCardReposito
 from aiskra.modules.system.api import deps as system_deps
 from aiskra.modules.system.application.commands.probe_model import ProbeModelHandler
 from aiskra.modules.system.application.queries.get_ai_config import GetAIConfigHandler
+from aiskra.modules.training.api import deps as training_deps
+from aiskra.modules.training.application.actors import Actors
+from aiskra.modules.training.application.commands.calls import (
+    AnswerCallHandler,
+    EndCallHandler,
+    SendReplicaHandler,
+    StartDdsCallHandler,
+    StartIncomingCallHandler,
+)
+from aiskra.modules.training.application.commands.scenarios import (
+    GenerateScenariosHandler,
+    ReviewScenarioHandler,
+    ScenarioGenerator,
+)
+from aiskra.modules.training.application.queries.calls import CardCallsHandler, GetCallHandler
+from aiskra.modules.training.application.queries.scenarios import GetScenarioHandler, ListScenariosHandler
+from aiskra.modules.training.infrastructure.repositories import SqlCallRepository, SqlScenarioRepository
 from aiskra.platform.db import SqlAlchemyUnitOfWork, create_engine, create_session_factory
 from aiskra.platform.deps import get_session
 from aiskra.platform.models_registry import metadata as _all_models  # noqa: F401 — все ORM-модели в одном реестре
@@ -325,6 +344,81 @@ def _wire_incidents(app: FastAPI) -> None:
     ov[incidents_deps.provide_dds_status] = dds_status
 
 
+def build_generate_handler(router: ModelRouter, session: AsyncSession) -> GenerateScenariosHandler:
+    return GenerateScenariosHandler(
+        ScenarioGenerator(DictionaryScenarioFacts(session), router),
+        SqlScenarioRepository(session),
+        SqlAuditRecorder(session),
+        SqlAlchemyUnitOfWork(session),
+    )
+
+
+def _wire_training(app: FastAPI, services: Services) -> None:
+    """п. 3.2, 3.3, 1.4, 2.3: сценарии, ИИ-собеседники, учебные звонки."""
+    ov = app.dependency_overrides
+    clock = SystemClock()
+    router = services.model_router
+
+    def call_parts(session: AsyncSession) -> tuple[object, ...]:
+        return (
+            SqlCallRepository(session),
+            SqlScenarioRepository(session),
+            IncidentCardContext(session),
+            Actors(router),
+            SqlAlchemyUnitOfWork(session),
+            clock,
+        )
+
+    def generate(session: Session) -> GenerateScenariosHandler:
+        return build_generate_handler(router, session)
+
+    def review(session: Session) -> ReviewScenarioHandler:
+        return ReviewScenarioHandler(
+            SqlScenarioRepository(session), SqlAuditRecorder(session), SqlAlchemyUnitOfWork(session)
+        )
+
+    def list_scenarios(session: Session) -> ListScenariosHandler:
+        return ListScenariosHandler(SqlScenarioRepository(session))
+
+    def get_scenario(session: Session) -> GetScenarioHandler:
+        return GetScenarioHandler(SqlScenarioRepository(session))
+
+    def incoming(session: Session) -> StartIncomingCallHandler:
+        return StartIncomingCallHandler(
+            *call_parts(session), generator=ScenarioGenerator(DictionaryScenarioFacts(session), router)
+        )
+
+    def answer(session: Session) -> AnswerCallHandler:
+        return AnswerCallHandler(*call_parts(session))  # type: ignore[arg-type]
+
+    def dds_call(session: Session) -> StartDdsCallHandler:
+        return StartDdsCallHandler(*call_parts(session))  # type: ignore[arg-type]
+
+    def replica(session: Session) -> SendReplicaHandler:
+        return SendReplicaHandler(*call_parts(session))  # type: ignore[arg-type]
+
+    def end_call(session: Session) -> EndCallHandler:
+        return EndCallHandler(*call_parts(session), audit=SqlAuditRecorder(session))
+
+    def get_call(session: Session) -> GetCallHandler:
+        return GetCallHandler(SqlCallRepository(session))
+
+    def card_calls(session: Session) -> CardCallsHandler:
+        return CardCallsHandler(SqlCallRepository(session))
+
+    ov[training_deps.provide_generate] = generate
+    ov[training_deps.provide_review] = review
+    ov[training_deps.provide_list_scenarios] = list_scenarios
+    ov[training_deps.provide_get_scenario] = get_scenario
+    ov[training_deps.provide_incoming] = incoming
+    ov[training_deps.provide_answer] = answer
+    ov[training_deps.provide_dds_call] = dds_call
+    ov[training_deps.provide_replica] = replica
+    ov[training_deps.provide_end_call] = end_call
+    ov[training_deps.provide_get_call] = get_call
+    ov[training_deps.provide_card_calls] = card_calls
+
+
 def wire(app: FastAPI, services: Services) -> None:
     ov = app.dependency_overrides
     # --- system
@@ -363,4 +457,6 @@ def wire(app: FastAPI, services: Services) -> None:
     _wire_identity_and_audit(app, services)
     # --- incidents: карточка 112 (п. 1.1)
     _wire_incidents(app)
+    # --- training: сценарии, ИИ-собеседники, учебные звонки (п. 3.2, 3.3, 1.4, 2.3)
+    _wire_training(app, services)
     # --- сюда добавляются связывания модулей training, assessment … (п. 3.x, 4.x)

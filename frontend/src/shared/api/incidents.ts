@@ -45,7 +45,7 @@ export interface CardView {
 const I = '/api/v1/incidents/cards';
 
 export const useOpenCard = () =>
-  useMutation({ mutationFn: (body: { aon?: string; channel?: string | null }) => http<CardOpened>(I, { method: 'POST', body: JSON.stringify(body) }) });
+  useMutation({ mutationFn: (body: { aon?: string; channel?: string | null; scenario_id?: string | null }) => http<CardOpened>(I, { method: 'POST', body: JSON.stringify(body) }) });
 
 export const useSaveCard = (id: string) =>
   useMutation({

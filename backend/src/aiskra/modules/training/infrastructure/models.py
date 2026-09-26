@@ -71,3 +71,33 @@ class AssignmentModel(Base):
     due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     note: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class CallModel(Base):
+    """Учебный звонок (п. 1.4, 2.3): входящий вызов заявителя, звонки ДДС старшему группы, заявителю, в службу."""
+
+    __tablename__ = "training_calls"
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
+    student_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    scenario_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("scenarios.id"))
+    card_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("incident_cards.id", ondelete="SET NULL"), index=True)
+    role: Mapped[str] = mapped_column(String(8))  # 112 | dds
+    party: Mapped[str] = mapped_column(String(16))  # applicant | brigade | service
+    direction: Mapped[str] = mapped_column(String(4))  # in | out
+    service_code: Mapped[str | None] = mapped_column(String(64))
+    target_service: Mapped[str | None] = mapped_column(String(64))
+    aon: Mapped[str] = mapped_column(String(32), default="")
+    status: Mapped[str] = mapped_column(String(16), default="ringing")
+    revealed: Mapped[list[str]] = mapped_column(JsonType, default=list)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    answered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class CallMessageModel(Base):
+    __tablename__ = "training_call_messages"
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
+    call_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("training_calls.id", ondelete="CASCADE"), index=True)
+    speaker: Mapped[str] = mapped_column(String(16))  # operator | party | system
+    text: Mapped[str] = mapped_column(Text)
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

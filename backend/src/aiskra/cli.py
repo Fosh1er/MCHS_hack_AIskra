@@ -2,6 +2,7 @@
 
 uv run python -m aiskra.cli import-dictionaries      # справочники из data/ в БД (п. 0.2)
 uv run python -m aiskra.cli import-addresses         # адресный справочник и границы районов (п. 1.2)
+uv run python -m aiskra.cli generate-scenarios --count 30   # банк утверждённых сценариев для демо (п. 3.2)
 uv run python -m aiskra.cli create-user --login ivanov --role student --full-name "Иванов И. И."
                                                      # пароль спрашивается интерактивно или берётся из
                                                      # переменной окружения, указанной в --password-env
@@ -22,14 +23,17 @@ from dataclasses import asdict
 
 from aiskra.bootstrap import (
     build_create_user_handler,
+    build_generate_handler,
     build_identity_adapters,
     build_import_addresses_handler,
     build_import_handler,
+    build_services,
 )
 from aiskra.modules.dictionaries.application.commands.import_addresses import ImportAddresses
 from aiskra.modules.dictionaries.application.commands.import_dictionaries import ImportDictionaries
 from aiskra.modules.identity.application.commands.create_user import CreateUser
 from aiskra.modules.identity.infrastructure.repositories import SqlUserRepository
+from aiskra.modules.training.application.commands.scenarios import GenerateScenarios
 from aiskra.platform.db import create_engine, create_session_factory
 from aiskra.platform.models_registry import metadata
 from aiskra.platform.settings import Settings
@@ -55,6 +59,25 @@ async def import_addresses(settings: Settings) -> None:
         print(json.dumps(asdict(report), ensure_ascii=False, indent=2))
     finally:
         await engine.dispose()
+
+
+async def generate_scenarios(
+    settings: Settings, *, count: int, groups: list[int], difficulty: int, seed: int | None
+) -> None:
+    services = build_services(settings)
+    engine = create_engine(settings.database_url)
+    try:
+        async with create_session_factory(engine)() as session:
+            handler = build_generate_handler(services.model_router, session)
+            ids = await handler(
+                GenerateScenarios(
+                    actor=None, count=count, groups=groups, difficulty=difficulty, approve=True, seed=seed
+                )
+            )
+        print(f"Сгенерировано и утверждено сценариев: {len(ids)}")
+    finally:
+        await engine.dispose()
+        await services.aclose()
 
 
 async def create_user(
@@ -126,6 +149,11 @@ def main() -> None:
     sub = parser.add_subparsers(dest="cmd", required=True)
     sub.add_parser("import-dictionaries", help="импорт справочников из data/")
     sub.add_parser("import-addresses", help="импорт адресного справочника и границ районов из data/ (п. 1.2)")
+    gen = sub.add_parser("generate-scenarios", help="сгенерировать и утвердить сценарии для банка (п. 3.2)")
+    gen.add_argument("--count", type=int, default=30)
+    gen.add_argument("--group", type=int, action="append", default=[], help="группа классификатора (можно несколько)")
+    gen.add_argument("--difficulty", type=int, default=2)
+    gen.add_argument("--seed", type=int, default=None)
     user = sub.add_parser("create-user", help="создать пользователя (от имени системы, пишется в аудит)")
     user.add_argument("--login", required=True)
     user.add_argument("--full-name", required=True)
@@ -141,6 +169,12 @@ def main() -> None:
             asyncio.run(import_dictionaries(settings))
         elif args.cmd == "import-addresses":
             asyncio.run(import_addresses(settings))
+        elif args.cmd == "generate-scenarios":
+            asyncio.run(
+                generate_scenarios(
+                    settings, count=args.count, groups=args.group, difficulty=args.difficulty, seed=args.seed
+                )
+            )
         elif args.cmd == "create-user":
             password = _read_password(args.password_env)
             asyncio.run(

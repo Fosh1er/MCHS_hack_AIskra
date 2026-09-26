@@ -36,6 +36,7 @@ ai:
     scenario_generation: {provider: local,       temperature: 0.8, cache: off, max_tokens: 2000}
     applicant_actor:     {provider: local_small, temperature: 0.6, cache: task,  cache_ttl: 1d, max_tokens: 160}
     brigade_actor:       {provider: local_small, temperature: 0.6, cache: task,  cache_ttl: 1d, max_tokens: 160}
+    service_actor:       {provider: local_small, temperature: 0.6, cache: task,  cache_ttl: 1d, max_tokens: 160}
     judge:               {provider: local,       temperature: 0,   cache: exact, cache_ttl: 7d, max_tokens: 600}
     insights:            {provider: local,       temperature: 0.3, cache: off}
   tts: {kind: fake, cache_ttl: 30d}
