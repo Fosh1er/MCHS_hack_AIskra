@@ -69,6 +69,9 @@ cd backend && uv run python -m aiskra.cli create-user --login admin --full-name 
 - **Значимое действие → аудит.** Обработчик команды получает `AuditRecorder` в `__init__`, пишет `AuditEntry(event=AuditEvent.X, actor=cmd.actor, meta=cmd.meta, …)` до `uow.commit()`. Новое событие — значение в `shared/audit.py:AuditEvent` и название в `AUDIT_EVENT_TITLES`.
 - **Команда от имени пользователя** несёт `actor: Principal` и `meta: RequestMeta` (в API — зависимость `Meta` из `shared/web.py`).
 - **Поиск по тексту** — только по ключам `shared/text.py:search_key`, сохранённым при записи. Не используйте `func.lower()`: он зависит от локали PostgreSQL.
+- **Проверено автотестом:** любой маршрут `/api/v1` без сессии отвечает 401 (`test_security.py`). Публичный маршрут — только осознанно, с добавлением в `PUBLIC` теста.
+- **Заголовки безопасности** ставит `platform/security_headers.py`; ответы API — `no-store`. Непредвиденная ошибка → единый 500 без подробностей.
+- **Журнал аудита** не редактируется; удаление — только очистка старше срока (не меньше 183 дней, `PurgeAudit`).
 - **Интеграционные тесты:** фикстуры `admin`, `client`, `app_client` и функция `login(client, "student")` в `tests/integration/conftest.py`. Пользователи трёх ролей создаются автоматически.
 
 ## Справочники (п. 0.2) — что уже есть

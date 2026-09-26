@@ -129,13 +129,15 @@ class FileBackupStore:
                     await conn.execute(insert(t), batch[i : i + 500])
                 rows += len(batch)
             if conn.dialect.name == "postgresql":  # счётчики автоинкремента — после явных id
+                q = conn.dialect.identifier_preparer.quote  # имена — из ORM-метаданных, но всё равно экранируем
                 for t in tables:
                     for col in t.primary_key.columns:
                         if isinstance(col.type, Integer) and col.autoincrement is not False:
                             await conn.execute(
                                 text(
-                                    f"SELECT setval(pg_get_serial_sequence('{t.name}', '{col.name}'), "
-                                    f"COALESCE((SELECT MAX({col.name}) FROM {t.name}), 0) + 1, false)"
-                                )
+                                    "SELECT setval(pg_get_serial_sequence(:t, :c), "
+                                    f"COALESCE((SELECT MAX({q(col.name)}) FROM {q(t.name)}), 0) + 1, false)"
+                                ),
+                                {"t": t.name, "c": col.name},
                             )
         return self._info(path, len(tables), rows)

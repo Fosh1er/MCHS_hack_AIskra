@@ -10,7 +10,7 @@ services:
       POSTGRES_USER: aiskra
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-aiskra}
     volumes: [pgdata:/var/lib/postgresql/data]
-    ports: ["5432:5432"]
+    ports: ["127.0.0.1:5432:5432"]   # БД — только с самого сервера (п. 6.2)
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U aiskra -d aiskra"]
       interval: 5s
@@ -24,20 +24,26 @@ services:
       AISKRA_DATABASE_URL: postgresql+asyncpg://aiskra:${POSTGRES_PASSWORD:-aiskra}@db:5432/aiskra
       AISKRA_AI_CONFIG_PATH: /app/config/ai.yaml
       AISKRA_BACKUP_DIR: /app/backups
+      AISKRA_SESSION_COOKIE_SECURE: "true"   # вход — через nginx по HTTPS (п. 6.2)
       AISKRA_MATERIALS_DIR: /app/materials
     volumes:
       - ./config:/app/config:ro
       - ./data:/app/data:ro
       - backups:/app/backups   # резервные копии (п. 5.2)
       - materials:/app/materials   # учебные материалы (п. 4.4)
-    ports: ["8000:8000"]
+    ports: ["127.0.0.1:8000:8000"]   # API снаружи — только через nginx с TLS (п. 6.2)
     depends_on:
       db: {condition: service_healthy}
     restart: unless-stopped
 
   frontend:
     build: {context: ., dockerfile: frontend/Dockerfile}
-    ports: ["8080:80"]
+    ports: ["8080:80", "8443:443"]   # http://…:8080 перенаправляет на https://…:8443
+    environment:
+      PUBLIC_HTTPS_PORT: "8443"
+      TLS_SAN: ${TLS_SAN:-}           # имя или IP сервера для сертификата: DNS:aiskra.local,IP:10.0.0.5
+    volumes:
+      - tls:/etc/nginx/tls           # свой сертификат: server.crt и server.key
     depends_on: [backend]
     restart: unless-stopped
 
@@ -45,7 +51,7 @@ services:
     profiles: [local-llm]
     image: ollama/ollama:latest
     volumes: [ollama:/root/.ollama]
-    ports: ["11434:11434"]
+    ports: ["127.0.0.1:11434:11434"]
     deploy:
       resources:
         limits: {cpus: "4"}   # ТЗ: сервер 6 ядер без GPU — оставляем ядра API и БД
@@ -56,3 +62,4 @@ volumes:
   ollama:
   backups:
   materials:
+  tls:

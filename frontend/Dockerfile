@@ -10,5 +10,9 @@ COPY frontend frontend
 RUN npm run build -w frontend
 
 FROM nginx:1.27-alpine
-COPY infra/nginx/default.conf /etc/nginx/conf.d/default.conf
+# openssl — для самоподписанного сертификата при первом старте (п. 6.2)
+RUN apk add --no-cache openssl && rm -f /etc/nginx/conf.d/default.conf
+COPY infra/nginx/templates/ /etc/nginx/templates/
+COPY --chmod=755 infra/nginx/15-tls-selfsigned.sh /docker-entrypoint.d/15-tls-selfsigned.sh
+ENV PUBLIC_HTTPS_PORT=8443
 COPY --from=build /repo/frontend/dist /usr/share/nginx/html

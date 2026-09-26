@@ -3,11 +3,16 @@ import { useState, type FormEvent } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { homeFor, useLogin, useMe } from '../shared/api/auth';
 
+/** Возврат после входа — только на свой путь: «/…», без «//» и «/\» (открытый редирект, п. 6.2). */
+export function safeInternalPath(p: string | undefined): string | undefined {
+  return p && p.startsWith('/') && !p.startsWith('//') && !p.includes('\\') && !/[\u0000-\u001f]/.test(p) ? p : undefined;
+}
+
 export function LoginPage() {
   const me = useMe();
   const login = useLogin();
   const navigate = useNavigate();
-  const from = (useLocation().state as { from?: string } | null)?.from;
+  const from = safeInternalPath((useLocation().state as { from?: string } | null)?.from);
   const [form, setForm] = useState({ login: '', password: '', arm: '' });
 
   if (me.data) return <Navigate to={from ?? homeFor(me.data)} replace />;

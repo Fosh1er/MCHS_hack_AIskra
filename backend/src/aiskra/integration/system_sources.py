@@ -1,4 +1,4 @@
-"""Порт `SessionDefaults` модуля training поверх настроек модуля system (п. 5.2)."""
+"""Порты поверх настроек модуля system: тайминг занятия (training, п. 5.2), срок хранения журнала (audit, п. 6.2)."""
 
 from __future__ import annotations
 
@@ -17,3 +17,13 @@ class SystemSessionDefaults:
     async def get(self) -> dict[str, Any]:
         values = merged("session_defaults", await SqlSettingsStore(self._s).get("session_defaults"))
         return {k: int(v) if k in ("difficulty", "max_waiting") else v for k, v in values.items()}
+
+
+class SystemRetentionPolicy:
+    """Порт `RetentionPolicy` модуля audit: срок хранения журнала — из настроек администратора."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._s = session
+
+    async def retention_days(self) -> int:
+        return int(merged("audit", await SqlSettingsStore(self._s).get("audit"))["retention_days"])

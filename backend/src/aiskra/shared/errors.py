@@ -31,6 +31,12 @@ class AuthenticationError(AppError):
     code = "unauthenticated"
 
 
+class TooManyRequestsError(AppError):
+    """Слишком много попыток (HTTP 429): подбор пароля с одного адреса."""
+
+    code = "too_many_requests"
+
+
 class PermissionDeniedError(AppError):
     """Недостаточно прав (HTTP 403)."""
 

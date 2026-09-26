@@ -27,7 +27,8 @@ class Settings(BaseSettings):
 
     # Вход и сессии (п. 0.3, ADR-0010)
     session_cookie_name: str = "aiskra_session"
-    session_cookie_secure: bool = False  # true — в контуре с TLS
+    session_cookie_secure: bool = False  # true — в контуре с TLS (docker compose: nginx с HTTPS)
+    expose_docs: bool = True  # /docs и /openapi.json; в закрытом контуре можно выключить
     session_ttl_hours: int = 24  # автовыход через 24 ч, как в АРМ-112
     login_max_attempts: int = 5
     login_lock_minutes: int = 15

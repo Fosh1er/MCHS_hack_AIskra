@@ -62,5 +62,6 @@ def test_audit_search_like_original(app_client: Callable[[], TestClient], admin:
 
 def test_audit_is_append_only(admin: TestClient) -> None:
     paths = admin.get("/openapi.json").json()["paths"]
-    methods = {m for path, ops in paths.items() if path.startswith("/api/v1/audit") for m in ops}
-    assert methods == {"get"}
+    mutating = {(path, m) for path, ops in paths.items() if path.startswith("/api/v1/audit") for m in ops if m != "get"}
+    # единственное изменение журнала — очистка по сроку хранения (≥183 дн., п. 6.2); отдельную запись не удалить
+    assert mutating == {("/api/v1/audit/purge", "post")}
