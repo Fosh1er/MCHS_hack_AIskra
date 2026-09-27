@@ -1085,6 +1085,11 @@ body:has(.dds-editor) .ipphone > .arm-dock__section:not(.ipphone__screen) { disp
 .call-panel__err { color: #ffb4a0; font-size: var(--fs-xs); margin-top: 6px; }
 .call-panel__actions { display: flex; justify-content: space-between; align-items: center; color: var(--text-inverse); font-size: var(--fs-sm); }
 .call-panel__end { display: inline-flex; gap: 6px; align-items: center; height: 32px; padding: 0 14px; border: 0; background: var(--s-critical); color: var(--text-inverse); font-weight: var(--fw-bold); cursor: pointer; }
+.call-panel__talk { display: flex; gap: 6px; align-items: center; justify-content: center; width: 100%; height: 34px; margin-top: 6px; border: 1px solid var(--border-strong, #5b6b7d); background: transparent; color: var(--text-inverse); font-weight: var(--fw-bold); cursor: pointer; }
+.call-panel__talk:disabled { opacity: .5; cursor: default; }
+.call-panel__talk.is-on { background: var(--s-critical); border-color: var(--s-critical); animation: call-talk-pulse 1.2s ease-in-out infinite; }
+@keyframes call-talk-pulse { 50% { opacity: .75; } }
+@media (prefers-reduced-motion: reduce) { .call-panel__talk.is-on { animation: none; } }
 .call-panel__close { height: 32px; padding: 0 14px; border: 1px solid var(--c-mist-100); background: transparent; color: var(--text-inverse); cursor: pointer; }
 .arm-newcard--call { display: inline-flex; gap: 4px; align-items: center; background: var(--accent); }
 .arm-newcard:disabled { opacity: .6; cursor: default; }
