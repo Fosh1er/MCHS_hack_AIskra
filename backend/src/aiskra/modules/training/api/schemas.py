@@ -30,7 +30,7 @@ class StatusOut(BaseModel):
 
 class IncomingIn(_Strict):
     groups: list[int] = Field(default_factory=list)
-    difficulty: int = Field(default=2, ge=1, le=5)
+    difficulty: int | None = Field(default=None, ge=1, le=5, description="Сложность занятия; нет — любая")
 
 
 class AnswerIn(_Strict):

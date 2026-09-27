@@ -1,0 +1,137 @@
+"""Аналитика преподавателя (specs/4.5) через HTTP: норматив / факт, профиль обучающегося, разбор занятия,
+подбор задания по слабым местам; чужому преподавателю и обучающемуся — недоступно."""
+
+from collections.abc import Callable, Iterator
+from typing import Any
+
+import pytest
+from fastapi.testclient import TestClient
+
+from tests.integration.test_assessment import fill_from_reference
+from tests.integration.test_journal import app_client as journal_app_client  # noqa: F401
+from tests.integration.test_journal import as_user
+
+
+@pytest.fixture(scope="module")
+def app_client(journal_app_client: Callable[[], TestClient]) -> Iterator[Callable[[], TestClient]]:  # noqa: F811
+    yield journal_app_client
+
+
+@pytest.fixture(scope="module")
+def lesson(app_client: Callable[[], TestClient]) -> dict[str, Any]:
+    """Занятие: оператор заполнил карточку по эталону, ДДС приняла системную карточку; всё оценено."""
+    teacher, student, petrov = (as_user(app_client, u) for u in ("teacher", "student", "petrov"))
+    ids = teacher.post("/api/v1/training/scenarios/generate", json={"count": 2, "groups": [1], "difficulty": 3}).json()[
+        "ids"
+    ]
+    for sid in ids:
+        teacher.post(f"/api/v1/training/scenarios/{sid}/approve")
+    dds_code = teacher.get(f"/api/v1/training/scenarios/{ids[0]}").json()["reference_card"]["services"][0]["code"]
+    people = {s["login"]: s["id"] for s in teacher.get("/api/v1/training/students").json()}
+    body = {
+        "title": "Аналитика: пожары",
+        "mode": "mixed",
+        "card_source": "generated",
+        "groups": [1],
+        "participants": [
+            {"student_id": people["student"], "role": "112"},
+            {"student_id": people["petrov"], "role": "dds", "dds_service_code": dds_code},
+        ],
+        "settings": {"feed_interval_s": 60, "max_waiting": 2, "difficulty": 3},
+    }
+    session_id = teacher.post("/api/v1/training/sessions", json=body).json()["id"]
+    teacher.post(f"/api/v1/training/sessions/{session_id}/start")
+
+    fed = petrov.post("/api/v1/training/sessions/feed").json()
+    base = f"/api/v1/incidents/dds/{dds_code}/cards/{fed['card_id']}"
+    petrov.post(f"{base}/received")
+    petrov.post(f"{base}/status", json={"status": "accepted", "order_no": "7", "comment": "Выехали"})
+
+    call = student.post("/api/v1/training/calls/incoming", json={"groups": [1], "difficulty": 3}).json()
+    ref = teacher.get(f"/api/v1/training/scenarios/{call['scenario_id']}").json()["reference_card"]
+    card = student.post(
+        "/api/v1/incidents/cards",
+        json={"aon": call["aon"], "scenario_id": call["scenario_id"], "session_id": session_id},
+    ).json()
+    services = [{"code": s["code"], "is_main": s["main"], "added_by": "auto"} for s in ref["services"]]
+    r = student.post(
+        f"/api/v1/incidents/cards/{card['id']}/save",
+        json={"data": fill_from_reference(ref, call["aon"]), "services": services},
+    )
+    assert r.status_code == 200, r.text
+    assert teacher.post(f"/api/v1/assessment/sessions/{session_id}/evaluate").json()["assessed"] >= 2
+    return {"session_id": session_id, "people": people, "card_number": card["number"], "dds": dds_code}
+
+
+def test_norm_report_compares_fact_with_pp1931(app_client: Callable[[], TestClient], lesson: dict[str, Any]) -> None:
+    teacher = as_user(app_client, "teacher")
+    r = teacher.get("/api/v1/assessment/analytics/norms", params={"session_id": lesson["session_id"]})
+    assert r.status_code == 200, r.text
+    v = r.json()
+    assert "1931" in v["source"]
+    assert v["card_112"]["count"] == 1 and v["card_112"]["norm_s"] == 75  # норматив по умолчанию — ПП № 1931
+    assert v["card_112"]["within"] == 1  # в тесте карточка сохраняется за доли секунды
+    assert v["dds"]["count"] >= 1 and v["dds"]["norm_s"] == 30 and v["dds"]["median_s"] is not None
+    assert {row["role"] for row in v["by_student"]} == {"112", "dds"}
+    assert v["by_session"][0]["session_id"] == lesson["session_id"]
+    period = teacher.get("/api/v1/assessment/analytics/norms", params={"days": 7}).json()
+    assert period["card_112"]["count"] >= 1 and period["period"] == "последние 7 дн."
+    assert teacher.get("/api/v1/assessment/analytics/norms", params={"days": 0}).json()["period"] == "все занятия"
+
+
+def test_student_profile_across_sessions(app_client: Callable[[], TestClient], lesson: dict[str, Any]) -> None:
+    teacher = as_user(app_client, "teacher")
+    r = teacher.get(f"/api/v1/assessment/analytics/students/{lesson['people']['student']}")
+    assert r.status_code == 200, r.text
+    p = r.json()
+    assert p["full_name"] == "Обучающийся Тестовый" and p["roles"] == ["112"] and p["cards"] >= 1
+    assert p["points"] and p["points"][-1]["card_number"] == lesson["card_number"]
+    assert p["criteria"] and all(c["group"] is not None for c in p["criteria"])
+    assert p["coverage"][0]["group_id"] == 1 and p["coverage"][0]["title"]  # группа сценария, а не выбор оператора
+    assert all(g["group_id"] != 1 for g in p["not_practiced"])
+    assert p["by_difficulty"] and p["by_difficulty"][0]["difficulty"] == 3  # сценарий подобран по сложности занятия
+    assert p["card_112"]["count"] >= 1
+    other = teacher.get("/api/v1/assessment/analytics/students/00000000-0000-0000-0000-000000000001")
+    assert other.status_code == 404
+
+
+def test_debrief_lists_characteristic_shortcomings(
+    app_client: Callable[[], TestClient], lesson: dict[str, Any]
+) -> None:
+    teacher = as_user(app_client, "teacher")
+    r = teacher.get(f"/api/v1/assessment/sessions/{lesson['session_id']}/debrief")
+    assert r.status_code == 200, r.text
+    d = r.json()
+    # карточка оператора тоже уходит в ДДС Петрова: 112 — 1, ДДС — 2 (системная и от оператора);
+    # карточку оператора Петров не открывал — она не оценена
+    assert d["title"] == "Аналитика: пожары" and d["cards"] == 3 and d["assessed"] == 2
+    assert d["best"] and {b["role"] for b in d["best"]} == {"112", "dds"}
+    assert all(set(e) >= {"text", "count", "cards", "students"} for e in d["top_errors"])
+    assert all(c["advice"] for c in d["weak_criteria"])
+    assert d["card_112"]["count"] == 1 and d["dds"]["count"] >= 1
+
+
+def test_suggest_assignment_by_weak_spots(app_client: Callable[[], TestClient], lesson: dict[str, Any]) -> None:
+    teacher = as_user(app_client, "teacher")
+    ids = [lesson["people"]["student"], lesson["people"]["petrov"]]
+    r = teacher.get("/api/v1/assessment/analytics/suggest", params={"student_id": ids})
+    assert r.status_code == 200, r.text
+    s = r.json()
+    assert s["mode"] == "mixed" and 1 <= len(s["groups"]) <= 3 and s["title"].startswith("Работа над ошибками")
+    assert 1 <= s["difficulty"] <= 5 and s["difficulty_reason"]
+    assert {p["role"] for p in s["participants"]} == {"112", "dds"}
+    dds = next(p for p in s["participants"] if p["role"] == "dds")
+    assert dds["service_code"] == lesson["dds"]
+    one = teacher.get("/api/v1/assessment/analytics/suggest", params={"student_id": [ids[0]]}).json()
+    assert one["mode"] == "cards_112" and one["title"].endswith("Обучающийся Тестовый")
+    assert teacher.get("/api/v1/assessment/analytics/suggest").status_code == 422
+
+
+def test_analytics_is_teacher_only(app_client: Callable[[], TestClient], lesson: dict[str, Any]) -> None:
+    student = as_user(app_client, "student")
+    for url in (
+        "/api/v1/assessment/analytics/norms",
+        f"/api/v1/assessment/analytics/students/{lesson['people']['student']}",
+        f"/api/v1/assessment/sessions/{lesson['session_id']}/debrief",
+    ):
+        assert student.get(url).status_code == 403

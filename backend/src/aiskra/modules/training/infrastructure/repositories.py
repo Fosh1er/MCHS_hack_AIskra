@@ -110,14 +110,21 @@ class SqlScenarioRepository:
             for r in rows
         ], total
 
-    async def random_approved(self, rng: random.Random, groups: list[int] | None) -> Scenario | None:
+    async def random_approved(
+        self, rng: random.Random, groups: list[int] | None, difficulty: int | None = None
+    ) -> Scenario | None:
         found = (
             await self._s.execute(
-                select(ScenarioModel.id, ScenarioModel.incident_type_code).where(ScenarioModel.status == "approved")
+                select(ScenarioModel.id, ScenarioModel.incident_type_code, ScenarioModel.difficulty).where(
+                    ScenarioModel.status == "approved"
+                )
             )
         ).all()
-        pool = [sid for sid, code in found if not groups or _group(code) in groups]
-        return await self.get(rng.choice(pool)) if pool else None
+        pool = [(sid, diff) for sid, code, diff in found if not groups or _group(code) in groups]
+        if pool and difficulty is not None:  # сложность занятия (п. 3.7): сначала сценарии нужного уровня
+            best = min(abs(d - difficulty) for _, d in pool)
+            pool = [(sid, d) for sid, d in pool if abs(d - difficulty) == best]
+        return await self.get(rng.choice(pool)[0]) if pool else None
 
 
 class SqlCallRepository:

@@ -85,7 +85,7 @@ class _CallBase:
 class StartIncomingCall(Command):
     actor: Principal
     groups: list[int] = field(default_factory=list)
-    difficulty: int = 2
+    difficulty: int | None = None  # сложность занятия; вне занятия — любой сценарий банка
     seed: int | None = None
 
 
@@ -96,9 +96,9 @@ class StartIncomingCallHandler(_CallBase):
 
     async def __call__(self, cmd: StartIncomingCall) -> CallStarted:
         rng = random.Random(cmd.seed)
-        scenario = await self._scenarios.random_approved(rng, cmd.groups or None)
+        scenario = await self._scenarios.random_approved(rng, cmd.groups or None, cmd.difficulty)
         if scenario is None:  # банк пуст — сценарий на лету, сохраняется черновиком для проверки преподавателем
-            scenario = await self._gen.generate(rng, cmd.groups, cmd.difficulty, None)
+            scenario = await self._gen.generate(rng, cmd.groups, cmd.difficulty or 2, None)
             await self._scenarios.add(scenario)
         aon = scenario.legend.get("applicant", {}).get("phone", "")
         call = Call(

@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from fastapi.responses import Response
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -18,6 +18,20 @@ from aiskra.modules.assessment.application.commands.evaluate_session import (
 )
 from aiskra.modules.assessment.application.commands.override import OverrideAssessment, OverrideAssessmentHandler
 from aiskra.modules.assessment.application.ports.attempts import AssessmentRecord
+from aiskra.modules.assessment.application.queries.analytics import (
+    AssignmentSuggestion,
+    DebriefView,
+    NormReport,
+    NormReportHandler,
+    NormReportView,
+    SessionDebrief,
+    SessionDebriefHandler,
+    StudentProfile,
+    StudentProfileHandler,
+    StudentProfileView,
+    SuggestAssignment,
+    SuggestAssignmentHandler,
+)
 from aiskra.modules.assessment.application.queries.assessments import (
     GetAssessment,
     GetAssessmentHandler,
@@ -168,3 +182,51 @@ async def my_session_report(
     handler: Annotated[GetMySessionReportHandler, Depends(deps.provide_my_report)],
 ) -> MySessionReport:
     return await handler(GetMySessionReport(actor=actor, session_id=session_id))
+
+
+# ------------------------------------------------------------------ аналитика преподавателя (specs/4.5)
+
+
+@router.get(
+    "/analytics/norms", response_model=NormReportView, summary="Норматив / факт по времени (ПП РФ № 1931, форма 1/112)"
+)
+async def norm_report(
+    actor: Teacher,
+    handler: Annotated[NormReportHandler, Depends(deps.provide_norm_report)],
+    days: Annotated[int, Query(ge=0, le=3650, description="Период, дней; 0 — все занятия")] = 30,
+    session_id: UUID | None = None,
+) -> NormReportView:
+    return await handler(NormReport(actor=actor, days=days or None, session_id=session_id))
+
+
+@router.get(
+    "/analytics/students/{student_id}",
+    response_model=StudentProfileView,
+    summary="Профиль обучающегося по всем занятиям преподавателя",
+)
+async def student_profile(
+    student_id: UUID, actor: Teacher, handler: Annotated[StudentProfileHandler, Depends(deps.provide_student_profile)]
+) -> StudentProfileView:
+    return await handler(StudentProfile(actor=actor, student_id=student_id))
+
+
+@router.get(
+    "/sessions/{session_id}/debrief", response_model=DebriefView, summary="Разбор занятия: характерные недостатки"
+)
+async def session_debrief(
+    session_id: UUID, actor: Teacher, handler: Annotated[SessionDebriefHandler, Depends(deps.provide_debrief)]
+) -> DebriefView:
+    return await handler(SessionDebrief(actor=actor, session_id=session_id))
+
+
+@router.get(
+    "/analytics/suggest",
+    response_model=AssignmentSuggestion,
+    summary="Подбор задания по слабым местам: группы классификатора, сложность, фокус инструктажа",
+)
+async def suggest_assignment(
+    actor: Teacher,
+    handler: Annotated[SuggestAssignmentHandler, Depends(deps.provide_suggest)],
+    student_id: Annotated[list[UUID], Query(min_length=1, max_length=100)],
+) -> AssignmentSuggestion:
+    return await handler(SuggestAssignment(actor=actor, student_ids=student_id))
