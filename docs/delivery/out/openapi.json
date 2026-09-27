@@ -4896,6 +4896,53 @@
      }
     }
    }
+  },
+  "/api/v1/assessment/analytics/validation": {
+   "get": {
+    "tags": [
+     "assessment"
+    ],
+    "summary": "Достоверность автооценки: бенчмарк ошибок, согласованность генератора, согласие с экспертом (п. 3.5)",
+    "operationId": "validation_api_v1_assessment_analytics_validation_get",
+    "parameters": [
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 500,
+       "minimum": 1,
+       "description": "Сколько утверждённых сценариев взять",
+       "default": 50,
+       "title": "Limit"
+      },
+      "description": "Сколько утверждённых сценариев взять"
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ValidationView"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
   }
  },
  "components": {
@@ -5621,6 +5668,117 @@
      "created_at"
     ],
     "title": "BackupInfo"
+   },
+   "Benchmark": {
+    "properties": {
+     "scenarios": {
+      "type": "integer",
+      "title": "Scenarios"
+     },
+     "cases": {
+      "type": "integer",
+      "title": "Cases"
+     },
+     "specificity_112": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Specificity 112"
+     },
+     "specificity_dds": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Specificity Dds"
+     },
+     "detection": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Detection"
+     },
+     "localization": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Localization"
+     },
+     "verdict_accuracy": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Verdict Accuracy"
+     },
+     "verdict_kappa": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Verdict Kappa"
+     },
+     "critical_caught": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Critical Caught"
+     },
+     "mutations": {
+      "items": {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      "type": "array",
+      "title": "Mutations"
+     }
+    },
+    "type": "object",
+    "required": [
+     "scenarios",
+     "cases",
+     "specificity_112",
+     "specificity_dds",
+     "detection",
+     "localization",
+     "verdict_accuracy",
+     "verdict_kappa",
+     "critical_caught",
+     "mutations"
+    ],
+    "title": "Benchmark"
    },
    "BlockIn": {
     "properties": {
@@ -7352,6 +7510,61 @@
      "title"
     ],
     "title": "EventType"
+   },
+   "ExpertAgreement": {
+    "properties": {
+     "pairs": {
+      "type": "integer",
+      "title": "Pairs"
+     },
+     "mae": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Mae"
+     },
+     "verdict_agreement": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Verdict Agreement"
+     },
+     "kappa": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Kappa"
+     },
+     "threshold": {
+      "type": "number",
+      "title": "Threshold",
+      "default": 70
+     }
+    },
+    "type": "object",
+    "required": [
+     "pairs",
+     "mae",
+     "verdict_agreement",
+     "kappa"
+    ],
+    "title": "ExpertAgreement",
+    "description": "Автооценка против экспертной правки преподавателя (по последней версии оценки каждой карточки)."
    },
    "FeedResult": {
     "properties": {
@@ -11441,6 +11654,45 @@
      "type"
     ],
     "title": "ValidationError"
+   },
+   "ValidationView": {
+    "properties": {
+     "generated_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Generated At"
+     },
+     "benchmark": {
+      "$ref": "#/components/schemas/Benchmark"
+     },
+     "generator": {
+      "items": {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      "type": "array",
+      "title": "Generator"
+     },
+     "expert": {
+      "$ref": "#/components/schemas/ExpertAgreement"
+     },
+     "notes": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Notes"
+     }
+    },
+    "type": "object",
+    "required": [
+     "generated_at",
+     "benchmark",
+     "generator",
+     "expert",
+     "notes"
+    ],
+    "title": "ValidationView"
    },
    "VictimsIn": {
     "properties": {
