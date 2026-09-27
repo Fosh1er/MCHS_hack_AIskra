@@ -14,6 +14,7 @@ export const NAV: Record<'teacher' | 'admin' | 'student', { role: string; items:
       { id: 'sessions', label: 'Занятия', icon: 'school', href: '/teacher/sessions' },
       { id: 'analytics', label: 'Аналитика', icon: 'bar_chart', href: '/teacher/analytics' },
       { id: 'readiness', label: 'Допуск', icon: 'check_circle', href: '/teacher/readiness' },
+      { id: 'validation', label: 'Достоверность', icon: 'shield', href: '/teacher/validation' },
       { id: 'materials', label: 'Учебные материалы', icon: 'description', href: '/teacher/materials' },
       { id: 'journal', label: 'Журнал 112', icon: 'table', href: '/arm/112/journal', group: 'АРМ' },
       { id: 'dds', label: 'АРМ ДДС', icon: 'headset', href: '/arm/dds' },

@@ -1,0 +1,44 @@
+# Демо-стенд на бесплатных моделях OpenRouter (OpenAI-совместимый API). Только синтетические данные: запросы
+# уходят во внешний сервис (ответ заказчика #710). В контуре заказчика — config/ai.example.yaml с локальной моделью.
+#
+# Подключение: в .env —
+#   AISKRA_AI_CONFIG_PATH=<путь к этому файлу>   (в docker — /app/config/ai.openrouter.yaml)
+#   AISKRA_AI_ALLOW_EXTERNAL=true
+#   DEMO_LLM_API_KEY=<ключ OpenRouter>            ключ только в .env, не в этом файле
+# Модели выбраны 27.09.2026 по https://openrouter.ai/api/v1/models (цена 0, поддержка JSON-ответа);
+# бесплатные модели OpenRouter меняются — при ошибке «model not found» замените имя в переменной ниже.
+# Лимиты бесплатного тарифа — порядка 20 запросов в минуту и ограниченное число в сутки: параллельность низкая.
+ai:
+  allow_external: ${AISKRA_AI_ALLOW_EXTERNAL:-false}
+  default_provider: demo
+  providers:
+    # Генерация сценариев и ИИ-судья: JSON по схеме, хороший русский.
+    demo:
+      kind: openai_compatible
+      base_url: ${DEMO_LLM_URL:-https://openrouter.ai/api/v1}
+      api_key_env: DEMO_LLM_API_KEY
+      model: ${DEMO_LLM_MODEL:-qwen/qwen3.8-27b:free}
+      timeout_s: 90
+      max_concurrency: 2
+      structured_output: json_object
+    # Реплики заявителя, старшего группы, диспетчера службы: быстрая модель.
+    demo_small:
+      kind: openai_compatible
+      base_url: ${DEMO_LLM_URL:-https://openrouter.ai/api/v1}
+      api_key_env: DEMO_LLM_API_KEY
+      model: ${DEMO_SMALL_MODEL:-google/gemma-4-26b-a4b-it:free}
+      timeout_s: 45
+      max_concurrency: 2
+      structured_output: json_object
+    fake: {kind: fake}
+  cache: {backend: memory, max_items: 20000}
+  tasks:
+    probe:               {provider: demo,       temperature: 0,   cache: exact, cache_ttl: 1h}
+    scenario_generation: {provider: demo,       temperature: 0.8, cache: off,   max_tokens: 2000}
+    applicant_actor:     {provider: demo_small, temperature: 0.6, cache: task,  cache_ttl: 1d, max_tokens: 160}
+    brigade_actor:       {provider: demo_small, temperature: 0.6, cache: task,  cache_ttl: 1d, max_tokens: 160}
+    service_actor:       {provider: demo_small, temperature: 0.6, cache: task,  cache_ttl: 1d, max_tokens: 160}
+    judge:               {provider: demo,       temperature: 0,   cache: exact, cache_ttl: 7d, max_tokens: 600}
+    insights:            {provider: demo,       temperature: 0.3, cache: off}
+  tts: {kind: fake, cache_ttl: 30d}
+  stt: {kind: fake}

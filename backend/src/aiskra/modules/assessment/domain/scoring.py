@@ -71,6 +71,8 @@ class Criterion:
     score: float | None  # None — не проверено (нет эталона или модели)
     errors: list[str] = field(default_factory=list)
     note: str = ""
+    # критическая ошибка (п. 3.5): обучающийся отправил бы не те силы или не туда — «не зачтено» при любом балле
+    critical: bool = False
 
     @property
     def title(self) -> str:
@@ -90,6 +92,10 @@ class Result:
     def errors(self) -> list[str]:
         return [f"{c.title}: {e}" for c in self.criteria for e in c.errors]
 
+    @property
+    def critical(self) -> list[str]:
+        return [c.key for c in self.criteria if c.critical]
+
 
 def norm_text(s: str | None) -> str:
     s = (s or "").lower().replace("ё", "е")
@@ -98,6 +104,13 @@ def norm_text(s: str | None) -> str:
         " ",
         s,
     )
+    return re.sub(r"[^а-яa-z0-9]+", " ", s).strip()
+
+
+def norm_words(s: str | None) -> str:
+    """Нормализация свободного текста (описание): регистр, «ё», знаки. В отличие от `norm_text` слова «улица»,
+    «набережная» и т. п. не вырезаются — иначе такие ключевые факты эталона не найти (п. 3.5, бенчмарк)."""
+    s = (s or "").lower().replace("ё", "е")
     return re.sub(r"[^а-яa-z0-9]+", " ", s).strip()
 
 
@@ -142,8 +155,10 @@ def assess_card_112(
     norm_seconds: float = CARD_NORM_SECONDS,
     names: dict[str, str] | None = None,
     flag_names: dict[str, str] | None = None,
+    spoken: str | None = None,
 ) -> list[Criterion]:
-    """Критерии карточки 112. `names`, `flag_names` — коды служб и признаков → названия (понятные сообщения)."""
+    """Критерии карточки 112. `names`, `flag_names` — коды служб и признаков → названия (понятные сообщения);
+    `spoken` — что сообщил заявитель: ключевые факты описания учитываются, только если они прозвучали."""
     names = names or {}
     fnames = flag_names or {}
     out: list[Criterion] = []
@@ -170,6 +185,7 @@ def assess_card_112(
         c.errors.append(f"выбран близкий, но не тот тип; эталон — «{ref.get('final_type') or exp_types[0]}»")
     else:
         c.errors.append(f"неверный тип; эталон — «{ref.get('final_type') or (exp_types[0] if exp_types else '?')}»")
+        c.critical = True  # другая группа — другие силы и алгоритм реагирования
     out.append(c)
 
     score, missing, extra = f1(set(services), {s["code"] for s in ref.get("services", [])})
@@ -181,6 +197,7 @@ def assess_card_112(
     main = next((s["code"] for s in ref.get("services", []) if s.get("main")), None)
     if main and main not in services:
         c.errors.append(f"нет основной службы «{names.get(main, main)}»")
+        c.critical = True
     out.append(c)
 
     a, ra = card.get("address") or {}, ref.get("address") or {}
@@ -188,10 +205,12 @@ def assess_card_112(
     house_ok = norm_text(a.get("house")) == norm_text(ra.get("house"))
     district_ok = bool(a.get("district")) and a.get("district") == ra.get("district")
     c = Criterion(
-        "address", (0.6 if street_ok else 0) + (0.3 if street_ok and house_ok else 0) + (0.1 if district_ok else 0)
+        "address",
+        round((0.6 if street_ok else 0) + (0.3 if street_ok and house_ok else 0) + (0.1 if district_ok else 0), 3),
     )
     if not street_ok:
         c.errors.append(f"улица не совпадает с эталоном «{ra.get('street')}»")
+        c.critical = bool(ra.get("street"))  # силы уедут не туда
     elif not house_ok:
         c.errors.append(f"номер дома не совпадает (эталон {ra.get('house')})")
     if not district_ok:
@@ -226,14 +245,18 @@ def assess_card_112(
             if rv.get("has")
             else "в карточке отмечены пострадавшие, которых нет"
         )
+        c.critical = bool(rv.get("has"))  # без отметки не будет вызвана скорая
     elif not count_ok:
         c.errors.append(f"неверное количество пострадавших (эталон {rv.get('count')})")
     out.append(c)
 
     words = [w for w in ref.get("description_keywords", []) if w]
-    text = norm_text(card.get("description"))
+    if spoken is not None:  # п. 3.5: нельзя требовать в описании то, чего заявитель не говорил
+        heard = norm_words(spoken)
+        words = [w for w in words if norm_words(w)[:5] in heard]
+    text = norm_words(card.get("description"))
     if words:
-        hit = [w for w in words if w[:5] in text]
+        hit = [w for w in words if norm_words(w)[:5] in text]
         c = Criterion("description", len(hit) / len(words))
         miss = [w for w in words if w not in hit]
         if miss:
@@ -278,11 +301,11 @@ def assess_dds(
     first = steps[0] if steps else None
     expected_first = ref.get("first_status", "accepted")
 
-    c = Criterion("decision", 0.0)
+    c = Criterion("decision", 0.0, critical=True)
     if first is None:
         c.errors.append("решение по карточке не принято")
     elif first.status == expected_first:
-        c.score = 1.0
+        c.score, c.critical = 1.0, False
     else:
         c.errors.append(
             "карточка не принята, хотя по эталону служба должна реагировать"
@@ -293,7 +316,7 @@ def assess_dds(
 
     if first is not None and first.at and added_at:
         secs = max(0.0, (first.at - added_at).total_seconds())
-        c = Criterion("reaction", timing_score(secs, norm_seconds))
+        c = Criterion("reaction", timing_score(secs, norm_seconds), critical=secs > 3 * norm_seconds)
         if secs > norm_seconds:
             c.errors.append(f"решение принято через {int(secs)} с при нормативе {int(norm_seconds)} с")
         out.append(c)
@@ -345,11 +368,13 @@ def finish(
     stats: dict[str, Any] | None = None,
 ) -> Result:
     score = total(criteria, weights)
+    if any(c.critical for c in criteria):  # критическая ошибка — «не зачтено», балл ниже порога (п. 3.5)
+        score = min(score, max(0.0, threshold - 1))
     return Result(
         role=role,
         criteria=criteria,
         score=score,
-        passed=score >= threshold,
+        passed=score >= threshold and not any(c.critical for c in criteria),
         has_reference=has_reference,
         stats=stats or {},
     )

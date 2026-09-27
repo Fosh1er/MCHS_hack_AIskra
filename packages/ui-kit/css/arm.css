@@ -1116,6 +1116,7 @@ body:has(.dds-editor) .ipphone > .arm-dock__section:not(.ipphone__screen) { disp
 .assess .arm-minibtn { margin-left: auto; }
 .assess__err { color: #c0461f; font-size: var(--fs-xs); }
 .assess__note, .assess__meta { margin: 0; font-size: var(--fs-xs); color: var(--text-muted); }
+.assess__note--critical { color: var(--s-critical); font-weight: var(--fw-bold); }
 .assess__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .assess__item { display: grid; grid-template-columns: minmax(160px, 38%) 1fr; gap: 4px 12px; align-items: center; font-size: var(--fs-sm); }
 .assess__na { font-size: var(--fs-xs); color: var(--text-muted); }

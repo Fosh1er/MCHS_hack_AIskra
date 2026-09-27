@@ -64,6 +64,7 @@ def to_details(result: Result, service_code: str | None, card_number: int) -> di
         "has_reference": result.has_reference,
         "criteria": [{**asdict(c), "title": c.title} for c in result.criteria],
         "errors": result.errors,
+        "critical": [c.title for c in result.criteria if c.critical],  # п. 3.5: «не зачтено» при любом балле
         "stats": result.stats,
     }
 
@@ -96,6 +97,7 @@ class AssessCardHandler:
                 norm_seconds=s.norm_seconds or CARD_NORM_SECONDS,
                 names=a.service_names,
                 flag_names=a.flag_names,
+                spoken=a.legend_text or None,
             )
             judged = (
                 await self._judge.check(

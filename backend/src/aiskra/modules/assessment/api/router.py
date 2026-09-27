@@ -54,6 +54,7 @@ from aiskra.modules.assessment.application.queries.reports import (
     SessionReport,
     report_csv,
 )
+from aiskra.modules.assessment.application.queries.validation import ValidationHandler, ValidationQuery, ValidationView
 from aiskra.modules.assessment.domain.scoring import PASS_THRESHOLD
 from aiskra.shared.security import Permission, Principal
 from aiskra.shared.web import CurrentPrincipal, Meta, require
@@ -248,3 +249,16 @@ async def readiness(
     min_cards: Annotated[int, Query(ge=1, le=50, description="Меньше карточек — «недостаточно данных»")] = 5,
 ) -> ReadinessView:
     return await handler(ReadinessQuery(actor=actor, student_ids=student_id or [], last=last, min_cards=min_cards))
+
+
+@router.get(
+    "/analytics/validation",
+    response_model=ValidationView,
+    summary="Достоверность автооценки: бенчмарк ошибок, согласованность генератора, согласие с экспертом (п. 3.5)",
+)
+async def validation(
+    _: Teacher,
+    handler: Annotated[ValidationHandler, Depends(deps.provide_validation)],
+    limit: Annotated[int, Query(ge=1, le=500, description="Сколько утверждённых сценариев взять")] = 50,
+) -> ValidationView:
+    return await handler(ValidationQuery(limit=limit))

@@ -1,0 +1,332 @@
+{
+ "generated_at": "2026-09-27T14:08:09.128239+00:00",
+ "benchmark": {
+  "scenarios": 30,
+  "cases": 602,
+  "specificity_112": 1.0,
+  "specificity_dds": 1.0,
+  "detection": 1.0,
+  "localization": 1.0,
+  "verdict_accuracy": 1.0,
+  "verdict_kappa": 1.0,
+  "critical_caught": 1.0,
+  "mutations": [
+   {
+    "key": "type_other_group",
+    "title": "Тип из другой группы классификатора",
+    "role": "112",
+    "target": "Тип происшествия",
+    "critical": true,
+    "cases": 30,
+    "detection": 1.0,
+    "localization": 1.0,
+    "verdict_agreement": 1.0,
+    "avg_score": 69.0
+   },
+   {
+    "key": "type_same_group",
+    "title": "Близкий тип той же группы",
+    "role": "112",
+    "target": "Тип происшествия",
+    "critical": false,
+    "cases": 30,
+    "detection": 1.0,
+    "localization": 1.0,
+    "verdict_agreement": 1.0,
+    "avg_score": 88.5
+   },
+   {
+    "key": "no_main_service",
+    "title": "Не направлено в основную службу",
+    "role": "112",
+    "target": "Службы",
+    "critical": true,
+    "cases": 26,
+    "detection": 1.0,
+    "localization": 1.0,
+    "verdict_agreement": 1.0,
+    "avg_score": 69.0
+   },
+   {
+    "key": "no_secondary_service",
+    "title": "Пропущена одна из дополнительных служб",
+    "role": "112",
+    "target": "Службы",
+    "critical": false,
+    "cases": 24,
+    "detection": 1.0,
+    "localization": 1.0,
+    "verdict_agreement": 1.0,
+    "avg_score": 98.7
+   },
+   {
+    "key": "extra_service",
+    "title": "Лишняя служба",
+    "role": "112",
+    "target": "Службы",
+    "critical": false,
+    "cases": 30,
+    "detection": 1.0,
+    "localization": 1.0,
+    "verdict_agreement": 1.0,
+    "avg_score": 98.1
+   },
+   {
+    "key": "wrong_street",
+    "title": "Не та улица",
+    "role": "112",
+    "target": "Адрес",
+    "critical": true,
+    "cases": 30,
+    "detection": 1.0,
+    "localization": 1.0,
+    "verdict_agreement": 1.0,
+    "avg_score": 69.0
+   },
+   {
+    "key": "wrong_house",
+    "title": "Не тот дом",
+    "role": "112",
+    "target": "Адрес",
+    "critical": false,
+    "cases": 30,
+    "detection": 1.0,
+    "localization": 1.0,
+    "verdict_agreement": 1.0,
+    "avg_score": 95.4
+   },
+   {
+    "key": "no_district",
+    "title": "Не указан район",
+    "role": "112",
+    "target": "Адрес",
+    "critical": false,
+    "cases": 30,
+    "detection": 1.0,
+    "localization": 1.0,
+    "verdict_agreement": 1.0,
+    "avg_score": 98.5
+   },
+   {
+    "key": "missed_flag",
+    "title": "Не отмечен признак опросной карты",
+    "role": "112",
+    "target": "Признаки опросной карты",
+    "critical": false,
+    "cases": 21,
+    "detection": 1.0,
+    "localization": 1.0,
+    "verdict_agreement": 1.0,
+    "avg_score": 95.4
+   },
+   {
+    "key": "no_applicant_name",
+    "title": "Не записано ФИО заявителя",
+    "role": "112",
+    "target": "Заявитель",
+    "critical": false,
+    "cases": 30,
+    "detection": 1.0,
+    "localization": 1.0,
+    "verdict_agreement": 1.0,
+    "avg_score": 96.2
+   },
+   {
+    "key": "missed_victims",
+    "title": "Не отмечены пострадавшие",
+    "role": "112",
+    "target": "Пострадавшие",
+    "critical": true,
+    "cases": 11,
+    "detection": 1.0,
+    "localization": 1.0,
+    "verdict_agreement": 1.0,
+    "avg_score": 69.0
+   },
+   {
+    "key": "victims_count",
+    "title": "Неверное число пострадавших",
+    "role": "112",
+    "target": "Пострадавшие",
+    "critical": false,
+    "cases": 11,
+    "detection": 1.0,
+    "localization": 1.0,
+    "verdict_agreement": 1.0,
+    "avg_score": 97.7
+   },
+   {
+    "key": "empty_description",
+    "title": "Пустое описание со слов заявителя",
+    "role": "112",
+    "target": "Описание: ключевые факты",
+    "critical": false,
+    "cases": 29,
+    "detection": 1.0,
+    "localization": 1.0,
+    "verdict_agreement": 1.0,
+    "avg_score": 92.3
+   },
+   {
+    "key": "no_victims_question",
+    "title": "Не спросил о пострадавших",
+    "role": "112",
+    "target": "Полнота опроса заявителя",
+    "critical": false,
+    "cases": 30,
+    "detection": 1.0,
+    "localization": 1.0,
+    "verdict_agreement": 1.0,
+    "avg_score": 97.4
+   },
+   {
+    "key": "slow",
+    "title": "Карточка заполнена за два норматива",
+    "role": "112",
+    "target": "Время заполнения",
+    "critical": false,
+    "cases": 30,
+    "detection": 1.0,
+    "localization": 1.0,
+    "verdict_agreement": 1.0,
+    "avg_score": 96.2
+   },
+   {
+    "key": "rejected",
+    "title": "«Не принята» вместо «Принята»",
+    "role": "dds",
+    "target": "Решение «Принята / Не принята»",
+    "critical": true,
+    "cases": 30,
+    "detection": 1.0,
+    "localization": 1.0,
+    "verdict_agreement": 1.0,
+    "avg_score": 50.0
+   },
+   {
+    "key": "very_slow",
+    "title": "Решение позже трёх нормативов",
+    "role": "dds",
+    "target": "Время реакции",
+    "critical": true,
+    "cases": 30,
+    "detection": 1.0,
+    "localization": 1.0,
+    "verdict_agreement": 1.0,
+    "avg_score": 69.0
+   },
+   {
+    "key": "slow",
+    "title": "Решение за полтора норматива",
+    "role": "dds",
+    "target": "Время реакции",
+    "critical": false,
+    "cases": 30,
+    "detection": 1.0,
+    "localization": 1.0,
+    "verdict_agreement": 1.0,
+    "avg_score": 95.0
+   },
+   {
+    "key": "no_order_no",
+    "title": "Не указан номер наряда",
+    "role": "dds",
+    "target": "Номер наряда",
+    "critical": false,
+    "cases": 30,
+    "detection": 1.0,
+    "localization": 1.0,
+    "verdict_agreement": 1.0,
+    "avg_score": 90.0
+   },
+   {
+    "key": "no_comments",
+    "title": "Статусы без комментариев",
+    "role": "dds",
+    "target": "Комментарии к статусам",
+    "critical": false,
+    "cases": 30,
+    "detection": 1.0,
+    "localization": 1.0,
+    "verdict_agreement": 1.0,
+    "avg_score": 90.0
+   },
+   {
+    "key": "chain_incomplete",
+    "title": "Работы не доведены до «Работы завершены»",
+    "role": "dds",
+    "target": "Порядок и полнота статусов",
+    "critical": false,
+    "cases": 30,
+    "detection": 1.0,
+    "localization": 1.0,
+    "verdict_agreement": 1.0,
+    "avg_score": 88.0
+   },
+   {
+    "key": "no_call",
+    "title": "Нет звонка старшему группы",
+    "role": "dds",
+    "target": "Звонки",
+    "critical": false,
+    "cases": 30,
+    "detection": 1.0,
+    "localization": 1.0,
+    "verdict_agreement": 1.0,
+    "avg_score": 90.0
+   }
+  ]
+ },
+ "generator": [
+  {
+   "key": "address",
+   "title": "Адрес легенды = адрес эталона",
+   "checked": 30,
+   "share": 1.0
+  },
+  {
+   "key": "victims",
+   "title": "Пострадавшие легенды = эталон",
+   "checked": 30,
+   "share": 1.0
+  },
+  {
+   "key": "applicant",
+   "title": "Заявитель легенды = эталон",
+   "checked": 30,
+   "share": 1.0
+  },
+  {
+   "key": "keywords",
+   "title": "Ключевые факты эталона есть в речи заявителя",
+   "checked": 29,
+   "share": 0.897
+  },
+  {
+   "key": "routing",
+   "title": "Службы эталона = автоподбор по классификатору",
+   "checked": 30,
+   "share": 1.0
+  },
+  {
+   "key": "main_service",
+   "title": "У эталона есть основная служба (графа «главная служба» классификатора)",
+   "checked": 30,
+   "share": 0.867
+  }
+ ],
+ "expert": {
+  "pairs": 0,
+  "mae": null,
+  "verdict_agreement": null,
+  "kappa": null,
+  "threshold": 70
+ },
+ "notes": [
+  "Бенчмарк синтетический: ошибки вносятся по одной в карточку, заполненную точно по эталону; он проверяет, что правила оценки находят то, что должны, и не ругаются зря.",
+  "Главная метрика на реальных данных — согласие с экспертом: растёт с каждой правкой преподавателя.",
+  "ИИ-судья (смысл и грамотность описания) в бенчмарк не входит: без модели он не вызывается; проверка судьи на модели — `tools/validate_ai.py --judge`.",
+  "Экспертных правок пока 0; для устойчивой оценки нужно не меньше 30."
+ ],
+ "judge": null
+}
