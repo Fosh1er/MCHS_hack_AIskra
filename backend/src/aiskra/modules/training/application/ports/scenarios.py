@@ -53,7 +53,11 @@ class ScenarioRepository(Protocol):
         offset: int,
     ) -> tuple[list[ScenarioRow], int]: ...
 
-    async def random_approved(self, rng: random.Random, groups: list[int] | None) -> Scenario | None: ...
+    async def random_approved(
+        self, rng: random.Random, groups: list[int] | None, difficulty: int | None = None
+    ) -> Scenario | None:
+        """Случайный утверждённый сценарий групп; `difficulty` — ближайшие к ней по сложности."""
+        ...
 
 
 class CallRepository(Protocol):

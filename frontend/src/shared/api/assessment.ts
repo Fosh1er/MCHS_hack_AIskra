@@ -100,3 +100,56 @@ export interface Recommendation { key: string; average: number; text: string }
 export interface MySessionReport { report: SessionReport; recommendations: Recommendation[] }
 export const useMySessionReport = (id: string) =>
   useQuery({ queryKey: ['my-report', id], queryFn: () => http<MySessionReport>(`${A}/sessions/${id}/mine`) });
+
+// ------------------------------------------------------------------ аналитика преподавателя (specs/4.5)
+/** «Норматив / факт» (ПП РФ № 1931; форма 1/112): у каждого занятия может быть свой норматив. */
+export interface NormStat {
+  count: number; within: number; within_share: number | null;
+  median_s: number | null; p90_s: number | null; avg_s: number | null; norm_s: number | null;
+}
+export interface NormReportView {
+  period: string; source: string; card_112: NormStat; dds: NormStat;
+  by_student: { key: string; title: string; role: '112' | 'dds'; stat: NormStat }[];
+  by_session: { session_id: string; title: string; at: string | null; card_112: NormStat; dds: NormStat }[];
+}
+export interface ErrorRow { text: string; count: number; cards: number[]; students: string[] }
+export interface GroupRow { group_id: number; title: string; cards: number; avg_score: number | null; errors: number }
+export interface StudentProfileView {
+  student_id: string; full_name: string; roles: ('112' | 'dds')[]; sessions: number; cards: number;
+  avg_score: number | null; passed_share: number | null;
+  points: { t: string; v: number; role: string; card_number: number; session: string; passed: boolean | null }[];
+  criteria: { key: string; title: string; student: number; group: number | null; delta: number | null }[];
+  frequent_errors: ErrorRow[]; coverage: GroupRow[];
+  not_practiced: { group_id: number; title: string; approved: number }[];
+  by_difficulty: { difficulty: number; cards: number; avg_score: number | null }[];
+  card_112: NormStat; dds: NormStat; recommendations: Recommendation[];
+}
+export interface DebriefView {
+  session_id: string; title: string; started_at: string | null; cards: number; assessed: number;
+  avg_score: number | null; passed_share: number | null; top_errors: ErrorRow[];
+  weak_criteria: { key: string; title: string; average: number; advice: string }[];
+  weak_groups: GroupRow[];
+  overdue: { who: string; role: '112' | 'dds'; card_number: number; time_s: number; norm_s: number }[];
+  best: { who: string; role: '112' | 'dds'; avg_score: number | null }[];
+  card_112: NormStat; dds: NormStat;
+}
+export interface AssignmentSuggestion {
+  title: string; mode: 'cards_112' | 'dds_actions' | 'mixed';
+  groups: { group_id: number; title: string; reason: string; avg_score: number | null; approved: number }[];
+  difficulty: number; difficulty_reason: string;
+  focus: { key: string; title: string; average: number; advice: string }[];
+  participants: { student_id: string; full_name: string; role: '112' | 'dds'; service_code: string | null }[];
+  approved_total: number; warnings: string[];
+}
+
+export const useNormReport = (days: number | null) =>
+  useQuery({
+    queryKey: ['analytics', 'norms', days],
+    queryFn: () => http<NormReportView>(`${A}/analytics/norms?days=${days ?? 0}`), // 0 — все занятия
+  });
+export const useStudentProfile = (id: string) =>
+  useQuery({ queryKey: ['analytics', 'student', id], queryFn: () => http<StudentProfileView>(`${A}/analytics/students/${id}`) });
+export const useDebrief = (id: string) =>
+  useQuery({ queryKey: ['analytics', 'debrief', id], queryFn: () => http<DebriefView>(`${A}/sessions/${id}/debrief`) });
+export const fetchSuggestion = (studentIds: string[]) =>
+  http<AssignmentSuggestion>(`${A}/analytics/suggest?${studentIds.map((id) => `student_id=${encodeURIComponent(id)}`).join('&')}`);

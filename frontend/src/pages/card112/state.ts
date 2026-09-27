@@ -5,7 +5,7 @@ import type { ResolvedService, TreeNode } from '../../shared/api/dictionaries';
 export const DESCRIPTION_MAX = 1999;
 export const AMBULANCE_VISIBLE_CHARS = 100;
 /** Норматив таймера. На стенде 01:03 — тёмный, 01:23 — красный; точное значение уточняется у заказчика. */
-export const CARD_NORM_SECONDS = 80;
+export const CARD_NORM_SECONDS = 75; // ПП РФ № 1931: опрос до готовой карточки — в среднем 75 с
 
 /** Три кнопки стенда 2026 под шапкой = признаки маршрутизации классификатора. */
 export const TOP_FLAGS = { victims: 'victims', notOnSite: 'victims_not_on_site', noAccess: 'no_access' } as const;

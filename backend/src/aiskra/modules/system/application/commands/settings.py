@@ -16,7 +16,7 @@ from aiskra.shared.security import Principal
 # ключ → (значение по умолчанию, минимум, максимум)
 LIMITS: dict[str, dict[str, tuple[float, float, float]]] = {
     "session_defaults": {
-        "norm_112": (80, 5, 3600),
+        "norm_112": (75, 5, 3600),
         "norm_dds": (30, 5, 3600),
         "threshold": (70, 0, 100),
         "difficulty": (2, 1, 5),

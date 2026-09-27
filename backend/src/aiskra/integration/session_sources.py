@@ -12,13 +12,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from aiskra.modules.assessment.application.ports.reports import ReportCard, ReportParticipant, SessionFacts
 from aiskra.modules.assessment.infrastructure.models import AssessmentModel
+from aiskra.modules.dictionaries.infrastructure.models import IncidentGroupModel, IncidentTypeModel
 from aiskra.modules.incidents.domain.card import IncidentCardData
 from aiskra.modules.incidents.domain.incident import AddedBy, CardService, IncidentCard
-from aiskra.modules.incidents.infrastructure.models import CardServiceModel, IncidentCardModel
+from aiskra.modules.incidents.infrastructure.models import CardServiceModel, CardServiceStatusModel, IncidentCardModel
 from aiskra.modules.incidents.infrastructure.repositories import SqlCardRepository
 from aiskra.modules.training.application.ports.sessions import ParticipantProgress
 from aiskra.modules.training.domain.scenario import Scenario
 from aiskra.modules.training.domain.session import TrainingSession
+from aiskra.modules.training.infrastructure.models import ScenarioModel, TrainingSessionModel
 from aiskra.modules.training.infrastructure.sessions import SqlSessionRepository, SqlStudentDirectory
 from aiskra.platform.types import as_utc
 
@@ -224,6 +226,14 @@ class SessionFactsReader:
             )
             for cid, code, st in rows.all():
                 services.setdefault(cid, {})[code] = st
+        scen = await self._scenarios({c.scenario_id for c in cards if c.scenario_id})
+        # что отрабатывалось: тип сценария (истина), без сценария — выбор оператора
+        itypes = {
+            c.id: scen.get(c.scenario_id, (None, None))[0] or next(iter(c.incident_type_codes or []), None)
+            for c in cards
+        }
+        groups = await self._groups({t for t in itypes.values() if t})
+        reactions = await self._reactions([c.id for c in cards])
         return SessionFacts(
             session_id=ts.id,
             teacher_id=ts.teacher_id,
@@ -253,7 +263,88 @@ class SessionFactsReader:
                     processing_s=c.processing_ms / 1000 if c.processing_ms is not None else None,
                     card_types=list(c.card_type_codes or []),
                     services=services.get(c.id, {}),
+                    incident_type=itypes[c.id],
+                    incident_group=groups.get(itypes[c.id] or ""),
+                    difficulty=scen.get(c.scenario_id, (None, None))[1],
+                    reactions=reactions.get(c.id, {}),
                 )
                 for c in cards
             ],
         )
+
+    async def teacher_sessions(self, teacher_id: UUID, since: datetime | None = None) -> list[UUID]:
+        stmt = select(TrainingSessionModel.id).where(
+            TrainingSessionModel.teacher_id == teacher_id, TrainingSessionModel.started_at.is_not(None)
+        )
+        if since is not None:
+            stmt = stmt.where(TrainingSessionModel.started_at >= since)
+        return list((await self._s.execute(stmt.order_by(TrainingSessionModel.started_at.desc()))).scalars())
+
+    async def _scenarios(self, ids: set[UUID]) -> dict[UUID | None, tuple[str | None, int | None]]:
+        if not ids:
+            return {}
+        rows = await self._s.execute(
+            select(ScenarioModel.id, ScenarioModel.incident_type_code, ScenarioModel.difficulty).where(
+                ScenarioModel.id.in_(ids)
+            )
+        )
+        return {sid: (code, diff) for sid, code, diff in rows.all()}
+
+    async def _groups(self, codes: set[str]) -> dict[str, int]:
+        if not codes:
+            return {}
+        rows = await self._s.execute(
+            select(IncidentTypeModel.code, IncidentTypeModel.group_id).where(IncidentTypeModel.code.in_(codes))
+        )
+        return {code: gid for code, gid in rows.all()}
+
+    async def _reactions(self, card_ids: list[UUID]) -> dict[UUID, dict[str, float]]:
+        """Время решения ДДС: от поступления карточки в службу до первого статуса после «Поступила» (как в оценке)."""
+        if not card_ids:
+            return {}
+        rows = await self._s.execute(
+            select(
+                CardServiceStatusModel.card_id,
+                CardServiceStatusModel.service_code,
+                CardServiceStatusModel.status,
+                CardServiceStatusModel.at,
+            )
+            .where(CardServiceStatusModel.card_id.in_(card_ids))
+            .order_by(CardServiceStatusModel.id)
+        )
+        added: dict[tuple[UUID, str], datetime] = {}
+        out: dict[UUID, dict[str, float]] = {}
+        for cid, code, status, raw_at in rows.all():
+            key, at = (cid, code), as_utc(raw_at)
+            if at is None:
+                continue
+            if status in WAITING:
+                added.setdefault(key, at)
+            elif key in added and code not in out.get(cid, {}):
+                out.setdefault(cid, {})[code] = max(0.0, (at - added[key]).total_seconds())
+        return out
+
+
+class SqlScenarioBank:
+    """`ScenarioBank` аналитики поверх справочника классификатора и банка сценариев."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._s = session
+
+    async def group_titles(self) -> dict[int, str]:
+        rows = await self._s.execute(select(IncidentGroupModel.id, IncidentGroupModel.title))
+        return {gid: title for gid, title in rows.all()}
+
+    async def approved_count(self, groups: list[int], difficulty: int | None) -> dict[int, int]:
+        stmt = (
+            select(IncidentTypeModel.group_id, func.count())
+            .select_from(ScenarioModel)
+            .join(IncidentTypeModel, IncidentTypeModel.code == ScenarioModel.incident_type_code)
+            .where(ScenarioModel.status == "approved")
+            .group_by(IncidentTypeModel.group_id)
+        )
+        if groups:
+            stmt = stmt.where(IncidentTypeModel.group_id.in_(groups))
+        if difficulty is not None:
+            stmt = stmt.where(ScenarioModel.difficulty == difficulty)
+        return {gid: int(n) for gid, n in (await self._s.execute(stmt)).all()}

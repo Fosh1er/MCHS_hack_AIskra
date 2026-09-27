@@ -173,7 +173,11 @@ class FeedDdsCardHandler:
             return FeedResult(card_id=None, waiting=waiting, reason="очередь заполнена")
         if last and (now - last).total_seconds() < float(s.settings["feed_interval_s"]):
             return FeedResult(card_id=None, waiting=waiting, reason="рано")
-        scenario = await self._scenarios.random_approved(random.Random(cmd.seed), s.groups or None)
+        scenario = await self._scenarios.random_approved(
+            random.Random(cmd.seed),
+            s.groups or None,
+            int(s.settings["difficulty"]) if "difficulty" in s.settings else None,
+        )
         if scenario is None:
             return FeedResult(
                 card_id=None, waiting=waiting, reason="в банке нет утверждённых сценариев выбранных категорий"

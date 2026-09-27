@@ -20,7 +20,7 @@ from aiskra.ai.adapters.factory import build_router, build_stt, build_tts
 from aiskra.ai.config import load_ai_config
 from aiskra.ai.router import ModelRouter
 from aiskra.integration.assessment_sources import IncidentAttempts
-from aiskra.integration.session_sources import IncidentSystemCards, SessionFactsReader, SessionProgress
+from aiskra.integration.session_sources import IncidentSystemCards, SessionFactsReader, SessionProgress, SqlScenarioBank
 from aiskra.integration.system_sources import SystemRetentionPolicy, SystemSessionDefaults
 from aiskra.integration.training_sources import DictionaryScenarioFacts, IncidentCardContext
 from aiskra.modules.assessment.api import deps as assessment_deps
@@ -28,6 +28,12 @@ from aiskra.modules.assessment.application.commands.assess import AssessCardHand
 from aiskra.modules.assessment.application.commands.evaluate_session import EvaluateSessionHandler
 from aiskra.modules.assessment.application.commands.override import OverrideAssessmentHandler
 from aiskra.modules.assessment.application.judge import Judge
+from aiskra.modules.assessment.application.queries.analytics import (
+    NormReportHandler,
+    SessionDebriefHandler,
+    StudentProfileHandler,
+    SuggestAssignmentHandler,
+)
 from aiskra.modules.assessment.application.queries.assessments import GetAssessmentHandler, GroupInsightsHandler
 from aiskra.modules.assessment.application.queries.reports import (
     GetMySessionReportHandler,
@@ -667,6 +673,30 @@ def _wire_assessment(app: FastAPI, services: Services) -> None:
     ov[assessment_deps.provide_my_report] = my_report
     ov[assessment_deps.provide_evaluate_session] = evaluate_session
     ov[assessment_deps.provide_progress] = progress
+
+    # аналитика преподавателя (specs/4.5)
+    def norm_report(session: Session) -> NormReportHandler:
+        return NormReportHandler(SessionFactsReader(session), SqlAssessmentRepository(session))
+
+    def student_profile(session: Session) -> StudentProfileHandler:
+        return StudentProfileHandler(
+            SessionFactsReader(session), SqlAssessmentRepository(session), SqlScenarioBank(session)
+        )
+
+    def debrief(session: Session) -> SessionDebriefHandler:
+        return SessionDebriefHandler(
+            SessionFactsReader(session), SqlAssessmentRepository(session), SqlScenarioBank(session)
+        )
+
+    def suggest(session: Session) -> SuggestAssignmentHandler:
+        return SuggestAssignmentHandler(
+            SessionFactsReader(session), SqlAssessmentRepository(session), SqlScenarioBank(session)
+        )
+
+    ov[assessment_deps.provide_norm_report] = norm_report
+    ov[assessment_deps.provide_student_profile] = student_profile
+    ov[assessment_deps.provide_debrief] = debrief
+    ov[assessment_deps.provide_suggest] = suggest
 
 
 def _wire_admin(app: FastAPI, services: Services) -> None:
