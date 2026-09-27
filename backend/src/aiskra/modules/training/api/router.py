@@ -111,7 +111,6 @@ from aiskra.modules.training.application.queries.sessions import (
     SessionPage,
     SessionView,
 )
-from aiskra.modules.training.application.speech import Transcribe, TranscribeHandler
 from aiskra.modules.training.domain.material import MAX_BYTES, MaterialKind
 from aiskra.shared.errors import NotFoundError
 from aiskra.shared.security import Permission, Principal
@@ -231,32 +230,6 @@ async def replica(
 ) -> ReplicaOut:
     r = await handler(SendReplica(actor=actor, call_id=call_id, text=body.text))
     return ReplicaOut(speaker=r.speaker, text=r.text)
-
-
-class SpeechOut(BaseModel):
-    text: str
-
-
-class SpeechStatusOut(BaseModel):
-    enabled: bool
-
-
-@router.get("/speech", response_model=SpeechStatusOut, summary="Доступен ли голосовой ввод (модель речи настроена)")
-async def speech_status(
-    _: Trainee, handler: Annotated[TranscribeHandler, Depends(deps.provide_transcribe)]
-) -> SpeechStatusOut:
-    return SpeechStatusOut(enabled=handler.enabled)
-
-
-@router.post("/speech", response_model=SpeechOut, summary="Распознать реплику в трубку (голосовой ввод, Whisper)")
-async def transcribe(
-    actor: Trainee,
-    handler: Annotated[TranscribeHandler, Depends(deps.provide_transcribe)],
-    audio: Annotated[UploadFile, File(description="Запись из браузера: webm/ogg/wav, до 3 МБ")],
-) -> SpeechOut:
-    data = await audio.read()
-    r = await handler(Transcribe(actor=actor, audio=data, mime=audio.content_type or "audio/webm"))
-    return SpeechOut(text=r.text)
 
 
 @router.post("/calls/{call_id}/end", response_model=StatusOut, summary="Завершить звонок")

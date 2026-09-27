@@ -18,12 +18,4 @@ ai:
     judge:               {provider: fake, temperature: 0,   cache: exact, cache_ttl: 7d}
     insights:            {provider: fake, temperature: 0.3, cache: off}
   tts: {kind: fake, cache_ttl: 30d}
-  # Голосовой ввод оператора (Whisper за OpenAI-совместимым /audio/transcriptions). Выключен, пока STT_KIND не задан.
-  # Локально (GPU/CPU): Speaches — docs/ai/Голосовой_ввод.md; STT_URL=http://<машина с GPU>:8000/v1
-  stt:
-    kind: ${STT_KIND:-fake}          # openai_compatible — включить
-    base_url: ${STT_URL:-http://whisper:8000/v1}
-    api_key_env: STT_API_KEY         # для локального сервера не нужен
-    model: ${STT_MODEL:-deepdml/faster-whisper-large-v3-turbo-ct2}
-    language: ru
-    timeout_s: 30
+  stt: {kind: fake}

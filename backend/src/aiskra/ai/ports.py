@@ -105,9 +105,4 @@ class TTSPort(Protocol):
 
 
 class STTPort(Protocol):
-    @property
-    def enabled(self) -> bool:
-        """False — распознавание не настроено (офлайн-заглушка): интерфейс не показывает микрофон."""
-        ...
-
-    async def transcribe(self, audio: bytes, *, lang: str = "ru", mime: str = "audio/webm") -> Transcript: ...
+    async def transcribe(self, audio: bytes, *, lang: str = "ru") -> Transcript: ...

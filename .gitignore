@@ -25,6 +25,3 @@ var/
 *.db-journal
 *.db-wal
 *.db-shm
-
-# самоподписанный сертификат dev-сервера (make dev-cert)
-.cert/
