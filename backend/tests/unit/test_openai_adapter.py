@@ -58,3 +58,23 @@ async def test_unavailable_model_raises_service_error() -> None:
 
     with pytest.raises(ExternalServiceError, match="недоступна"):
         await make(handler).complete([ChatMessage("user", "x")], params=LLMParams(task="probe"))
+
+
+async def test_extra_body_is_sent_but_cannot_override_model() -> None:
+    seen: dict[str, object] = {}
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        seen.update(json.loads(req.content))
+        return reply("Пожар в квартире")
+
+    llm = OpenAICompatibleLLM(
+        name="demo",
+        base_url="https://openrouter.ai/api/v1",
+        model="m",
+        extra_body={"reasoning": {"exclude": True}, "model": "другая"},
+        transport=httpx.MockTransport(handler),
+    )
+    await llm.complete(
+        [ChatMessage("user", "Что случилось?")], params=LLMParams(task="applicant_actor", temperature=0.6)
+    )
+    assert seen["reasoning"] == {"exclude": True} and seen["model"] == "m"

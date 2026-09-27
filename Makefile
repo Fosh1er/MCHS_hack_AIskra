@@ -11,6 +11,8 @@ be-check: be-lint be-test
 # M6: стенд одной командой (справочники, адреса, сценарии, учётки ролей, группа). Пароль — AISKRA_DEMO_PASSWORD.
 demo-seed:     ; cd backend && uv run python -m aiskra.cli demo-seed $(if $(MATERIALS),--materials $(MATERIALS),)
 demo-seed-docker: ; docker compose exec -e AISKRA_DEMO_PASSWORD backend python -m aiskra.cli demo-seed
+demo-history:  ; cd backend && uv run python tools/demo_history.py
+demo-history-docker: ; docker compose exec -e AISKRA_DEMO_PASSWORD backend python tools/demo_history.py
 fe-install:    ; npm install
 fe-dev:        ; npm run dev
 fe-build:      ; npm run typecheck && npm run build

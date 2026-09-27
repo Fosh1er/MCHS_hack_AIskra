@@ -22,7 +22,7 @@ services:
     env_file: [{path: .env, required: false}]
     environment:
       AISKRA_DATABASE_URL: postgresql+asyncpg://aiskra:${POSTGRES_PASSWORD:-aiskra}@db:5432/aiskra
-      AISKRA_AI_CONFIG_PATH: /app/config/ai.yaml
+      AISKRA_AI_CONFIG_PATH: /app/config/${AISKRA_AI_CONFIG:-ai.yaml}   # демо на OpenRouter: AISKRA_AI_CONFIG=ai.openrouter.yaml
       AISKRA_BACKUP_DIR: /app/backups
       AISKRA_SESSION_COOKIE_SECURE: "true"   # вход — через nginx по HTTPS (п. 6.2)
       AISKRA_MATERIALS_DIR: /app/materials

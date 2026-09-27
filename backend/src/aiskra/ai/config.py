@@ -53,6 +53,9 @@ class ProviderConfig(BaseModel):
     timeout_s: float = 60.0
     max_concurrency: int = Field(default=4, ge=1)
     structured_output: Literal["json_schema", "json_object", "prompt"] = "json_schema"
+    # дополнительные поля запроса провайдера, например OpenRouter: {reasoning: {enabled: false}} —
+    # «рассуждающая» модель отвечает сразу, без хода рассуждений
+    extra_body: dict[str, Any] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def _check(self) -> ProviderConfig:

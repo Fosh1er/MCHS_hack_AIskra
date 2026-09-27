@@ -24,6 +24,7 @@ def build_llm(name: str, cfg: ProviderConfig) -> LLMPort:
         timeout_s=cfg.timeout_s,
         max_concurrency=cfg.max_concurrency,
         structured_output=cfg.structured_output,
+        extra_body=cfg.extra_body,
     )
 
 
