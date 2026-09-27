@@ -127,11 +127,33 @@ def test_suggest_assignment_by_weak_spots(app_client: Callable[[], TestClient], 
     assert teacher.get("/api/v1/assessment/analytics/suggest").status_code == 422
 
 
+def test_readiness_scale_and_protocol_data(app_client: Callable[[], TestClient], lesson: dict[str, Any]) -> None:
+    teacher = as_user(app_client, "teacher")
+    r = teacher.get("/api/v1/assessment/analytics/readiness")
+    assert r.status_code == 200, r.text
+    v = r.json()
+    assert v["teacher"] and len(v["scale"]) == 4 and "31.10.2023" in v["source"]
+    rows = {(row["full_name"], row["role"]): row for row in v["rows"]}
+    op = rows[("Обучающийся Тестовый", "112")]["readiness"]
+    assert op["grade"] is None and op["grade_label"] == "недостаточно данных"  # одна карточка из пяти нужных
+    one = teacher.get(
+        "/api/v1/assessment/analytics/readiness",
+        params={"student_id": [lesson["people"]["student"]], "min_cards": 1, "last": 5},
+    ).json()
+    assert [row["role"] for row in one["rows"]] == ["112"]
+    graded = one["rows"][0]["readiness"]
+    assert graded["grade"] in (3, 4, 5) and graded["ready"] and graded["status"] == "готов к зачёту"
+    assert graded["timing"] == "в срок" and one["rows"][0]["groups"] == 1
+    profile = teacher.get(f"/api/v1/assessment/analytics/students/{lesson['people']['student']}").json()
+    assert profile["readiness"][0]["readiness"]["grade_label"] == "недостаточно данных"
+
+
 def test_analytics_is_teacher_only(app_client: Callable[[], TestClient], lesson: dict[str, Any]) -> None:
     student = as_user(app_client, "student")
     for url in (
         "/api/v1/assessment/analytics/norms",
         f"/api/v1/assessment/analytics/students/{lesson['people']['student']}",
         f"/api/v1/assessment/sessions/{lesson['session_id']}/debrief",
+        "/api/v1/assessment/analytics/readiness",
     ):
         assert student.get(url).status_code == 403

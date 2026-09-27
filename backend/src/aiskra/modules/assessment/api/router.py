@@ -24,6 +24,9 @@ from aiskra.modules.assessment.application.queries.analytics import (
     NormReport,
     NormReportHandler,
     NormReportView,
+    ReadinessHandler,
+    ReadinessQuery,
+    ReadinessView,
     SessionDebrief,
     SessionDebriefHandler,
     StudentProfile,
@@ -230,3 +233,18 @@ async def suggest_assignment(
     student_id: Annotated[list[UUID], Query(min_length=1, max_length=100)],
 ) -> AssignmentSuggestion:
     return await handler(SuggestAssignment(actor=actor, student_ids=student_id))
+
+
+@router.get(
+    "/analytics/readiness",
+    response_model=ReadinessView,
+    summary="Готовность к допуску: оценка по шкале Программы подготовки ЕДДС и нормативам ПП № 1931",
+)
+async def readiness(
+    actor: Teacher,
+    handler: Annotated[ReadinessHandler, Depends(deps.provide_readiness)],
+    student_id: Annotated[list[UUID] | None, Query(max_length=200, description="Нет — все обучающиеся")] = None,
+    last: Annotated[int, Query(ge=3, le=100, description="Сколько последних оценённых карточек учитывать")] = 10,
+    min_cards: Annotated[int, Query(ge=1, le=50, description="Меньше карточек — «недостаточно данных»")] = 5,
+) -> ReadinessView:
+    return await handler(ReadinessQuery(actor=actor, student_ids=student_id or [], last=last, min_cards=min_cards))
