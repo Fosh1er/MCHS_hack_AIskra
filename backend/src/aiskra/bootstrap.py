@@ -161,6 +161,7 @@ from aiskra.modules.training.application.queries.sessions import (
     MySessionsHandler,
     SessionMonitorHandler,
 )
+from aiskra.modules.training.application.speech import TranscribeHandler
 from aiskra.modules.training.infrastructure.materials import (
     DocumentTextExtractor,
     LocalFileStorage,
@@ -506,6 +507,7 @@ def _wire_training(app: FastAPI, services: Services) -> None:
     ov[training_deps.provide_answer] = answer
     ov[training_deps.provide_dds_call] = dds_call
     ov[training_deps.provide_replica] = replica
+    ov[training_deps.provide_transcribe] = lambda: TranscribeHandler(services.stt)  # голосовой ввод (п. 1.4)
     ov[training_deps.provide_end_call] = end_call
     ov[training_deps.provide_get_call] = get_call
     ov[training_deps.provide_card_calls] = card_calls
