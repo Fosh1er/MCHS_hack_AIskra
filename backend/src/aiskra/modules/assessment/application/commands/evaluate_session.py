@@ -10,6 +10,7 @@ from uuid import UUID
 from aiskra.modules.assessment.application.commands.assess import AssessCard, AssessCardHandler, Settings
 from aiskra.modules.assessment.application.ports.reports import SessionFactsSource
 from aiskra.modules.assessment.application.queries.reports import cards_of
+from aiskra.modules.assessment.domain.scoring import CARD_NORM_SECONDS, DDS_NORM_SECONDS
 from aiskra.shared.application import Command
 from aiskra.shared.audit import RequestMeta
 from aiskra.shared.errors import DomainError, NotFoundError
@@ -43,7 +44,10 @@ class EvaluateSessionHandler:
         for p in facts.participants:
             settings = Settings(
                 norm_seconds=float(
-                    st.get("norm_112" if p.role == "112" else "norm_dds", 80 if p.role == "112" else 30)
+                    st.get(
+                        "norm_112" if p.role == "112" else "norm_dds",
+                        CARD_NORM_SECONDS if p.role == "112" else DDS_NORM_SECONDS,
+                    )
                 ),
                 threshold=float(st.get("threshold", 70)),
             )

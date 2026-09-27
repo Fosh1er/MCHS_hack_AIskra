@@ -55,7 +55,7 @@ def test_settings_apply_to_sessions(app_client: Callable[[], TestClient], admin:
     assert teacher.put("/api/v1/system/settings/backup", json={"values": {"keep": 3}}).status_code == 403
 
     defaults = teacher.get("/api/v1/training/session-defaults").json()
-    assert defaults["norm_dds"] == 45 and defaults["threshold"] == 60 and defaults["norm_112"] == 80
+    assert defaults["norm_dds"] == 45 and defaults["threshold"] == 60 and defaults["norm_112"] == 75
     student_id = next(u["id"] for u in admin.get("/api/v1/users").json()["items"] if u["login"] == "student")
     body = {
         "title": "По умолчанию",

@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
-CARD_NORM_SECONDS = 80  # норматив заполнения карточки 112 (specs/1.1, таймер краснеет после него)
+CARD_NORM_SECONDS = 75  # опрос до карточки, доступной ДДС, в среднем 75 с — ПП РФ № 1931, п. 9 «р» (docs/research)
 DDS_NORM_SECONDS = 30  # норматив решения ДДС «Принята / Не принята» (#709, ТЗ)
 PASS_THRESHOLD = 70  # порог «зачтено», баллы
 
