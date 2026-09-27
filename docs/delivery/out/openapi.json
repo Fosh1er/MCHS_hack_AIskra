@@ -4614,6 +4614,204 @@
      }
     }
    }
+  },
+  "/api/v1/assessment/analytics/norms": {
+   "get": {
+    "tags": [
+     "assessment"
+    ],
+    "summary": "Норматив / факт по времени (ПП РФ № 1931, форма 1/112)",
+    "operationId": "norm_report_api_v1_assessment_analytics_norms_get",
+    "parameters": [
+     {
+      "name": "days",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 3650,
+       "minimum": 0,
+       "description": "Период, дней; 0 — все занятия",
+       "default": 30,
+       "title": "Days"
+      },
+      "description": "Период, дней; 0 — все занятия"
+     },
+     {
+      "name": "session_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "format": "uuid"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Session Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/NormReportView"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/assessment/analytics/students/{student_id}": {
+   "get": {
+    "tags": [
+     "assessment"
+    ],
+    "summary": "Профиль обучающегося по всем занятиям преподавателя",
+    "operationId": "student_profile_api_v1_assessment_analytics_students__student_id__get",
+    "parameters": [
+     {
+      "name": "student_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Student Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/StudentProfileView"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/assessment/sessions/{session_id}/debrief": {
+   "get": {
+    "tags": [
+     "assessment"
+    ],
+    "summary": "Разбор занятия: характерные недостатки",
+    "operationId": "session_debrief_api_v1_assessment_sessions__session_id__debrief_get",
+    "parameters": [
+     {
+      "name": "session_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Session Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/DebriefView"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/assessment/analytics/suggest": {
+   "get": {
+    "tags": [
+     "assessment"
+    ],
+    "summary": "Подбор задания по слабым местам: группы классификатора, сложность, фокус инструктажа",
+    "operationId": "suggest_assignment_api_v1_assessment_analytics_suggest_get",
+    "parameters": [
+     {
+      "name": "student_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "array",
+       "items": {
+        "type": "string",
+        "format": "uuid"
+       },
+       "minItems": 1,
+       "maxItems": 100,
+       "title": "Student Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/AssignmentSuggestion"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
   }
  },
  "components": {
@@ -5081,6 +5279,74 @@
      "details"
     ],
     "title": "AssessmentRecord"
+   },
+   "AssignmentSuggestion": {
+    "properties": {
+     "title": {
+      "type": "string",
+      "title": "Title"
+     },
+     "mode": {
+      "type": "string",
+      "title": "Mode"
+     },
+     "groups": {
+      "items": {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      "type": "array",
+      "title": "Groups"
+     },
+     "difficulty": {
+      "type": "integer",
+      "title": "Difficulty"
+     },
+     "difficulty_reason": {
+      "type": "string",
+      "title": "Difficulty Reason"
+     },
+     "focus": {
+      "items": {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      "type": "array",
+      "title": "Focus"
+     },
+     "participants": {
+      "items": {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      "type": "array",
+      "title": "Participants"
+     },
+     "approved_total": {
+      "type": "integer",
+      "title": "Approved Total"
+     },
+     "warnings": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Warnings"
+     }
+    },
+    "type": "object",
+    "required": [
+     "title",
+     "mode",
+     "groups",
+     "difficulty",
+     "difficulty_reason",
+     "focus",
+     "participants",
+     "approved_total",
+     "warnings"
+    ],
+    "title": "AssignmentSuggestion"
    },
    "AuditItem": {
     "properties": {
@@ -6616,6 +6882,125 @@
     "title": "DdsJournalRow",
     "description": "Строка реестра ДДС «Список происшествий» (dds/image3–5)."
    },
+   "DebriefView": {
+    "properties": {
+     "session_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Session Id"
+     },
+     "title": {
+      "type": "string",
+      "title": "Title"
+     },
+     "started_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Started At"
+     },
+     "cards": {
+      "type": "integer",
+      "title": "Cards"
+     },
+     "assessed": {
+      "type": "integer",
+      "title": "Assessed"
+     },
+     "avg_score": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Avg Score"
+     },
+     "passed_share": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Passed Share"
+     },
+     "top_errors": {
+      "items": {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      "type": "array",
+      "title": "Top Errors"
+     },
+     "weak_criteria": {
+      "items": {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      "type": "array",
+      "title": "Weak Criteria"
+     },
+     "weak_groups": {
+      "items": {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      "type": "array",
+      "title": "Weak Groups"
+     },
+     "overdue": {
+      "items": {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      "type": "array",
+      "title": "Overdue"
+     },
+     "best": {
+      "items": {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      "type": "array",
+      "title": "Best"
+     },
+     "card_112": {
+      "$ref": "#/components/schemas/NormStat"
+     },
+     "dds": {
+      "$ref": "#/components/schemas/NormStat"
+     }
+    },
+    "type": "object",
+    "required": [
+     "session_id",
+     "title",
+     "started_at",
+     "cards",
+     "assessed",
+     "avg_score",
+     "passed_share",
+     "top_errors",
+     "weak_criteria",
+     "weak_groups",
+     "overdue",
+     "best",
+     "card_112",
+     "dds"
+    ],
+    "title": "DebriefView"
+   },
    "DistrictRow": {
     "properties": {
      "code": {
@@ -7573,11 +7958,18 @@
       "title": "Groups"
      },
      "difficulty": {
-      "type": "integer",
-      "maximum": 5.0,
-      "minimum": 1.0,
+      "anyOf": [
+       {
+        "type": "integer",
+        "maximum": 5.0,
+        "minimum": 1.0
+       },
+       {
+        "type": "null"
+       }
+      ],
       "title": "Difficulty",
-      "default": 2
+      "description": "Сложность занятия; нет — любая"
      }
     },
     "additionalProperties": false,
@@ -8443,6 +8835,155 @@
      "started_at"
     ],
     "title": "MySessionView"
+   },
+   "NormReportView": {
+    "properties": {
+     "period": {
+      "type": "string",
+      "title": "Period"
+     },
+     "card_112": {
+      "$ref": "#/components/schemas/NormStat"
+     },
+     "dds": {
+      "$ref": "#/components/schemas/NormStat"
+     },
+     "by_student": {
+      "items": {
+       "$ref": "#/components/schemas/NormRow"
+      },
+      "type": "array",
+      "title": "By Student"
+     },
+     "by_session": {
+      "items": {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      "type": "array",
+      "title": "By Session"
+     },
+     "source": {
+      "type": "string",
+      "title": "Source",
+      "default": "ПП РФ № 1931, п. 9 «р»; форма 1/112 (приказ МЧС России № 192)"
+     }
+    },
+    "type": "object",
+    "required": [
+     "period",
+     "card_112",
+     "dds",
+     "by_student",
+     "by_session"
+    ],
+    "title": "NormReportView"
+   },
+   "NormRow": {
+    "properties": {
+     "key": {
+      "type": "string",
+      "title": "Key"
+     },
+     "title": {
+      "type": "string",
+      "title": "Title"
+     },
+     "role": {
+      "type": "string",
+      "title": "Role"
+     },
+     "stat": {
+      "$ref": "#/components/schemas/NormStat"
+     }
+    },
+    "type": "object",
+    "required": [
+     "key",
+     "title",
+     "role",
+     "stat"
+    ],
+    "title": "NormRow"
+   },
+   "NormStat": {
+    "properties": {
+     "count": {
+      "type": "integer",
+      "title": "Count"
+     },
+     "within": {
+      "type": "integer",
+      "title": "Within"
+     },
+     "within_share": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Within Share"
+     },
+     "median_s": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Median S"
+     },
+     "p90_s": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "P90 S"
+     },
+     "avg_s": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Avg S"
+     },
+     "norm_s": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Norm S"
+     }
+    },
+    "type": "object",
+    "required": [
+     "count",
+     "within",
+     "within_share",
+     "median_s",
+     "p90_s",
+     "avg_s",
+     "norm_s"
+    ],
+    "title": "NormStat",
+    "description": "«Норматив / факт» по одному показателю (по образцу Формы 1/112, приказ МЧС № 192)."
    },
    "OkrugRow": {
     "properties": {
@@ -10000,6 +10541,138 @@
      "status"
     ],
     "title": "StatusOut"
+   },
+   "StudentProfileView": {
+    "properties": {
+     "student_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Student Id"
+     },
+     "full_name": {
+      "type": "string",
+      "title": "Full Name"
+     },
+     "roles": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Roles"
+     },
+     "sessions": {
+      "type": "integer",
+      "title": "Sessions"
+     },
+     "cards": {
+      "type": "integer",
+      "title": "Cards"
+     },
+     "avg_score": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Avg Score"
+     },
+     "passed_share": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Passed Share"
+     },
+     "points": {
+      "items": {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      "type": "array",
+      "title": "Points"
+     },
+     "criteria": {
+      "items": {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      "type": "array",
+      "title": "Criteria"
+     },
+     "frequent_errors": {
+      "items": {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      "type": "array",
+      "title": "Frequent Errors"
+     },
+     "coverage": {
+      "items": {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      "type": "array",
+      "title": "Coverage"
+     },
+     "not_practiced": {
+      "items": {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      "type": "array",
+      "title": "Not Practiced"
+     },
+     "by_difficulty": {
+      "items": {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      "type": "array",
+      "title": "By Difficulty"
+     },
+     "card_112": {
+      "$ref": "#/components/schemas/NormStat"
+     },
+     "dds": {
+      "$ref": "#/components/schemas/NormStat"
+     },
+     "recommendations": {
+      "items": {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      "type": "array",
+      "title": "Recommendations"
+     }
+    },
+    "type": "object",
+    "required": [
+     "student_id",
+     "full_name",
+     "roles",
+     "sessions",
+     "cards",
+     "avg_score",
+     "passed_share",
+     "points",
+     "criteria",
+     "frequent_errors",
+     "coverage",
+     "not_practiced",
+     "by_difficulty",
+     "card_112",
+     "dds",
+     "recommendations"
+    ],
+    "title": "StudentProfileView"
    },
    "StudentReport": {
     "properties": {

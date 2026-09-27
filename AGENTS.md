@@ -123,6 +123,7 @@ cd backend && uv run python -m aiskra.cli create-user --login admin --full-name 
 - **Поток карточек ДДС** решает сервер: `POST /training/sessions/feed` (темп `feed_interval_s`, предел `max_waiting`); системная карточка — `integration/session_sources.py::IncidentSystemCards` (`origin = system`, автор — преподаватель).
 - **Мониторинг** — `GET /training/sessions/{id}/monitor` (`SessionProgress`), **отчёт** — `GET /assessment/sessions/{id}/report` и `report.csv` (факты — `SessionFactsReader`), **правка** — `POST /assessment/{id}/override`, **прогресс** — `GET /assessment/my/progress`.
 - **Обучающийся** — `GET /training/sessions/my` (для всех ролей, `null` вне занятия); баннер — `shared/ui/SessionBanner.tsx`.
+- **Аналитика (п. 4.5)** — `assessment/application/queries/analytics.py` (`TeacherAttempts` собирает попытки по занятиям преподавателя из `SessionFactsReader` и оценок), чистые функции — `assessment/domain/analytics.py`. Эндпоинты `/assessment/analytics/{norms,students/{id},suggest}` и `/assessment/sessions/{id}/debrief`, экраны — `pages/teacher/analytics/`. Нормативы — ПП РФ № 1931 (карточка 75 с, ДДС 30 с), основания — `docs/research/`.
 
 ## Кабинеты обучающегося и администратора (п. 5.1, 5.2) — что уже есть
 - **Каркас** всех кабинетов — `shared/ui/CabinetShell.tsx` (разделы ролей в `NAV`); `TeacherShell` — обёртка над ним.
