@@ -1,5 +1,5 @@
 # Частые команды. Бэкенд: uv (Python 3.12), фронтенд: npm workspaces (Node 22).
-.PHONY: up down logs be-install be-test be-lint be-check fe-install fe-dev fe-build check import-classifier demo-seed demo-seed-docker
+.PHONY: up down logs be-install be-test be-lint be-check fe-install fe-dev fe-dev-lan dev-cert fe-build check import-classifier demo-seed demo-seed-docker
 
 up:            ; docker compose up --build -d
 down:          ; docker compose down
@@ -15,5 +15,12 @@ demo-history:  ; cd backend && uv run python tools/demo_history.py
 demo-history-docker: ; docker compose exec -e AISKRA_DEMO_PASSWORD backend python tools/demo_history.py
 fe-install:    ; npm install
 fe-dev:        ; npm run dev
+# HTTPS для коллег в локальной сети: сертификат на IP этой машины (голосовой ввод требует https)
+dev-cert:
+	@mkdir -p .cert && IP=$$(ipconfig getifaddr en0 2>/dev/null || hostname -I 2>/dev/null | cut -d' ' -f1) && \
+	openssl req -x509 -newkey rsa:2048 -nodes -days 30 -keyout .cert/dev.key -out .cert/dev.crt -subj "/CN=АИскра dev" \
+	  -addext "subjectAltName=DNS:localhost,IP:127.0.0.1$${IP:+,IP:$$IP}" 2>/dev/null && \
+	echo "Сертификат для localhost и $$IP — .cert/dev.crt (30 дней). Клиент: make fe-dev-lan → https://$$IP:5173"
+fe-dev-lan:    ; npm run dev -w frontend -- --host
 fe-build:      ; npm run typecheck && npm run build
 check: be-check fe-build

@@ -5,7 +5,7 @@ from __future__ import annotations
 from aiskra.ai.adapters.caching import CachingLLM, CachingTTS
 from aiskra.ai.adapters.fake import FakeLLM
 from aiskra.ai.adapters.openai_compatible import OpenAICompatibleLLM
-from aiskra.ai.adapters.speech import FakeSTT, FakeTTS
+from aiskra.ai.adapters.speech import FakeSTT, FakeTTS, OpenAICompatibleSTT
 from aiskra.ai.config import AIConfig, ProviderConfig
 from aiskra.ai.ports import LLMPort, STTPort, TTSPort
 from aiskra.ai.router import ModelRouter, TaskProfile
@@ -51,4 +51,9 @@ def build_tts(cfg: AIConfig, cache: CachePort) -> TTSPort:
 
 
 def build_stt(cfg: AIConfig) -> STTPort:
+    s = cfg.stt
+    if s.kind == "openai_compatible" and s.base_url:
+        return OpenAICompatibleSTT(
+            base_url=s.base_url, model=s.model, api_key_env=s.api_key_env, language=s.language, timeout_s=s.timeout_s
+        )
     return FakeSTT()

@@ -104,6 +104,8 @@ make demo-seed-docker
 | **Локальная модель** | контур заказчика | `docker compose --profile local-llm up -d`, затем `docker compose exec ollama ollama pull qwen2.5:7b-instruct` и `qwen2.5:3b-instruct`; скопируйте `config/ai.example.yaml` в `config/ai.yaml` |
 | **Внешний API** | только демо-стенд (ответ заказчика #710) | в `.env`: `AISKRA_AI_ALLOW_EXTERNAL=true`, `DEMO_LLM_URL`, `DEMO_LLM_MODEL`, `DEMO_LLM_API_KEY`; в `config/ai.yaml` — провайдер `demo` для нужных задач. Готовый вариант на бесплатных моделях OpenRouter — [config/ai.openrouter.yaml](config/ai.openrouter.yaml) (`AISKRA_AI_CONFIG_PATH`) |
 
+Голосовой ввод оператора (Whisper локально на GPU или через API) — [docs/ai/Голосовой_ввод.md](docs/ai/Голосовой_ввод.md), включается `STT_KIND` / `STT_URL`.
+
 Ключи и адреса — только в переменных окружения, в БД и репозиторий не попадают. Проверка подключения — страница администратора «ИИ-модели». Подробности — [config/ai.example.yaml](config/ai.example.yaml) и [ADR-0003](docs/adr/0003-ports-adapters-ai.md).
 
 ## Разработка без Docker
@@ -115,6 +117,7 @@ AISKRA_DATABASE_URL=sqlite+aiosqlite:///./aiskra.db AISKRA_DEMO_PASSWORD='…' A
   sh -c 'uv run python -m aiskra.cli ensure-admin && uv run python -m aiskra.cli demo-seed'
 AISKRA_DATABASE_URL=sqlite+aiosqlite:///./aiskra.db uv run uvicorn aiskra.main:app --port 8000
 make fe-dev                        # во втором терминале: http://localhost:5173 (прокси на :8000)
+# коллегам в локальной сети по https (нужно для голосового ввода): make dev-cert && make fe-dev-lan → https://<IP>:5173
 ```
 
 Нужны Python 3.12+ с [uv](https://docs.astral.sh/uv/) и Node 22.

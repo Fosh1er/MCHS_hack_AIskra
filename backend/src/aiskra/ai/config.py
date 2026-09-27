@@ -95,8 +95,22 @@ class CacheConfig(BaseModel):
 
 
 class SpeechConfig(BaseModel):
-    kind: Literal["fake"] = "fake"
+    """Речь: `fake` — выключено; `openai_compatible` — сервер с OpenAI-совместимым `/audio/transcriptions`
+    (локальный Whisper: Speaches, faster-whisper; внешний: OpenRouter, OpenAI)."""
+
+    kind: Literal["fake", "openai_compatible"] = "fake"
+    base_url: str | None = None
+    api_key_env: str | None = None
+    model: str = "whisper-1"
+    language: str = "ru"
+    timeout_s: float = 30.0
     cache_ttl: int = 30 * 86_400
+
+    @model_validator(mode="after")
+    def _check_url(self) -> SpeechConfig:
+        if self.kind == "openai_compatible" and not self.base_url:
+            raise ValueError("для openai_compatible обязателен base_url")
+        return self
 
     @field_validator("cache_ttl", mode="before")
     @classmethod
@@ -130,6 +144,9 @@ class AIConfig(BaseModel):
                         f"провайдер «{name}»: внешний адрес {p.base_url} запрещён (allow_external: false). "
                         "Для демо на внешнем API явно включите allow_external."
                     )
+            for name, sp in (("stt", self.stt), ("tts", self.tts)):
+                if sp.kind != "fake" and sp.base_url and not is_internal_url(sp.base_url):
+                    raise ValueError(f"{name}: внешний адрес {sp.base_url} запрещён (allow_external: false)")
         return self
 
 

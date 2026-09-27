@@ -3386,6 +3386,66 @@
     }
    }
   },
+  "/api/v1/training/speech": {
+   "get": {
+    "tags": [
+     "training"
+    ],
+    "summary": "Доступен ли голосовой ввод (модель речи настроена)",
+    "operationId": "speech_status_api_v1_training_speech_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/SpeechStatusOut"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "training"
+    ],
+    "summary": "Распознать реплику в трубку (голосовой ввод, Whisper)",
+    "operationId": "transcribe_api_v1_training_speech_post",
+    "requestBody": {
+     "content": {
+      "multipart/form-data": {
+       "schema": {
+        "$ref": "#/components/schemas/Body_transcribe_api_v1_training_speech_post"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/SpeechOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/training/calls/{call_id}/end": {
    "post": {
     "tags": [
@@ -5791,6 +5851,21 @@
     },
     "type": "object",
     "title": "BlockIn"
+   },
+   "Body_transcribe_api_v1_training_speech_post": {
+    "properties": {
+     "audio": {
+      "type": "string",
+      "contentMediaType": "application/octet-stream",
+      "title": "Audio",
+      "description": "Запись из браузера: webm/ogg/wav, до 3 МБ"
+     }
+    },
+    "type": "object",
+    "required": [
+     "audio"
+    ],
+    "title": "Body_transcribe_api_v1_training_speech_post"
    },
    "Body_upload_material_api_v1_training_materials_post": {
     "properties": {
@@ -10960,6 +11035,32 @@
      "values"
     ],
     "title": "SettingsIn"
+   },
+   "SpeechOut": {
+    "properties": {
+     "text": {
+      "type": "string",
+      "title": "Text"
+     }
+    },
+    "type": "object",
+    "required": [
+     "text"
+    ],
+    "title": "SpeechOut"
+   },
+   "SpeechStatusOut": {
+    "properties": {
+     "enabled": {
+      "type": "boolean",
+      "title": "Enabled"
+     }
+    },
+    "type": "object",
+    "required": [
+     "enabled"
+    ],
+    "title": "SpeechStatusOut"
    },
    "StatusCommentIn": {
     "properties": {

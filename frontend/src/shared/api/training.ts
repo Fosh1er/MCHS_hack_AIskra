@@ -1,6 +1,6 @@
 /** Модуль training: учебные звонки (п. 1.4, 2.3), банк сценариев (п. 3.2, 4.1) и занятия (п. 4.2). */
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { http } from './http';
+import { ApiError, http } from './http';
 
 export interface CallStarted { call_id: string; scenario_id: string | null; aon: string; channel: string }
 export interface Replica { speaker: 'party' | 'operator' | 'system'; text: string }
@@ -21,6 +21,18 @@ export const endCall = (id: string) => post<{ status: string }>(`/calls/${id}/en
 export const startDdsCall = (b: { card_id: string; service_code: string; party: CallView['party']; target_service?: string | null; incoming?: boolean }) =>
   post<CallStarted>('/calls/dds', b);
 export const getCall = (id: string) => http<CallView>(`${T}/calls/${id}`);
+
+// ------------------------------------------------------------------ голосовой ввод (п. 1.4): Whisper на сервере
+export const useSpeechStatus = () =>
+  useQuery({ queryKey: ['speech-status'], queryFn: () => http<{ enabled: boolean }>(`${T}/speech`), staleTime: 60_000 });
+export async function transcribe(audio: Blob): Promise<string> {
+  const body = new FormData();
+  body.append('audio', audio, audio.type.includes('ogg') ? 'speech.ogg' : 'speech.webm');
+  const res = await fetch(`${T}/speech`, { method: 'POST', body, credentials: 'same-origin' });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new ApiError(res.status, data.error ?? 'http_error', data.message ?? res.statusText);
+  return String(data.text ?? '');
+}
 
 export const useCardCalls = (cardId: string | undefined) =>
   useQuery({ queryKey: ['card-calls', cardId], queryFn: () => http<CallView[]>(`${T}/cards/${cardId}/calls`), enabled: !!cardId });
