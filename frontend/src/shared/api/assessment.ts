@@ -122,7 +122,7 @@ export interface StudentProfileView {
   frequent_errors: ErrorRow[]; coverage: GroupRow[];
   not_practiced: { group_id: number; title: string; approved: number }[];
   by_difficulty: { difficulty: number; cards: number; avg_score: number | null }[];
-  card_112: NormStat; dds: NormStat; recommendations: Recommendation[];
+  card_112: NormStat; dds: NormStat; recommendations: Recommendation[]; readiness: ReadinessRow[];
 }
 export interface DebriefView {
   session_id: string; title: string; started_at: string | null; cards: number; assessed: number;
@@ -153,3 +153,22 @@ export const useDebrief = (id: string) =>
   useQuery({ queryKey: ['analytics', 'debrief', id], queryFn: () => http<DebriefView>(`${A}/sessions/${id}/debrief`) });
 export const fetchSuggestion = (studentIds: string[]) =>
   http<AssignmentSuggestion>(`${A}/analytics/suggest?${studentIds.map((id) => `student_id=${encodeURIComponent(id)}`).join('&')}`);
+
+// ------------------------------------------------------------------ готовность к допуску (specs/4.6)
+export interface Readiness {
+  grade: 5 | 4 | 3 | 2 | null; grade_label: string; ready: boolean; status: string; cards: number;
+  avg_score: number | null; timing: string; within_share: number | null; p90_ratio: number | null; reasons: string[];
+}
+export interface ReadinessRow {
+  student_id: string; full_name: string; role: '112' | 'dds'; service_code: string | null;
+  sessions: number; groups: number; last_at: string | null; expert: number; readiness: Readiness;
+}
+export interface ReadinessView {
+  rows: ReadinessRow[]; last: number; min_cards: number; generated_at: string; teacher: string;
+  scale: { grade: string; rule: string }[]; source: string;
+}
+export const useReadiness = (p: { last: number; studentIds?: string[] }) =>
+  useQuery({
+    queryKey: ['analytics', 'readiness', p.last, p.studentIds ?? []],
+    queryFn: () => http<ReadinessView>(`${A}/analytics/readiness?last=${p.last}${(p.studentIds ?? []).map((id) => `&student_id=${encodeURIComponent(id)}`).join('')}`),
+  });
