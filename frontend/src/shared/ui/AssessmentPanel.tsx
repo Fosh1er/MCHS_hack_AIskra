@@ -35,6 +35,9 @@ export function AssessmentPanel({ cardId, role, service, auto }: { cardId: strin
               <b>Оценка преподавателя: {num(data.details.expert.score)}</b> (автооценка {num(data.details.expert.auto_score)}). {data.details.expert.comment}
             </p>
           )}
+          {(data.details.critical?.length ?? 0) > 0 && (
+            <p className="assess__note assess__note--critical">Критическая ошибка — «не зачтено» при любом балле: {data.details.critical!.join(', ')}.</p>
+          )}
           {!data.details.has_reference && <p className="assess__note">Карточка заведена без сценария — сравнить с эталоном нельзя, проверено только время.</p>}
           <ul className="assess__list">
             {data.details.criteria.map((c) => (
