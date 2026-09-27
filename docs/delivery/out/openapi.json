@@ -4812,6 +4812,90 @@
      }
     }
    }
+  },
+  "/api/v1/assessment/analytics/readiness": {
+   "get": {
+    "tags": [
+     "assessment"
+    ],
+    "summary": "Готовность к допуску: оценка по шкале Программы подготовки ЕДДС и нормативам ПП № 1931",
+    "operationId": "readiness_api_v1_assessment_analytics_readiness_get",
+    "parameters": [
+     {
+      "name": "student_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "array",
+         "items": {
+          "type": "string",
+          "format": "uuid"
+         },
+         "maxItems": 200
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Нет — все обучающиеся",
+       "title": "Student Id"
+      },
+      "description": "Нет — все обучающиеся"
+     },
+     {
+      "name": "last",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 100,
+       "minimum": 3,
+       "description": "Сколько последних оценённых карточек учитывать",
+       "default": 10,
+       "title": "Last"
+      },
+      "description": "Сколько последних оценённых карточек учитывать"
+     },
+     {
+      "name": "min_cards",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 50,
+       "minimum": 1,
+       "description": "Меньше карточек — «недостаточно данных»",
+       "default": 5,
+       "title": "Min Cards"
+      },
+      "description": "Меньше карточек — «недостаточно данных»"
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ReadinessView"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
   }
  },
  "components": {
@@ -9502,6 +9586,215 @@
     ],
     "title": "QuestionnaireTree"
    },
+   "Readiness": {
+    "properties": {
+     "grade": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Grade"
+     },
+     "grade_label": {
+      "type": "string",
+      "title": "Grade Label"
+     },
+     "ready": {
+      "type": "boolean",
+      "title": "Ready"
+     },
+     "status": {
+      "type": "string",
+      "title": "Status"
+     },
+     "cards": {
+      "type": "integer",
+      "title": "Cards"
+     },
+     "avg_score": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Avg Score"
+     },
+     "timing": {
+      "type": "string",
+      "title": "Timing"
+     },
+     "within_share": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Within Share"
+     },
+     "p90_ratio": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "P90 Ratio"
+     },
+     "reasons": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Reasons"
+     }
+    },
+    "type": "object",
+    "required": [
+     "grade",
+     "grade_label",
+     "ready",
+     "status",
+     "cards",
+     "avg_score",
+     "timing",
+     "within_share",
+     "p90_ratio"
+    ],
+    "title": "Readiness"
+   },
+   "ReadinessRow": {
+    "properties": {
+     "student_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Student Id"
+     },
+     "full_name": {
+      "type": "string",
+      "title": "Full Name"
+     },
+     "role": {
+      "type": "string",
+      "title": "Role"
+     },
+     "service_code": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Service Code"
+     },
+     "sessions": {
+      "type": "integer",
+      "title": "Sessions"
+     },
+     "groups": {
+      "type": "integer",
+      "title": "Groups"
+     },
+     "last_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last At"
+     },
+     "expert": {
+      "type": "integer",
+      "title": "Expert"
+     },
+     "readiness": {
+      "$ref": "#/components/schemas/Readiness"
+     }
+    },
+    "type": "object",
+    "required": [
+     "student_id",
+     "full_name",
+     "role",
+     "service_code",
+     "sessions",
+     "groups",
+     "last_at",
+     "expert",
+     "readiness"
+    ],
+    "title": "ReadinessRow"
+   },
+   "ReadinessView": {
+    "properties": {
+     "rows": {
+      "items": {
+       "$ref": "#/components/schemas/ReadinessRow"
+      },
+      "type": "array",
+      "title": "Rows"
+     },
+     "last": {
+      "type": "integer",
+      "title": "Last"
+     },
+     "min_cards": {
+      "type": "integer",
+      "title": "Min Cards"
+     },
+     "generated_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Generated At"
+     },
+     "teacher": {
+      "type": "string",
+      "title": "Teacher"
+     },
+     "scale": {
+      "items": {
+       "additionalProperties": {
+        "type": "string"
+       },
+       "type": "object"
+      },
+      "type": "array",
+      "title": "Scale"
+     },
+     "source": {
+      "type": "string",
+      "title": "Source",
+      "default": "Шкала итогового контроля — Программа подготовки дежурно-диспетчерского персонала ЕДДС (МЧС России, протокол Правкомиссии от 31.10.2023 № 9); нормативы времени — ПП РФ № 1931; оценка готовности — профстандарт 12.002, функция C/03"
+     }
+    },
+    "type": "object",
+    "required": [
+     "rows",
+     "last",
+     "min_cards",
+     "generated_at",
+     "teacher",
+     "scale"
+    ],
+    "title": "ReadinessView"
+   },
    "ReplicaIn": {
     "properties": {
      "text": {
@@ -10651,6 +10944,13 @@
       },
       "type": "array",
       "title": "Recommendations"
+     },
+     "readiness": {
+      "items": {
+       "$ref": "#/components/schemas/ReadinessRow"
+      },
+      "type": "array",
+      "title": "Readiness"
      }
     },
     "type": "object",
