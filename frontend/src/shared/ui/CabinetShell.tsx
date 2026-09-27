@@ -12,6 +12,7 @@ export const NAV: Record<'teacher' | 'admin' | 'student', { role: string; items:
       { id: 'home', label: 'Пульт', icon: 'dashboard', href: '/teacher', group: 'Преподаватель' },
       { id: 'scenarios', label: 'Банк сценариев', icon: 'library', href: '/teacher/scenarios' },
       { id: 'sessions', label: 'Занятия', icon: 'school', href: '/teacher/sessions' },
+      { id: 'analytics', label: 'Аналитика', icon: 'bar_chart', href: '/teacher/analytics' },
       { id: 'materials', label: 'Учебные материалы', icon: 'description', href: '/teacher/materials' },
       { id: 'journal', label: 'Журнал 112', icon: 'table', href: '/arm/112/journal', group: 'АРМ' },
       { id: 'dds', label: 'АРМ ДДС', icon: 'headset', href: '/arm/dds' },

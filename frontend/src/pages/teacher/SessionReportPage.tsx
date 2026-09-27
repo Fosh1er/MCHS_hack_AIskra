@@ -1,7 +1,7 @@
 /** Отчёт по занятию (п. 4.3). ТЗ, сценарии 2–3: действия, ошибки, время против норматива, грамматика; наглядные
  *  диаграммы; экспертная правка оценки с комментарием; выгрузка в Excel (CSV) и PDF (печать страницы). */
 import { Fragment, useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { Banner, Button, Card, LineChart, StatTile, StatusPill } from '@smena112/ui-kit';
 import { reportCsvUrl, useEvaluateSession, useOverride, useSessionReport, type CardResult, type SessionReport } from '../../shared/api/assessment';
 import { TeacherShell } from '../../shared/ui/TeacherShell';
@@ -132,7 +132,7 @@ function Heatmap({ r }: { r: SessionReport }) {
 
 function TimeHistogram({ r }: { r: SessionReport }) {
   const max = Math.max(1, ...r.time_buckets.map((b) => b.count));
-  const norm = r.settings.norm_112 ?? 80;
+  const norm = r.settings.norm_112 ?? 75;
   return (
     <Card title="Время заполнения карточки 112" subtitle={`Норматив ${norm} с`}>
       <div className="tch-hist" role="img" aria-label={r.time_buckets.map((b) => `${b.label}: ${b.count}`).join(', ')}>
@@ -159,6 +159,7 @@ export function SessionReportPage() {
       actions={
         <span className="tch-noprint cab-filters">
           <Button icon="refresh" disabled={evaluate.isPending} onClick={() => evaluate.mutate()}>{evaluate.isPending ? 'оценка…' : 'оценить все карточки'}</Button>
+          <Link className="cab-btn" to={`/teacher/sessions/${id}/debrief`}>разбор</Link>
           <a className="cab-btn" href={reportCsvUrl(id)} download>Excel (CSV)</a>
           <Button icon="description" onClick={() => window.print()}>PDF</Button>
         </span>

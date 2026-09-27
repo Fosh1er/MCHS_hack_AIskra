@@ -521,3 +521,17 @@
 .mat-found p { margin: 6px 0 0; }
 .mat-text mark, .mat-found mark { background: #ffe58a; color: inherit; }
 .mat-layout { grid-template-columns: minmax(0, 1fr) 300px; }
+
+/* аналитика преподавателя (specs/4.5) */
+.c-green { color: var(--s-ok); }
+.tch-share { display: inline-flex; align-items: center; gap: 8px; min-width: 140px; }
+.tch-share__track { flex: 1; height: 8px; background: var(--bg-panel); min-width: 60px; }
+.tch-share__fill { display: block; height: 100%; background: var(--s-ok); }
+.tch-share__fill.is-low { background: var(--s-critical); }
+.tch-share__fill.is-mid { background: var(--s-warn); }
+.tch-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.tch-list { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 8px; font-size: var(--fs-md); }
+.tch-list small { display: block; color: var(--text-muted); font-size: var(--fs-sm); }
+.tch-source { font-size: var(--fs-sm); color: var(--text-muted); }
+.tch-suggest { margin-top: 10px; padding: 10px 12px; background: var(--c-blue-100); border-left: 3px solid var(--accent); font-size: var(--fs-md); }
+.tch-suggest ul { margin: 4px 0 0; padding-left: 18px; }

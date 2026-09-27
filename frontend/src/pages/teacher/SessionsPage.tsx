@@ -1,7 +1,7 @@
 /** Занятия (п. 4.2): список и создание. ТЗ, сценарии 2–3: тип занятия, категории событий, источник карточек,
  *  обучающиеся и их роли (оператор 112 или диспетчер конкретной ДДС), нормативы и темп. */
-import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Banner, Button, Card, StatusPill } from '@smena112/ui-kit';
 import { useIncidentGroups, useServices } from '../../shared/api/dictionaries';
 import {
@@ -9,10 +9,11 @@ import {
   type CardSource, type CreateSessionBody, type SessionMode, type SessionSettings,
 } from '../../shared/api/training';
 import { useGroups } from '../../shared/api/admin';
+import { fetchSuggestion, type AssignmentSuggestion } from '../../shared/api/assessment';
 import { TeacherShell } from '../../shared/ui/TeacherShell';
 import { GroupPicker } from './ScenariosPage';
 
-const DEFAULTS: SessionSettings = { norm_112: 80, norm_dds: 30, threshold: 70, difficulty: 2, call_interval_s: 40, feed_interval_s: 45, max_waiting: 3 };
+const DEFAULTS: SessionSettings = { norm_112: 75, norm_dds: 30, threshold: 70, difficulty: 2, call_interval_s: 40, feed_interval_s: 45, max_waiting: 3 };
 const SETTING_LABELS: [keyof SessionSettings, string, number, number][] = [
   ['norm_112', 'Норматив карточки 112, с', 5, 3600],
   ['norm_dds', 'Норматив решения ДДС, с', 5, 3600],
@@ -24,7 +25,8 @@ const SETTING_LABELS: [keyof SessionSettings, string, number, number][] = [
 ];
 type Role = '' | '112' | 'dds';
 
-function CreateForm({ onCreated }: { onCreated: (id: string) => void }) {
+/** `assign` — id обучающегося: индивидуальное задание из его профиля (роль и подбор — по его истории). */
+function CreateForm({ onCreated, assign }: { onCreated: (id: string) => void; assign?: string }) {
   const students = useStudents();
   const groups = useIncidentGroups();
   const services = useServices();
@@ -54,6 +56,35 @@ function CreateForm({ onCreated }: { onCreated: (id: string) => void }) {
     student_id: id, role: v.role as '112' | 'dds', dds_service_code: v.role === 'dds' ? v.service || null : null,
   }));
   const missingService = participants.some((p) => p.role === 'dds' && !p.dds_service_code);
+  // подбор по слабым местам (specs/4.5): группы классификатора, сложность, фокус инструктажа
+  const [suggest, setSuggest] = useState<AssignmentSuggestion | null>(null);
+  const [suggestError, setSuggestError] = useState('');
+  const [suggesting, setSuggesting] = useState(false);
+  const runSuggest = (ids: string[], applyRoles: boolean) => {
+    setSuggesting(true);
+    setSuggestError('');
+    fetchSuggestion(ids)
+      .then((sg) => {
+        setSuggest(sg);
+        setPicked(sg.groups.map((g) => g.group_id));
+        setSettings((x) => ({ ...x, difficulty: sg.difficulty }));
+        setMode(sg.mode);
+        setTitle((t) => (t.trim() && !applyRoles ? t : sg.title));
+        if (applyRoles) {
+          const known = Object.fromEntries(sg.participants.map((p) => [p.student_id, { role: p.role as Role, service: p.service_code ?? '' }]));
+          setRoles(Object.fromEntries(ids.map((id) => [id, known[id] ?? { role: '112' as Role, service: '' }])));
+        }
+      })
+      .catch((e: Error) => setSuggestError(e.message))
+      .finally(() => setSuggesting(false));
+  };
+  const autoRun = useRef(false);
+  useEffect(() => { // из профиля обучающегося — сразу после загрузки настроек по умолчанию
+    if (assign && defaults && !autoRun.current) {
+      autoRun.current = true;
+      runSuggest([assign], true);
+    }
+  }, [assign, defaults]); // eslint-disable-line react-hooks/exhaustive-deps
   const submit = () => {
     const body: CreateSessionBody = { title: title.trim(), mode, card_source: source, groups: picked, participants, settings };
     create.mutate(body, { onSuccess: (r) => onCreated(r.id) });
@@ -85,6 +116,14 @@ function CreateForm({ onCreated }: { onCreated: (id: string) => void }) {
           <span className="cab-filters__label">роли и службы подставятся из состава группы, их можно поправить</span>
         </div>
       )}
+      <div className="cab-filters" style={{ marginTop: 10 }}>
+        <Button icon="bolt" disabled={suggesting || !participants.length} onClick={() => runSuggest(participants.map((p) => p.student_id), false)}>
+          {suggesting ? 'подбор…' : 'подобрать по слабым местам'}
+        </Button>
+        <span className="cab-filters__label">категории и сложность — по ошибкам выбранных обучающихся в ваших занятиях</span>
+      </div>
+      {suggestError && <Banner status="critical">{suggestError}</Banner>}
+      {suggest && <SuggestionNote s={suggest} />}
       <table className="cab-table" style={{ marginTop: 8 }}>
         <thead><tr><th>Обучающийся</th><th>Логин</th><th>Роль на занятии</th><th>Служба (для ДДС)</th></tr></thead>
         <tbody>
@@ -133,14 +172,27 @@ function CreateForm({ onCreated }: { onCreated: (id: string) => void }) {
   );
 }
 
+function SuggestionNote({ s }: { s: AssignmentSuggestion }) {
+  return (
+    <div className="tch-suggest" role="status">
+      <b>Подобрано по слабым местам.</b> Сложность {s.difficulty}: {s.difficulty_reason}.
+      {s.groups.length > 0 && <ul>{s.groups.map((g) => <li key={g.group_id}>{g.group_id}. {g.title} — {g.reason}{g.approved ? `, в банке ${g.approved}` : ''}</li>)}</ul>}
+      {s.focus.length > 0 && <>На инструктаже: <ul>{s.focus.map((f) => <li key={f.key}><b>{f.title}</b> ({Math.round(f.average * 100)} %) — {f.advice}</li>)}</ul></>}
+      {s.warnings.map((w) => <div key={w} className="c-red">{w}</div>)}
+    </div>
+  );
+}
+
 export function SessionsPage() {
   const navigate = useNavigate();
   const sessions = useSessions();
-  const [creating, setCreating] = useState(false);
+  const [params] = useSearchParams();
+  const assign = params.get('assign') ?? undefined;
+  const [creating, setCreating] = useState(Boolean(assign));
   return (
     <TeacherShell active="sessions" crumbs="Пульт / Занятия" title="Занятия"
       actions={!creating && <Button variant="primary" icon="plus" onClick={() => setCreating(true)}>новое занятие</Button>}>
-      {creating && <CreateForm onCreated={(id) => navigate(`/teacher/sessions/${id}`)} />}
+      {creating && <CreateForm assign={assign} onCreated={(id) => navigate(`/teacher/sessions/${id}`)} />}
       <Card flush>
         <table className="cab-table">
           <thead><tr><th>Занятие</th><th>Тип</th><th className="num">Участников</th><th>Начало</th><th>Статус</th><th /></tr></thead>
