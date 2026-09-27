@@ -7,7 +7,7 @@ export interface Assessment {
   id: string; card_id: string; student_id: string | null; role: '112' | 'dds'; service_code: string | null;
   score: number; passed: boolean; grader: string; created_at: string | null;
   details: {
-    criteria: CriterionResult[]; errors: string[]; has_reference: boolean; card_number: number; stats: Record<string, number | null>; version?: number;
+    criteria: CriterionResult[]; errors: string[]; critical?: string[]; has_reference: boolean; card_number: number; stats: Record<string, number | null>; version?: number;
     expert?: { score: number; comment: string; teacher_id: string; auto_score: number };
   };
 }
@@ -172,3 +172,20 @@ export const useReadiness = (p: { last: number; studentIds?: string[] }) =>
     queryKey: ['analytics', 'readiness', p.last, p.studentIds ?? []],
     queryFn: () => http<ReadinessView>(`${A}/analytics/readiness?last=${p.last}${(p.studentIds ?? []).map((id) => `&student_id=${encodeURIComponent(id)}`).join('')}`),
   });
+
+// ------------------------------------------------------------------ достоверность автооценки (п. 3.5)
+export interface ValidationView {
+  generated_at: string;
+  benchmark: {
+    scenarios: number; cases: number; specificity_112: number | null; specificity_dds: number | null;
+    detection: number | null; localization: number | null; verdict_accuracy: number | null; verdict_kappa: number | null;
+    critical_caught: number | null;
+    mutations: { key: string; title: string; role: '112' | 'dds'; target: string; critical: boolean; cases: number;
+      detection: number | null; localization: number | null; verdict_agreement: number | null; avg_score: number | null }[];
+  };
+  generator: { key: string; title: string; checked: number; share: number | null }[];
+  expert: { pairs: number; mae: number | null; verdict_agreement: number | null; kappa: number | null; threshold: number };
+  notes: string[];
+}
+export const useValidation = () =>
+  useQuery({ queryKey: ['analytics', 'validation'], queryFn: () => http<ValidationView>(`${A}/analytics/validation`) });
