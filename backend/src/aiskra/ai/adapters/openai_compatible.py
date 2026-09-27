@@ -33,6 +33,7 @@ class OpenAICompatibleLLM:
         timeout_s: float = 60.0,
         max_concurrency: int = 4,
         structured_output: StructuredMode = "json_schema",
+        extra_body: dict[str, Any] | None = None,
         transport: httpx.AsyncBaseTransport | None = None,
     ) -> None:
         headers = {"Content-Type": "application/json"}
@@ -42,6 +43,7 @@ class OpenAICompatibleLLM:
         self._name = name
         self._model = model
         self._structured = structured_output
+        self._extra = dict(extra_body or {})
         self._timeout = timeout_s
         # Ограничение параллельности: на CPU-сервере без GPU модель не должна «съедать» все ядра.
         self._sem = asyncio.Semaphore(max_concurrency)
@@ -65,7 +67,7 @@ class OpenAICompatibleLLM:
         schema: type[BaseModel] | None = None,
     ) -> LLMResult:
         msgs = [{"role": m.role, "content": m.content} for m in messages]
-        body: dict[str, Any] = {"model": self._model, "temperature": params.temperature}
+        body: dict[str, Any] = {**self._extra, "model": self._model, "temperature": params.temperature}
         if params.max_tokens:
             body["max_tokens"] = params.max_tokens
         if params.seed is not None:
@@ -136,7 +138,11 @@ class OpenAICompatibleLLM:
         try:
             text = data["choices"][0]["message"]["content"] or ""
         except (KeyError, IndexError, TypeError) as exc:
-            raise ExternalServiceError(f"{self._name}: неожиданный формат ответа") from exc
+            # шлюзы (OpenRouter) при сбое поставщика отвечают 200 с {"error": …} вместо choices
+            reason = (data.get("error") or {}).get("message") if isinstance(data, dict) else None
+            raise ExternalServiceError(
+                f"{self._name}: неожиданный формат ответа" + (f" — {str(reason)[:200]}" if reason else "")
+            ) from exc
         u = data.get("usage") or {}
         return text, LLMUsage(prompt_tokens=u.get("prompt_tokens"), completion_tokens=u.get("completion_tokens"))
 
