@@ -148,6 +148,22 @@ def test_readiness_scale_and_protocol_data(app_client: Callable[[], TestClient],
     assert profile["readiness"][0]["readiness"]["grade_label"] == "недостаточно данных"
 
 
+def test_validation_report(app_client: Callable[[], TestClient], lesson: dict[str, Any]) -> None:
+    teacher = as_user(app_client, "teacher")
+    report = teacher.get(f"/api/v1/assessment/sessions/{lesson['session_id']}/report").json()
+    op = next(s for s in report["students"] if s["role"] == "112")["cards"][0]
+    r = teacher.post(f"/api/v1/assessment/{op['assessment_id']}/override", json={"score": 60, "comment": "Проверка"})
+    assert r.status_code == 200, r.text
+    v = teacher.get("/api/v1/assessment/analytics/validation").json()
+    b = v["benchmark"]
+    assert b["scenarios"] >= 2 and b["cases"] > 20
+    assert b["detection"] == 1 and b["critical_caught"] == 1 and b["specificity_112"] == 1
+    routing = next(g for g in v["generator"] if g["key"] == "routing")
+    assert routing["checked"] >= 2 and routing["share"] == 1  # эталон = автоподбор по текущему классификатору
+    assert v["expert"]["pairs"] >= 1 and v["expert"]["mae"] is not None
+    assert any("ИИ-судья" in n for n in v["notes"])
+
+
 def test_analytics_is_teacher_only(app_client: Callable[[], TestClient], lesson: dict[str, Any]) -> None:
     student = as_user(app_client, "student")
     for url in (
@@ -155,5 +171,6 @@ def test_analytics_is_teacher_only(app_client: Callable[[], TestClient], lesson:
         f"/api/v1/assessment/analytics/students/{lesson['people']['student']}",
         f"/api/v1/assessment/sessions/{lesson['session_id']}/debrief",
         "/api/v1/assessment/analytics/readiness",
+        "/api/v1/assessment/analytics/validation",
     ):
         assert student.get(url).status_code == 403

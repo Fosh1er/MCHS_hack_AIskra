@@ -23,6 +23,7 @@ from aiskra.integration.assessment_sources import IncidentAttempts
 from aiskra.integration.session_sources import IncidentSystemCards, SessionFactsReader, SessionProgress, SqlScenarioBank
 from aiskra.integration.system_sources import SystemRetentionPolicy, SystemSessionDefaults
 from aiskra.integration.training_sources import DictionaryScenarioFacts, IncidentCardContext
+from aiskra.integration.validation_sources import ScenarioBankCases
 from aiskra.modules.assessment.api import deps as assessment_deps
 from aiskra.modules.assessment.application.commands.assess import AssessCardHandler
 from aiskra.modules.assessment.application.commands.evaluate_session import EvaluateSessionHandler
@@ -41,6 +42,7 @@ from aiskra.modules.assessment.application.queries.reports import (
     GetSessionReportHandler,
     MyProgressHandler,
 )
+from aiskra.modules.assessment.application.queries.validation import ValidationHandler
 from aiskra.modules.assessment.infrastructure.repositories import SqlAssessmentRepository
 from aiskra.modules.audit.api import deps as audit_deps
 from aiskra.modules.audit.application.commands.purge import PurgeAuditHandler
@@ -703,6 +705,11 @@ def _wire_assessment(app: FastAPI, services: Services) -> None:
         return ReadinessHandler(SessionFactsReader(session), SqlAssessmentRepository(session))
 
     ov[assessment_deps.provide_readiness] = readiness
+
+    def validation(session: Session) -> ValidationHandler:  # п. 3.5
+        return ValidationHandler(ScenarioBankCases(session), SqlAssessmentRepository(session))
+
+    ov[assessment_deps.provide_validation] = validation
 
 
 def _wire_admin(app: FastAPI, services: Services) -> None:
