@@ -30,6 +30,7 @@ from aiskra.modules.assessment.application.commands.override import OverrideAsse
 from aiskra.modules.assessment.application.judge import Judge
 from aiskra.modules.assessment.application.queries.analytics import (
     NormReportHandler,
+    ReadinessHandler,
     SessionDebriefHandler,
     StudentProfileHandler,
     SuggestAssignmentHandler,
@@ -697,6 +698,11 @@ def _wire_assessment(app: FastAPI, services: Services) -> None:
     ov[assessment_deps.provide_student_profile] = student_profile
     ov[assessment_deps.provide_debrief] = debrief
     ov[assessment_deps.provide_suggest] = suggest
+
+    def readiness(session: Session) -> ReadinessHandler:
+        return ReadinessHandler(SessionFactsReader(session), SqlAssessmentRepository(session))
+
+    ov[assessment_deps.provide_readiness] = readiness
 
 
 def _wire_admin(app: FastAPI, services: Services) -> None:

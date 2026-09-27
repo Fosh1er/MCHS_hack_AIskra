@@ -6,7 +6,8 @@ import { Banner, Button, Card, LineChart, StatTile, StatusPill } from '@smena112
 import { useStudentProfile } from '../../../shared/api/assessment';
 import { TeacherShell } from '../../../shared/ui/TeacherShell';
 import { num } from '../../../shared/format';
-import { ErrorsCard, NormTiles, pct, when } from './parts';
+import { ErrorsCard, NormTiles, pct, roleLabel, when } from './parts';
+import { GradePill } from './ReadinessPage';
 
 const delta = (d: number | null) => (d === null ? '—' : `${d > 0 ? '+' : ''}${Math.round(d * 100)}`);
 
@@ -31,6 +32,19 @@ export function StudentProfilePage() {
             <StatTile label="Карточек" value={p.cards} />
             <StatTile label="Занятий" value={p.sessions} />
           </section>
+          {p.readiness.length > 0 && (
+            <Card title="Готовность к допуску" subtitle="По последним 10 карточкам: шкала Программы подготовки ЕДДС, нормативы ПП № 1931"
+              actions={<Link className="cab-btn tch-noprint" to="/teacher/readiness">все обучающиеся</Link>}>
+              <ul className="tch-list">
+                {p.readiness.map((r) => (
+                  <li key={r.role}>
+                    {roleLabel(r.role, r.service_code)}: <GradePill r={r.readiness} /> — <b className={r.readiness.ready ? '' : 'c-red'}>{r.readiness.status}</b>
+                    <small>{r.readiness.reasons.join('; ')}</small>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
           {p.points.length >= 2 && (
             <Card title="Динамика баллов" subtitle="Каждая точка — оценённая карточка, по времени">
               <LineChart points={p.points.map((x) => ({ t: when(x.t), v: x.v }))}

@@ -19,6 +19,8 @@ import { SessionReportPage } from '../pages/teacher/SessionReportPage';
 import { AnalyticsPage } from '../pages/teacher/analytics/AnalyticsPage';
 import { StudentProfilePage } from '../pages/teacher/analytics/StudentProfilePage';
 import { SessionDebriefPage } from '../pages/teacher/analytics/SessionDebriefPage';
+import { ReadinessPage } from '../pages/teacher/analytics/ReadinessPage';
+import { ReadinessProtocolPage } from '../pages/teacher/analytics/ReadinessProtocolPage';
 import { ProgressPage } from '../pages/student/ProgressPage';
 import { StudentHomePage } from '../pages/student/StudentHomePage';
 import { MySessionPage } from '../pages/student/MySessionPage';
@@ -49,6 +51,8 @@ export const router = createBrowserRouter([
   { path: '/teacher/sessions/:id/report', element: <RequireAuth permission={PERMISSIONS.lessonsConduct}><SessionReportPage /></RequireAuth> },
   { path: '/teacher/sessions/:id/debrief', element: <RequireAuth permission={PERMISSIONS.lessonsConduct}><SessionDebriefPage /></RequireAuth> },
   { path: '/teacher/analytics', element: <RequireAuth permission={PERMISSIONS.lessonsConduct}><AnalyticsPage /></RequireAuth> },
+  { path: '/teacher/readiness', element: <RequireAuth permission={PERMISSIONS.lessonsConduct}><ReadinessPage /></RequireAuth> },
+  { path: '/teacher/readiness/protocol', element: <RequireAuth permission={PERMISSIONS.lessonsConduct}><ReadinessProtocolPage /></RequireAuth> },
   { path: '/teacher/students/:id', element: <RequireAuth permission={PERMISSIONS.lessonsConduct}><StudentProfilePage /></RequireAuth> },
   { path: '/student/progress', element: <RequireAuth permission={PERMISSIONS.trainingParticipate}><ProgressPage /></RequireAuth> },
   { path: '/student', element: <RequireAuth permission={PERMISSIONS.trainingParticipate}><StudentHomePage /></RequireAuth> },

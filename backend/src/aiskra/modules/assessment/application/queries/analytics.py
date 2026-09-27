@@ -4,7 +4,8 @@ docs/research/Подготовка_персонала_112_и_ЕДДС.md):
 - профиль обучающегося по всем занятиям преподавателя (ПС 12.002 C/03, C/04);
 - «норматив / факт» по времени (ПП РФ № 1931; форма 1/112, приказ МЧС № 192);
 - разбор занятия — характерные недостатки группы (ГОСТ Р 22.7.01, п. 3.12.3);
-- подбор задания по слабым местам (ПС 12.002 C/05).
+- подбор задания по слабым местам (ПС 12.002 C/05);
+- готовность к допуску по шкале Программы подготовки ЕДДС 2023 (ПС 12.002 C/03, specs/4.6).
 
 Всё строится по фактам занятий и сохранённым оценкам; видны только занятия самого преподавателя.
 """
@@ -21,6 +22,7 @@ from aiskra.modules.assessment.application.ports.attempts import AssessmentRepos
 from aiskra.modules.assessment.application.ports.reports import ScenarioBank, SessionFacts, SessionFactsSource
 from aiskra.modules.assessment.application.queries.reports import cards_of
 from aiskra.modules.assessment.domain.analytics import NormStat, error_key, next_difficulty, norm_stat
+from aiskra.modules.assessment.domain.readiness import MIN_CARDS, Readiness, assess_readiness
 from aiskra.modules.assessment.domain.recommendations import RECOMMENDATIONS, recommend
 from aiskra.modules.assessment.domain.scoring import CARD_NORM_SECONDS, DDS_NORM_SECONDS, PASS_THRESHOLD, TITLES
 from aiskra.shared.application import Query
@@ -49,6 +51,7 @@ class Attempt:
     passed: bool | None = None
     criteria: dict[str, float | None] = field(default_factory=dict)
     errors: list[tuple[str, str]] = field(default_factory=list)  # (ключ критерия, текст замечания)
+    expert: bool = False  # балл поставил преподаватель
 
 
 def attempts_of(facts: SessionFacts, records: dict[tuple[UUID, str, str | None], Any]) -> list[Attempt]:
@@ -80,6 +83,7 @@ def attempts_of(facts: SessionFacts, records: dict[tuple[UUID, str, str | None],
                     errors=[(c["key"], e) for c in rec.details.get("criteria", []) for e in c.get("errors", [])]
                     if rec
                     else [],
+                    expert=bool(rec and rec.details.get("expert")),
                 )
             )
     return out
@@ -245,6 +249,105 @@ def _group_by(attempts: list[Attempt], key: Any) -> dict[Any, list[Attempt]]:
     return out
 
 
+# ------------------------------------------------------------------ готовность к допуску (specs/4.6)
+
+READINESS_LAST = 10  # оценку ставим по последним карточкам: ранние попытки не тянут вниз
+
+
+@dataclass(frozen=True)
+class ReadinessRow:
+    student_id: UUID
+    full_name: str
+    role: str
+    service_code: str | None
+    sessions: int
+    groups: int  # отработано групп классификатора
+    last_at: datetime | None
+    expert: int  # сколько из учтённых карточек с экспертной оценкой
+    readiness: Readiness
+
+
+def readiness_rows(
+    attempts: list[Attempt], last: int = READINESS_LAST, min_cards: int = MIN_CARDS
+) -> list[ReadinessRow]:
+    """Готовность по каждой роли обучающегося: последние `last` оценённых карточек, их балл и время."""
+    rows = []
+    for (sid, role), xs in _group_by(attempts, lambda a: (a.student_id, a.role)).items():
+        assessed = [a for a in xs if a.score is not None][-last:]
+        r = assess_readiness(
+            [a.score for a in assessed if a.score is not None],
+            [(a.time_s, a.norm_s) for a in assessed if a.time_s is not None],
+            min_cards=min_cards,
+        )
+        rows.append(
+            ReadinessRow(
+                student_id=sid,
+                full_name=xs[0].full_name,
+                role=role,
+                service_code=xs[0].service_code if role == "dds" else None,
+                sessions=len({a.session_id for a in xs}),
+                groups=len({a.incident_group for a in xs if a.incident_group is not None}),
+                last_at=xs[-1].at,
+                expert=sum(1 for a in assessed if a.expert),
+                readiness=r,
+            )
+        )
+    return sorted(rows, key=lambda r: (r.role, -(r.readiness.grade or 0), r.full_name))
+
+
+@dataclass(frozen=True, kw_only=True)
+class ReadinessQuery(Query):
+    actor: Principal
+    student_ids: list[UUID] = field(default_factory=list)  # пусто — все обучающиеся занятий преподавателя
+    last: int = READINESS_LAST
+    min_cards: int = MIN_CARDS
+
+
+@dataclass(frozen=True)
+class ReadinessView:
+    rows: list[ReadinessRow]
+    last: int
+    min_cards: int
+    generated_at: datetime
+    teacher: str
+    scale: list[dict[str, str]]
+    source: str = (
+        "Шкала итогового контроля — Программа подготовки дежурно-диспетчерского персонала ЕДДС (МЧС России, "
+        "протокол Правкомиссии от 31.10.2023 № 9); нормативы времени — ПП РФ № 1931; оценка готовности — "
+        "профстандарт 12.002, функция C/03"
+    )
+
+
+SCALE = [
+    {"grade": "отлично", "rule": "средний балл 90–100 %, в нормативе не меньше 90 % карточек"},
+    {"grade": "хорошо", "rule": "75–90 %, в нормативе не меньше 90 % карточек"},
+    {
+        "grade": "удовлетворительно",
+        "rule": "60–75 % или небольшое превышение времени (≥ 60 % в нормативе, 90-й процентиль ≤ 1,5 норматива)",
+    },
+    {"grade": "неудовлетворительно", "rule": "меньше 60 % или значительное превышение времени"},
+]
+
+
+class ReadinessHandler:
+    def __init__(self, source: SessionFactsSource, repo: AssessmentRepository) -> None:
+        self._attempts = TeacherAttempts(source, repo)
+
+    async def __call__(self, q: ReadinessQuery) -> ReadinessView:
+        attempts = await self._attempts.all(q.actor.user_id)
+        if q.student_ids:
+            wanted = set(q.student_ids)
+            attempts = [a for a in attempts if a.student_id in wanted]
+        return ReadinessView(
+            rows=readiness_rows(attempts, q.last, q.min_cards),
+            last=q.last,
+            min_cards=q.min_cards,
+            generated_at=datetime.now(UTC),
+            teacher=q.actor.full_name,
+            scale=SCALE,
+        )
+
+
 # ------------------------------------------------------------------ профиль обучающегося
 
 
@@ -272,6 +375,7 @@ class StudentProfileView:
     card_112: NormStat
     dds: NormStat
     recommendations: list[dict[str, Any]]
+    readiness: list[ReadinessRow] = field(default_factory=list)
 
 
 class StudentProfileHandler:
@@ -341,6 +445,7 @@ class StudentProfileHandler:
             card_112=norm_stat(_samples(mine, "112")),
             dds=norm_stat(_samples(mine, "dds")),
             recommendations=recommend(own),
+            readiness=readiness_rows(mine),
         )
 
 

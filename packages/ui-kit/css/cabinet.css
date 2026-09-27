@@ -535,3 +535,15 @@
 .tch-source { font-size: var(--fs-sm); color: var(--text-muted); }
 .tch-suggest { margin-top: 10px; padding: 10px 12px; background: var(--c-blue-100); border-left: 3px solid var(--accent); font-size: var(--fs-md); }
 .tch-suggest ul { margin: 4px 0 0; padding-left: 18px; }
+/* протокол готовности (specs/4.6): документ на белом листе, при печати — без оболочки кабинета */
+.tch-protocol { background: var(--c-white); padding: 24px 28px; max-width: 980px; font-size: var(--fs-md); line-height: 1.45; }
+.tch-protocol h2 { text-align: center; margin: 0 0 4px; font-size: 18px; }
+.tch-protocol__sub { text-align: center; margin: 0 0 16px; }
+.tch-protocol__table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: var(--fs-sm); }
+.tch-protocol__table th, .tch-protocol__table td { border: 1px solid var(--c-slate-600); padding: 4px 6px; text-align: left; vertical-align: top; }
+.tch-protocol__table small { display: block; color: var(--text-muted); }
+.tch-protocol__signs { display: flex; flex-direction: column; gap: 18px; margin-top: 28px; }
+@media print {
+  body:has(.tch-protocol) .cab-topbar { display: none !important; }
+  .tch-protocol { padding: 0; max-width: none; }
+}
