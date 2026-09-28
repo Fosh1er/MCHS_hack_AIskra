@@ -10,7 +10,8 @@ import { MaterialViewer } from '../../shared/ui/MaterialViewer';
 function Classifier() {
   const groups = useIncidentGroups();
   const services = useServices();
-  const names = new Map((services.data ?? []).map((s) => [s.code, s.short]));
+  // в классификаторе «Главная служба» — код (MCHS, Police…), а не служба справочника: переводим через main_codes
+  const byMain = new Map((services.data ?? []).flatMap((s) => s.main_codes.map((m) => [m, s] as const)));
   const [q, setQ] = useState('');
   const [group, setGroup] = useState<number | null>(null);
   const r = useIncidentTypeSearch(q, group);
@@ -26,14 +27,20 @@ function Classifier() {
       </div>
       <Card flush>
         <table className="cab-table">
-          <thead><tr><th>Код</th><th>Признаки</th><th>Конечный тип</th><th>Типы служб</th></tr></thead>
+          <thead><tr><th>Код</th><th>Признаки</th><th>Конечный тип</th><th>Главная служба</th></tr></thead>
           <tbody>
             {r.data?.items.map((t) => (
               <tr key={t.code}>
                 <td className="c-slate">{t.code}</td>
                 <td>{[t.sign1, t.sign2, t.sign3].filter(Boolean).join(' → ')}{t.operator_hint && <div className="stu-hint">Оператору: {t.operator_hint}</div>}</td>
                 <td>{t.final_type}</td>
-                <td>{t.main_services.map((s) => <Tag key={s}>{names.get(s) ?? s}</Tag>)}</td>
+                <td>
+                  {t.main_services.map((m) => {
+                    const s = byMain.get(m);
+                    return <span key={m} title={s?.full}><Tag>{s?.short ?? m}</Tag></span>;
+                  })}
+                  {!t.main_services.length && <span className="c-slate">—</span>}
+                </td>
               </tr>
             ))}
           </tbody>

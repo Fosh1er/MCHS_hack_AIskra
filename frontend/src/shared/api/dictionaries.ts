@@ -17,7 +17,10 @@ export interface IncidentTypeDetails {
   type: { code: string; final_type: string | null; ekp_type: string | null; main_services: string[] };
   routing: RoutingCell[];
 }
-export interface ServiceRow { code: string; short: string; full: string; kind: string; okrug: string | null; phone: string; integrated: boolean }
+export interface ServiceRow {
+  code: string; short: string; full: string; kind: string; okrug: string | null; phone: string; integrated: boolean;
+  main_codes: string[]; // коды «Главной службы» классификатора (MCHS, Police, AMBULANCE…), которые обслуживает служба
+}
 export interface ResolvedService { code: string; short: string; full: string; kind: string; phone: string; main: boolean; integrated: boolean; service_type: string | null; reasons: string[] }
 export interface ResolvedServices { services: ResolvedService[]; monitoring: string[]; needs_address: boolean }
 export interface Okrug { code: string; short: string; name: string; prefecture: string | null }
