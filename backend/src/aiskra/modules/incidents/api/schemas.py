@@ -172,3 +172,11 @@ class ServiceStatusIn(_Strict):
     status: ServiceStatus
     order_no: str = Field(default="", max_length=32, description="«Номер наряда»")
     comment: str = Field(default="", max_length=500)
+
+
+class CardTimerIn(BaseModel):
+    paused: bool = Field(description="true — остановить таймер на время подсказок, false — запустить снова")
+
+
+class CardTimerOut(BaseModel):
+    paused_ms: int = Field(description="Сколько таймер карточки стоял на паузе, мс")

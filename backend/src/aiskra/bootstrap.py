@@ -99,6 +99,7 @@ from aiskra.modules.identity.infrastructure.security import ScryptPasswordHasher
 from aiskra.modules.incidents.api import deps as incidents_deps
 from aiskra.modules.incidents.application.commands.add_workout import AddWorkoutHandler
 from aiskra.modules.incidents.application.commands.append_card import AppendCardHandler
+from aiskra.modules.incidents.application.commands.card_timer import SetCardTimerPausedHandler
 from aiskra.modules.incidents.application.commands.change_card_status import ChangeCardStatusHandler
 from aiskra.modules.incidents.application.commands.dds import ChangeServiceStatusHandler, MarkServiceReceivedHandler
 from aiskra.modules.incidents.application.commands.open_card import OpenCardHandler
@@ -403,6 +404,11 @@ def _wire_incidents(app: FastAPI) -> None:
     def set_flags(session: Session) -> SetCardFlagsHandler:
         return SetCardFlagsHandler(SqlCardRepository(session), SqlAuditRecorder(session), SqlAlchemyUnitOfWork(session))
 
+    def card_timer(session: Session) -> SetCardTimerPausedHandler:
+        return SetCardTimerPausedHandler(
+            SqlCardRepository(session), SqlAuditRecorder(session), SqlAlchemyUnitOfWork(session), clock
+        )
+
     def append(session: Session) -> AppendCardHandler:
         return AppendCardHandler(SqlCardRepository(session), SqlAuditRecorder(session), SqlAlchemyUnitOfWork(session))
 
@@ -419,6 +425,7 @@ def _wire_incidents(app: FastAPI) -> None:
     ov[incidents_deps.provide_search_journal] = journal
     ov[incidents_deps.provide_change_status] = change_status
     ov[incidents_deps.provide_set_flags] = set_flags
+    ov[incidents_deps.provide_card_timer] = card_timer
     ov[incidents_deps.provide_append] = append
     ov[incidents_deps.provide_add_workout] = add_workout
     ov[incidents_deps.provide_record_view] = record_view

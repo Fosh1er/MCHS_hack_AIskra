@@ -13,12 +13,13 @@ interface Controls {
   unregister: (id: TourId) => void;
   screen: TourId | null;
   replay: () => void; // подсказки текущего экрана ещё раз
+  active: { id: TourId; auto: boolean } | null; // идут подсказки экрана; auto — показаны сами, а не по кнопке
   restart: () => void; // «пройти обучение заново»: сбросить прогресс
 }
 
 const Ctx = createContext<Controls | null>(null);
 
-interface Active { key: number; ids: string[]; steps: TourStep[] }
+interface Active { key: number; id: TourId; auto: boolean; ids: string[]; steps: TourStep[] }
 
 export function OnboardingProvider({ children }: { children: ReactNode }) {
   const me = useMe().data;
@@ -30,12 +31,12 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => { started.current.clear(); setActive(null); }, [me?.user_id]);
 
-  const start = useCallback((id: TourId, welcome: boolean) => {
+  const start = useCallback((id: TourId, welcome: boolean, auto: boolean) => {
     const steps = visibleSteps([...(welcome ? WELCOME : []), ...TOURS[id]]);
     if (!steps.length) return;
     const ids = welcome ? [WELCOME_ID, id] : [id];
     ids.forEach((x) => started.current.add(x));
-    setActive({ key: Date.now(), ids, steps });
+    setActive({ key: Date.now(), id, auto, ids, steps });
   }, []);
 
   // автозапуск: только обучающемуся, если не пропустил обучение и экран не пройден
@@ -43,7 +44,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!screen?.ready || active || !s?.enabled || s.dismissed) return;
     if (s.seen.includes(screen.id) || started.current.has(screen.id)) return;
-    start(screen.id, !s.seen.includes(WELCOME_ID) && !started.current.has(WELCOME_ID));
+    start(screen.id, !s.seen.includes(WELCOME_ID) && !started.current.has(WELCOME_ID), true);
   }, [screen, s, active, start]);
 
   // ушли с экрана посреди подсказок — закрыть их, экран не считается пройденным
@@ -63,14 +64,21 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
 
   const register = useCallback((id: TourId, ready: boolean) => setScreen({ id, ready }), []);
   const unregister = useCallback((id: TourId) => setScreen((cur) => (cur?.id === id ? null : cur)), []);
-  const replay = useCallback(() => { if (screen) start(screen.id, false); }, [screen, start]);
+  const replay = useCallback(() => { if (screen) start(screen.id, false, false); }, [screen, start]);
   const restart = useCallback(() => {
     started.current.clear();
-    update.mutate({ action: 'reset' }, { onSuccess: () => { if (screen) start(screen.id, true); } });
+    update.mutate({ action: 'reset' }, { onSuccess: () => { if (screen) start(screen.id, true, true); } });
   }, [screen, start, update]);
 
-  const value = useMemo(() => ({ register, unregister, screen: screen?.id ?? null, replay, restart }),
-    [register, unregister, screen, replay, restart]);
+  const activeId = active?.id;
+  const activeAuto = active?.auto;
+  const value = useMemo(
+    () => ({
+      register, unregister, screen: screen?.id ?? null, replay, restart,
+      active: activeId ? { id: activeId, auto: !!activeAuto } : null,
+    }),
+    [register, unregister, screen, replay, restart, activeId, activeAuto],
+  );
 
   return (
     <Ctx.Provider value={value}>
@@ -89,6 +97,11 @@ export function useScreenTour(id: TourId, ready = true): void {
     register?.(id, ready);
   }, [register, id, ready]);
   useEffect(() => () => unregister?.(id), [unregister, id]);
+}
+
+/** Какие подсказки идут сейчас: карточка 112 ставит таймер на паузу, пока новичок проходит их впервые. */
+export function useActiveTour(): { id: TourId; auto: boolean } | null {
+  return useContext(Ctx)?.active ?? null;
 }
 
 /** Кнопки «обучение» и «пройти обучение заново». */

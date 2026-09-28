@@ -73,6 +73,8 @@ class SqlCardRepository:
             scenario_id=row.scenario_id,
             session_id=row.session_id,
             origin=row.origin,
+            paused_ms=row.paused_ms,
+            pause_started_at=as_utc(row.pause_started_at),
         )
 
     async def save(self, card: IncidentCard) -> None:
@@ -156,6 +158,8 @@ def _fill(row: IncidentCardModel, card: IncidentCard) -> None:
     row.opened_at = card.opened_at
     row.saved_at = card.saved_at
     row.processing_ms = card.processing_ms
+    row.paused_ms = card.paused_ms
+    row.pause_started_at = card.pause_started_at
     row.is_emergency = card.is_emergency
     row.is_incident = card.is_incident
     row.worked_at = card.worked_at

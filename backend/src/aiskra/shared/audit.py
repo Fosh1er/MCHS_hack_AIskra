@@ -63,6 +63,7 @@ class AuditEvent(StrEnum):
     CARD_RETURNED = "card.returned"
     CARD_FLAGS = "card.flags"
     CARD_APPENDED = "card.appended"
+    CARD_TIMER_PAUSED = "card.timer_paused"
     WORKOUT_ADDED = "card.workout_added"
 
     @property
@@ -113,6 +114,7 @@ AUDIT_EVENT_TITLES: Mapping[AuditEvent, str] = {
     AuditEvent.CARD_RETURNED: "Возврат на доработку",
     AuditEvent.CARD_FLAGS: "Изменение признаков ЧС / ЧП",
     AuditEvent.CARD_APPENDED: "Дополнение карточки",
+    AuditEvent.CARD_TIMER_PAUSED: "Пауза таймера карточки на обучение интерфейсу",
     AuditEvent.WORKOUT_ADDED: "Отработка",
 }
 

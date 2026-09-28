@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID
 
@@ -146,7 +146,7 @@ class SessionProgress:
                 waiting: list[IncidentCardModel] = []
                 marks = await self._assessments([c.id for c in done], "112", None)
                 current = draft  # нет черновика — оператор ждёт следующий вызов
-                since = draft.opened_at if draft else None
+                since = _timer_start(draft) if draft else None
             else:
                 svc = p.dds_service_code or ""
                 statuses = (
@@ -348,3 +348,9 @@ class SqlScenarioBank:
         if difficulty is not None:
             stmt = stmt.where(ScenarioModel.difficulty == difficulty)
         return {gid: int(n) for gid, n in (await self._s.execute(stmt)).all()}
+
+
+def _timer_start(card: IncidentCardModel) -> datetime | None:
+    """Начало отсчёта таймера черновика для мониторинга: открытие плюс пауза на подсказки (п. 5.3)."""
+    opened = as_utc(card.opened_at)
+    return opened + timedelta(milliseconds=card.paused_ms) if opened and card.paused_ms else opened

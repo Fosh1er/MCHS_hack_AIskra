@@ -250,6 +250,8 @@ class SqlCardReader:
             checked_at=as_utc(card.checked_at),
             checked_by_name=checker_name,
             processing_ms=card.processing_ms,
+            paused_ms=card.paused_ms or 0,
+            timer_paused=card.pause_started_at is not None,
             is_emergency=card.is_emergency,
             is_incident=card.is_incident,
             address_line=_address(card.address_text, okrug, district),

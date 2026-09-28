@@ -16,6 +16,8 @@ from aiskra.modules.incidents.api.schemas import (
     CardOpenedOut,
     CardSavedOut,
     CardServiceOut,
+    CardTimerIn,
+    CardTimerOut,
     ChangedOut,
     CreatedOut,
     OpenCardIn,
@@ -27,6 +29,7 @@ from aiskra.modules.incidents.api.schemas import (
 )
 from aiskra.modules.incidents.application.commands.add_workout import AddWorkout, AddWorkoutHandler
 from aiskra.modules.incidents.application.commands.append_card import AppendCard, AppendCardHandler
+from aiskra.modules.incidents.application.commands.card_timer import SetCardTimerPaused, SetCardTimerPausedHandler
 from aiskra.modules.incidents.application.commands.change_card_status import (
     ChangeCardStatus,
     ChangeCardStatusHandler,
@@ -104,6 +107,23 @@ async def save_card(
         saved_at=saved.saved_at,
         processing_ms=saved.processing_ms,
         services=[CardServiceOut(**asdict(s)) for s in saved.services],
+    )
+
+
+@router.post(
+    "/cards/{card_id}/timer",
+    response_model=CardTimerOut,
+    summary="Пауза таймера черновика на время подсказок по карточке (п. 5.3): одна на карточку, до 10 минут",
+)
+async def card_timer(
+    card_id: UUID,
+    body: CardTimerIn,
+    actor: Trainee,
+    meta: Meta,
+    handler: Annotated[SetCardTimerPausedHandler, Depends(deps.provide_card_timer)],
+) -> CardTimerOut:
+    return CardTimerOut(
+        paused_ms=await handler(SetCardTimerPaused(actor=actor, card_id=card_id, paused=body.paused, meta=meta))
     )
 
 

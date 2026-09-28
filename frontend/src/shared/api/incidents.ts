@@ -41,6 +41,7 @@ export interface CardView {
   worked_at: string | null; checked_at: string | null; checked_by_name: string | null;
   rework: { comment: string; at: string | null; by: string | null } | null;
   processing_ms: number | null; is_emergency: boolean; is_incident: boolean; address_line: string | null;
+  paused_ms: number; timer_paused: boolean; // п. 5.3: пауза таймера на подсказки — не входит во время заполнения
   data: Partial<CardData>; services: CardServiceView[]; workouts: WorkoutView[]; incident_types: IncidentTypeInfo[];
 }
 
@@ -138,6 +139,10 @@ export function useCardActions(id: string) {
 
 /** «Просмотр карточки» в аудите — один раз при открытии (а не при каждом обновлении экрана). */
 export const markCardViewed = (id: string) => http<void>(`${I}/${id}/viewed`, { method: 'POST' });
+
+/** Пауза таймера черновика на время подсказок по карточке (п. 5.3): одна на карточку, до 10 минут. */
+export const setCardTimerPaused = (id: string, paused: boolean) =>
+  http<{ paused_ms: number }>(`${I}/${id}/timer`, { method: 'POST', body: JSON.stringify({ paused }) });
 
 // ------------------------------------------------------------------ п. 2.1, 2.2: АРМ ДДС
 

@@ -138,6 +138,7 @@ cd backend && uv run python -m aiskra.cli create-user --login admin --full-name 
 ## Обучение интерфейсу (п. 5.3) — что уже есть
 - Прогресс — `users.onboarding` (JSON `{dismissed, seen[]}`, миграция 0012), домен `identity/domain/onboarding.py`, API `GET/POST /auth/onboarding` (`seen` · `dismiss` · `reset`); автоматически — только праву `training.participate`.
 - Фронт: тексты — `shared/onboarding/tours.ts`, подсветка — `Tour.tsx`, логика показа — `OnboardingProvider.tsx`. **Новый экран обучающегося:** описание в `TOURS`, на странице `useScreenTour('<id>', <данные загружены>)`, цели — `data-tour="…"` или существующие `id`. Меняете разметку экрана — проверьте, что селекторы в `tours.ts` ещё находят элементы (шаг без цели молча пропускается).
+- Пауза таймера карточки 112 на первые подсказки — `IncidentCard.pause_timer/resume_timer`, `POST /incidents/cards/{id}/timer` (одна на карточку, до 10 мин, аудит). `processing_ms` уже без паузы; новый расчёт «время от открытия» делайте от `opened_at + paused_ms`.
 
 ## Учебные материалы (п. 4.4) — что уже есть
 - Домен `training/domain/material.py` (тип по сигнатуре, выдержки, `best_passages`); файлы — `LocalFileStorage` (`materials_dir`), текст — таблица `materials`; извлечение — `DocumentTextExtractor`.

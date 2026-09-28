@@ -46,6 +46,8 @@ class IncidentCardModel(Base):
     opened_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     saved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     processing_ms: Mapped[int | None] = mapped_column(Integer)  # таймер карточки
+    paused_ms: Mapped[int | None] = mapped_column(Integer)  # п. 5.3: пауза таймера на обучение интерфейсу
+    pause_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))  # пауза идёт сейчас
     is_emergency: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())  # ЧС
     is_incident: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())  # ЧП
     worked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

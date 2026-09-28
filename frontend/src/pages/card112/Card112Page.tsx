@@ -9,13 +9,13 @@ import {
   useCardTypes, useEnum, useResolvedServices, useServices, useTerritory,
   type IncidentTypeDetails, type Questionnaire,
 } from '../../shared/api/dictionaries';
-import { SERVICE_STATUS, useCard, useOpenCard, useSaveCard, type CardView } from '../../shared/api/incidents';
+import { SERVICE_STATUS, setCardTimerPaused, useCard, useOpenCard, useSaveCard, type CardView } from '../../shared/api/incidents';
 import { dropDraft, loadDraft, saveDraft } from '../../shared/api/resilience';
 import { shortName } from '../../shared/ui/ArmTopBar';
 import { CardHeader } from './CardHeader';
 import { CardViewer } from './CardViewer';
 import { CallPanel } from '../../shared/ui/CallPanel';
-import { useScreenTour } from '../../shared/onboarding/OnboardingProvider';
+import { useActiveTour, useScreenTour } from '../../shared/onboarding/OnboardingProvider';
 import { answerCall } from '../../shared/api/training';
 import { ApplicantRow, VictimsRow } from './ApplicantBlock';
 import { AddressBlock, DescriptionBlock } from './AddressBlock';
@@ -81,6 +81,32 @@ export function Card112Page() {
 }
 
 type ModalKind = null | 'services' | 'save' | 'close' | 'new' | 'no_contact' | 'call_dropped';
+
+/** Пауза таймера, пока новичок впервые проходит подсказки по карточке (п. 5.3): время инструктажа не идёт
+ *  в норматив. Сервер вычитает паузу из времени заполнения (одна на карточку, до 10 минут); ручной повтор
+ *  подсказок кнопкой «?» таймер не останавливает. Возвращает, сколько миллисекунд вычесть из часов карточки к моменту `now`. */
+function useTourTimerPause(view: CardView, editable: boolean, now: number): number {
+  const tour = useActiveTour();
+  const qc = useQueryClient();
+  const pausing = editable && tour?.id === 'card-112' && tour.auto;
+  const since = useRef<number | null>(null);
+  const [localMs, setLocalMs] = useState(0);
+  useEffect(() => {
+    if (!pausing) return;
+    since.current = Date.now();
+    void setCardTimerPaused(view.id, true).catch(() => undefined);
+    return () => {
+      const ms = Date.now() - (since.current ?? Date.now());
+      since.current = null;
+      setLocalMs((x) => x + ms);
+      void setCardTimerPaused(view.id, false)
+        .catch(() => undefined)
+        .finally(() => qc.invalidateQueries({ queryKey: ['card', view.id] }));
+    };
+  }, [pausing, view.id, qc]);
+  const ongoing = since.current === null ? 0 : Math.max(0, now - since.current);
+  return Math.max(view.paused_ms ?? 0, localMs) + ongoing;
+}
 
 function CardEditor({ view, editable, me }: { view: CardView; editable: boolean; me: Me }) {
   const readOnly = !editable;
@@ -162,7 +188,8 @@ function CardEditor({ view, editable, me }: { view: CardView; editable: boolean;
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
   }, [readOnly]);
-  const seconds = readOnly ? Math.round((view.processing_ms ?? 0) / 1000) : Math.max(0, Math.floor((now - openedAt) / 1000));
+  const pausedMs = useTourTimerPause(view, editable, now);
+  const seconds = readOnly ? Math.round((view.processing_ms ?? 0) / 1000) : Math.max(0, Math.floor((now - openedAt - pausedMs) / 1000));
 
   // --- действия
   const flagName = (f: string) => flagNames.get(f)?.name ?? f;
