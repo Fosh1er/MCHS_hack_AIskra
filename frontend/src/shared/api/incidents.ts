@@ -41,6 +41,7 @@ export interface CardView {
   worked_at: string | null; checked_at: string | null; checked_by_name: string | null;
   rework: { comment: string; at: string | null; by: string | null } | null;
   processing_ms: number | null; is_emergency: boolean; is_incident: boolean; address_line: string | null;
+  paused_ms: number; timer_paused: boolean; // п. 5.3: пауза таймера на подсказки — не входит во время заполнения
   data: Partial<CardData>; services: CardServiceView[]; workouts: WorkoutView[]; incident_types: IncidentTypeInfo[];
 }
 
@@ -139,6 +140,10 @@ export function useCardActions(id: string) {
 /** «Просмотр карточки» в аудите — один раз при открытии (а не при каждом обновлении экрана). */
 export const markCardViewed = (id: string) => http<void>(`${I}/${id}/viewed`, { method: 'POST' });
 
+/** Пауза таймера черновика на время подсказок по карточке (п. 5.3): всего до 10 минут на карточку. */
+export const setCardTimerPaused = (id: string, paused: boolean) =>
+  http<{ paused_ms: number }>(`${I}/${id}/timer`, { method: 'POST', body: JSON.stringify({ paused }) });
+
 // ------------------------------------------------------------------ п. 2.1, 2.2: АРМ ДДС
 
 /** Строка реестра ДДС (dds/image3–5). */
@@ -148,6 +153,7 @@ export interface DdsJournalRow {
   empty_call: 'no_contact' | 'call_dropped' | null; has_victims: boolean; victims_count: number;
   address_line: string | null; description: string | null; author_name: string | null;
   service_status: string; service_status_at: string | null; added_at: string | null;
+  paused_ms: number; pause_started_at: string | null; // п. 5.3: пауза таймера ожидания на подсказки
 }
 export interface DdsJournalPage { items: DdsJournalRow[]; total: number; page: number; page_size: number }
 export interface DdsCardView { card: CardView; service_code: string; service_status: string; next_statuses: string[] }
@@ -192,3 +198,9 @@ export function useDdsActions(service: string, id: string) {
     }),
   };
 }
+
+/** Пауза таймера решения ДДС на время подсказок (п. 5.3): по карточке или по всем карточкам службы в очереди. */
+export const setDdsTimerPaused = (service: string, paused: boolean, cardId?: string) =>
+  http<{ cards: number }>(`/api/v1/incidents/dds/${encodeURIComponent(service)}/timer`, {
+    method: 'POST', body: JSON.stringify({ paused, card_id: cardId ?? null }),
+  });

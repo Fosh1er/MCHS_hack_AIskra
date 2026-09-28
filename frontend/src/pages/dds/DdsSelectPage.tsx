@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMe } from '../../shared/api/auth';
 import { useServices, type ServiceRow } from '../../shared/api/dictionaries';
+import { useScreenTour } from '../../shared/onboarding/OnboardingProvider';
 import { ArmTopBar } from '../../shared/ui/ArmTopBar';
 import { ARM_MENU } from '../../shared/ui/armMenu';
 
@@ -27,6 +28,7 @@ export function DdsSelectPage() {
   const me = useMe().data!;
   const navigate = useNavigate();
   const services = useServices();
+  useScreenTour('dds-select', !!services.data);
   const [q, setQ] = useState('');
   const last = lastDds();
   const filtered = useMemo(() => {

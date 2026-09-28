@@ -10,10 +10,11 @@ from dataclasses import dataclass, field
 from uuid import UUID
 
 from aiskra.modules.incidents.application.ports.dds import DdsRepository, DdsServiceState
-from aiskra.modules.incidents.domain.dds import TITLES, ServiceStatus, check_transition
+from aiskra.modules.incidents.domain.dds import TITLES, WAITING, ServiceStatus, check_transition
+from aiskra.modules.incidents.domain.timer_pause import end_pause, start_pause
 from aiskra.shared.application import Clock, Command, UnitOfWork
 from aiskra.shared.audit import AuditEntry, AuditEvent, AuditRecorder, RequestMeta
-from aiskra.shared.errors import NotFoundError
+from aiskra.shared.errors import DomainError, NotFoundError
 from aiskra.shared.security import Principal
 
 
@@ -101,6 +102,9 @@ class ChangeServiceStatusHandler(_Base):
         check_transition(ServiceStatus(st.current_status), cmd.status, order_no, comment)
         text = TITLES[cmd.status] + (f" · наряд {order_no}" if order_no else "") + (f" · {comment}" if comment else "")
         try:
+            if st.pause_started_at is not None:  # решение во время паузы на подсказки — пауза кончилась сейчас
+                paused = end_pause(st.paused_ms, st.pause_started_at, self._clock.now())
+                await self._repo.set_pause(cmd.card_id, cmd.service_code, paused_ms=paused, pause_started_at=None)
             await self._repo.set_status(
                 cmd.card_id,
                 cmd.service_code,
@@ -125,3 +129,60 @@ class ChangeServiceStatusHandler(_Base):
             await self._uow.rollback()
             raise
         return cmd.status.value
+
+
+@dataclass(frozen=True, kw_only=True)
+class SetDdsTimerPaused(Command):
+    """Пауза таймера решения на время подсказок (п. 5.3): по одной карточке (подсказки карточки ДДС) или по всем
+    карточкам службы, ждущим решения (подсказки реестра — таймер ожидания идёт с поступления карточки)."""
+
+    actor: Principal
+    service_code: str
+    card_id: UUID | None = None
+    paused: bool
+    meta: RequestMeta = field(default_factory=RequestMeta)
+
+
+class SetDdsTimerPausedHandler(_Base):
+    async def __call__(self, cmd: SetDdsTimerPaused) -> int:
+        """Возвращает, у скольких карточек службы таймер остановлен или запущен снова."""
+        now = self._clock.now()
+        if cmd.card_id is not None:
+            st = await load_state(self._repo, cmd.card_id, cmd.service_code)
+            if cmd.paused and st.current_status not in WAITING:
+                raise DomainError("Решение по карточке уже принято — таймер не идёт", code="dds_decided")
+            states = [st] if cmd.paused or st.pause_started_at is not None else []
+        else:
+            states = await self._repo.timer_states(cmd.service_code, paused=not cmd.paused)
+        changed = 0
+        try:
+            for st in states:
+                if cmd.paused:
+                    try:
+                        started = start_pause(st.paused_ms, st.pause_started_at, now)
+                    except DomainError:
+                        if cmd.card_id is not None:
+                            raise
+                        continue  # у этой карточки лимит паузы исчерпан — её таймер идёт
+                    await self._repo.set_pause(
+                        st.card_id, st.service_code, paused_ms=st.paused_ms, pause_started_at=started
+                    )
+                else:
+                    paused = end_pause(st.paused_ms, st.pause_started_at, now)
+                    await self._repo.set_pause(st.card_id, st.service_code, paused_ms=paused, pause_started_at=None)
+                    await self._audit.record(
+                        _entry(
+                            AuditEvent.SERVICE_TIMER_PAUSED,
+                            cmd.actor,
+                            st,
+                            cmd.meta,
+                            f"таймер решения стоял {(paused - (st.paused_ms or 0)) // 1000} с — подсказки по экрану",
+                            {"paused_ms": str(paused)},
+                        )
+                    )
+                changed += 1
+            await self._uow.commit()
+        except Exception:
+            await self._uow.rollback()
+            raise
+        return changed

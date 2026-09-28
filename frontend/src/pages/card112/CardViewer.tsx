@@ -15,6 +15,7 @@ import { AddressMap } from './AddressMap';
 import { AssessmentPanel } from '../../shared/ui/AssessmentPanel';
 import { Hint } from './Hint';
 import { focusId, useHotkeys, type HotkeyMap } from './useHotkeys';
+import { TourHelpButton } from '../../shared/onboarding/OnboardingProvider';
 
 const CARDS_CHECK = 'cards.check';
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -452,11 +453,12 @@ export function CardViewer({ view, me, dds }: { view: CardView; me: Me; dds?: Dd
             {canChecked && <span className="arm112-rel"><Hint k="Alt+Y" /><button type="button" className="arm-savebtn" disabled={actions.checked.isPending} onClick={checked}>Проверена</button></span>}
             {canReturn && <span className="arm112-rel"><Hint k="Alt+N" /><button type="button" className="arm-savebtn arm112v-return" onClick={() => setReturning(true)}>Вернуть на доработку</button></span>}
             {dds && ownService && dds.next.length > 0 && (
-              <button type="button" className="arm-savebtn" onClick={() => { setHistory(null); setEditor(true); }}>изменить статус</button>
+              <button type="button" className="arm-savebtn" data-tour="dds-status" onClick={() => { setHistory(null); setEditor(true); }}>изменить статус</button>
             )}
             <button type="button" className="arm-sqbtn" disabled title="Связи карточек — п. 1.6" aria-label="Связи"><Icon name="link" /></button>
             <button type="button" className="arm-sqbtn" disabled title="Напоминание — появится в следующих пунктах плана" aria-label="Напоминание"><Icon name="timer" /></button>
             <button type="button" className="arm-sqbtn" disabled title="Важное происшествие — появится в следующих пунктах плана" aria-label="Важное происшествие"><Icon name="bell" /></button>
+            <TourHelpButton />
             <SquareButton icon="close" label="Закрыть карточку (Esc)" onClick={close} />
           </>
         )}

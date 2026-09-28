@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Protocol
+from typing import Any, Protocol
 from uuid import UUID
 
 
@@ -52,3 +52,9 @@ class SessionReader(Protocol):
 
 class UserReader(Protocol):
     async def list(self, flt: UserFilter) -> tuple[list[UserListItem], int]: ...
+
+
+class OnboardingReader(Protocol):
+    async def onboarding(self, user_id: UUID) -> dict[str, Any] | None:
+        """Сырое поле прогресса обучения интерфейсу (п. 5.3); None — ничего не пройдено."""
+        ...

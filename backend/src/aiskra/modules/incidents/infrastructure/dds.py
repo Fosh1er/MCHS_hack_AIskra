@@ -10,6 +10,7 @@ from sqlalchemy import ColumnElement, column, func, select, table, tuple_, updat
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from aiskra.modules.incidents.application.ports.dds import DdsFilter, DdsJournalRow, DdsServiceState
+from aiskra.modules.incidents.domain.dds import WAITING
 from aiskra.modules.incidents.infrastructure.models import CardServiceModel as CS
 from aiskra.modules.incidents.infrastructure.models import CardServiceStatusModel as H
 from aiskra.modules.incidents.infrastructure.models import IncidentCardModel as C
@@ -30,7 +31,7 @@ class SqlDdsRepository:
     async def state(self, card_id: UUID, service_code: str) -> DdsServiceState | None:
         found = (
             await self._s.execute(
-                select(C.number, C.status, CS.current_status, _services.c.short_name)
+                select(C.number, C.status, CS.current_status, _services.c.short_name, CS.paused_ms, CS.pause_started_at)
                 .select_from(CS)
                 .join(C, C.id == CS.card_id)
                 .outerjoin(_services, _services.c.code == CS.service_code)
@@ -39,7 +40,7 @@ class SqlDdsRepository:
         ).first()
         if found is None:
             return None
-        number, card_status, current, short = found
+        number, card_status, current, short, paused_ms, pause_started_at = found
         return DdsServiceState(
             card_id=card_id,
             card_number=number,
@@ -47,7 +48,49 @@ class SqlDdsRepository:
             service_code=service_code,
             service_short=short or service_code,
             current_status=current,
+            paused_ms=paused_ms,
+            pause_started_at=as_utc(pause_started_at),
         )
+
+    async def timer_states(self, service_code: str, *, paused: bool) -> list[DdsServiceState]:
+        cond = CS.pause_started_at.is_not(None) if paused else CS.current_status.in_(WAITING)
+        rows = await self._s.execute(
+            select(
+                CS.card_id,
+                C.number,
+                C.status,
+                CS.current_status,
+                CS.paused_ms,
+                CS.pause_started_at,
+                _services.c.short_name,
+            )
+            .join(C, C.id == CS.card_id)
+            .outerjoin(_services, _services.c.code == CS.service_code)
+            .where(CS.service_code == service_code, cond)
+        )
+        return [
+            DdsServiceState(
+                card_id=cid,
+                card_number=number,
+                card_status=card_status,
+                service_code=service_code,
+                service_short=short or service_code,
+                current_status=current,
+                paused_ms=ms,
+                pause_started_at=as_utc(started),
+            )
+            for cid, number, card_status, current, ms, started, short in rows.all()
+        ]
+
+    async def set_pause(
+        self, card_id: UUID, service_code: str, *, paused_ms: int | None, pause_started_at: datetime | None
+    ) -> None:
+        await self._s.execute(
+            update(CS)
+            .where(CS.card_id == card_id, CS.service_code == service_code)
+            .values(paused_ms=paused_ms, pause_started_at=pause_started_at)
+        )
+        await self._s.flush()
 
     async def set_status(
         self,
@@ -115,6 +158,8 @@ class SqlDdsReader:
                     C,
                     CS.current_status,
                     last_at.label("status_at"),
+                    CS.paused_ms,
+                    CS.pause_started_at,
                     _users.c.full_name,
                     _okrugs.c.short,
                     _districts.c.name,
@@ -133,7 +178,14 @@ class SqlDdsReader:
 
     @staticmethod
     def _row(
-        c: C, status: str, status_at: Any, author: str | None, okrug: str | None, district: str | None
+        c: C,
+        status: str,
+        status_at: Any,
+        paused_ms: int | None,
+        pause_started_at: datetime | None,
+        author: str | None,
+        okrug: str | None,
+        district: str | None,
     ) -> DdsJournalRow:
         flags: dict[str, Any] = (c.payload or {}).get("flags") or {}
         empty = "no_contact" if flags.get("no_contact") else "call_dropped" if flags.get("call_dropped") else None
@@ -156,4 +208,6 @@ class SqlDdsReader:
             service_status=status,
             service_status_at=as_utc(status_at) if isinstance(status_at, datetime) else None,
             added_at=as_utc(c.saved_at),
+            paused_ms=paused_ms or 0,
+            pause_started_at=as_utc(pause_started_at),
         )

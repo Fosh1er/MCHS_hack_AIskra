@@ -15,6 +15,7 @@ from enum import StrEnum
 from uuid import UUID
 
 from aiskra.modules.incidents.domain.card import DESCRIPTION_MAX, IncidentCardData
+from aiskra.modules.incidents.domain.timer_pause import end_pause, start_pause
 from aiskra.shared.domain import Entity
 from aiskra.shared.errors import DomainError
 
@@ -81,13 +82,28 @@ class IncidentCard(Entity):
     scenario_id: UUID | None = None  # сценарий входящего вызова (п. 1.4) — эталон для оценки (3.4)
     session_id: UUID | None = None  # занятие (п. 4.2)
     origin: str = "student"  # student | scenario | system
+    paused_ms: int | None = None  # п. 5.3: сколько таймер стоял на паузе; None — паузы не было
+    pause_started_at: datetime | None = None  # пауза идёт сейчас
 
     @property
     def processing_ms(self) -> int | None:
-        """Таймер карточки: от открытия до сохранения (основа оценки тайминга)."""
+        """Таймер карточки: от открытия до сохранения без паузы на обучение интерфейсу (основа оценки тайминга)."""
         if self.saved_at is None:
             return None
-        return max(0, int((self.saved_at - self.opened_at).total_seconds() * 1000))
+        return max(0, int((self.saved_at - self.opened_at).total_seconds() * 1000) - (self.paused_ms or 0))
+
+    def pause_timer(self, now: datetime) -> None:
+        """Остановить таймер на время подсказок по карточке (п. 5.3); всего не больше MAX_TIMER_PAUSE."""
+        if self.status is not CardStatus.DRAFT:
+            raise DomainError(f"Карточка {self.number} уже сохранена", code="card_already_saved")
+        self.pause_started_at = start_pause(self.paused_ms, self.pause_started_at, now)
+
+    def resume_timer(self, now: datetime) -> int:
+        """Запустить таймер снова. Возвращает, сколько всего таймер стоял на паузе, мс."""
+        if self.pause_started_at is not None:
+            self.paused_ms = end_pause(self.paused_ms, self.pause_started_at, now)
+            self.pause_started_at = None
+        return self.paused_ms or 0
 
     def save(self, data: IncidentCardData, services: list[CardService], now: datetime) -> None:
         if self.status is not CardStatus.DRAFT:
@@ -102,6 +118,7 @@ class IncidentCard(Entity):
         self.services = [] if data.is_empty_call else list(services)
         self.data.services = [s.code for s in self.services]
         self.status = CardStatus.COMPLETED if data.is_empty_call else CardStatus.REGISTERED
+        self.resume_timer(now)  # сохранили во время паузы — пауза кончилась в момент сохранения
         self.saved_at = now
 
     # ---------------------------------------------------------------- после сохранения (п. 1.3)

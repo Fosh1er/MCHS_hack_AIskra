@@ -9,12 +9,13 @@ import {
   useCardTypes, useEnum, useResolvedServices, useServices, useTerritory,
   type IncidentTypeDetails, type Questionnaire,
 } from '../../shared/api/dictionaries';
-import { SERVICE_STATUS, useCard, useOpenCard, useSaveCard, type CardView } from '../../shared/api/incidents';
+import { SERVICE_STATUS, setCardTimerPaused, useCard, useOpenCard, useSaveCard, type CardView } from '../../shared/api/incidents';
 import { dropDraft, loadDraft, saveDraft } from '../../shared/api/resilience';
 import { shortName } from '../../shared/ui/ArmTopBar';
 import { CardHeader } from './CardHeader';
 import { CardViewer } from './CardViewer';
 import { CallPanel } from '../../shared/ui/CallPanel';
+import { useScreenTour, useTourPause } from '../../shared/onboarding/OnboardingProvider';
 import { answerCall } from '../../shared/api/training';
 import { ApplicantRow, VictimsRow } from './ApplicantBlock';
 import { AddressBlock, DescriptionBlock } from './AddressBlock';
@@ -81,6 +82,21 @@ export function Card112Page() {
 
 type ModalKind = null | 'services' | 'save' | 'close' | 'new' | 'no_contact' | 'call_dropped';
 
+/** Пауза таймера, пока новичок впервые проходит подсказки по карточке (п. 5.3): время инструктажа не идёт в норматив.
+ *  Сервер вычитает паузу из времени заполнения (всего до 10 минут на карточку). Возвращает, сколько миллисекунд
+ *  вычесть из часов карточки к моменту `now`. */
+function useTourTimerPause(view: CardView, editable: boolean, now: number): number {
+  const qc = useQueryClient();
+  const [localMs, setLocalMs] = useState(0);
+  const since = useTourPause('card-112', editable, {
+    set: (paused) => setCardTimerPaused(view.id, paused),
+    onEnd: (ms) => setLocalMs((x) => x + ms),
+    onSynced: () => { void qc.invalidateQueries({ queryKey: ['card', view.id] }); },
+  });
+  const ongoing = since === null ? 0 : Math.max(0, now - since);
+  return Math.max(view.paused_ms ?? 0, localMs) + ongoing;
+}
+
 function CardEditor({ view, editable, me }: { view: CardView; editable: boolean; me: Me }) {
   const readOnly = !editable;
   const navigate = useNavigate();
@@ -108,6 +124,7 @@ function CardEditor({ view, editable, me }: { view: CardView; editable: boolean;
   const flagEnum = useEnum('card_flag');
   const territory = useTerritory();
   const allServices = useServices();
+  useScreenTour('card-112', editable && !!cardTypes.data); // подсказки — только при заполнении своей карточки
   const flagNames = useMemo(() => new Map((flagEnum.data ?? []).map((f) => [f.code, f])), [flagEnum.data]);
   const serviceCatalog = useMemo(() => new Map((allServices.data ?? []).map((s) => [s.code, s])), [allServices.data]);
 
@@ -160,7 +177,8 @@ function CardEditor({ view, editable, me }: { view: CardView; editable: boolean;
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
   }, [readOnly]);
-  const seconds = readOnly ? Math.round((view.processing_ms ?? 0) / 1000) : Math.max(0, Math.floor((now - openedAt) / 1000));
+  const pausedMs = useTourTimerPause(view, editable, now);
+  const seconds = readOnly ? Math.round((view.processing_ms ?? 0) / 1000) : Math.max(0, Math.floor((now - openedAt - pausedMs) / 1000));
 
   // --- действия
   const flagName = (f: string) => flagNames.get(f)?.name ?? f;

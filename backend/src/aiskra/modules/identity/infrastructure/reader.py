@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from typing import Any
+from uuid import UUID
+
 from sqlalchemy import ColumnElement, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -76,3 +79,13 @@ class SqlUserReader:
             for r in rows
         ]
         return items, total
+
+
+class SqlOnboardingReader:
+    def __init__(self, session: AsyncSession) -> None:
+        self._s = session
+
+    async def onboarding(self, user_id: UUID) -> dict[str, Any] | None:
+        stmt = select(UserModel.onboarding).where(UserModel.id == user_id)
+        value: dict[str, Any] | None = (await self._s.execute(stmt)).scalar_one_or_none()
+        return value

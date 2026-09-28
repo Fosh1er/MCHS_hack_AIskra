@@ -56,6 +56,7 @@ class AuditEvent(StrEnum):
     SESSION_FINISHED = "sessions.finished"
     SCENARIO_EDITED = "scenarios.edited"
     SERVICE_STATUS_CHANGED = "dds.status_changed"
+    SERVICE_TIMER_PAUSED = "dds.timer_paused"
     CARD_SAVED = "card.saved"
     CARD_VIEWED = "card.viewed"
     CARD_WORKED = "card.worked"
@@ -63,6 +64,7 @@ class AuditEvent(StrEnum):
     CARD_RETURNED = "card.returned"
     CARD_FLAGS = "card.flags"
     CARD_APPENDED = "card.appended"
+    CARD_TIMER_PAUSED = "card.timer_paused"
     WORKOUT_ADDED = "card.workout_added"
 
     @property
@@ -106,6 +108,7 @@ AUDIT_EVENT_TITLES: Mapping[AuditEvent, str] = {
     AuditEvent.SESSION_FINISHED: "Завершение занятия",
     AuditEvent.SCENARIO_EDITED: "Правка сценария",
     AuditEvent.SERVICE_STATUS_CHANGED: "Изменение статуса службы (ДДС)",
+    AuditEvent.SERVICE_TIMER_PAUSED: "Пауза таймера решения ДДС на обучение интерфейсу",
     AuditEvent.CARD_SAVED: "Сохранение карточки происшествия",
     AuditEvent.CARD_VIEWED: "Просмотр карточки",
     AuditEvent.CARD_WORKED: "Переход в Отработана",
@@ -113,6 +116,7 @@ AUDIT_EVENT_TITLES: Mapping[AuditEvent, str] = {
     AuditEvent.CARD_RETURNED: "Возврат на доработку",
     AuditEvent.CARD_FLAGS: "Изменение признаков ЧС / ЧП",
     AuditEvent.CARD_APPENDED: "Дополнение карточки",
+    AuditEvent.CARD_TIMER_PAUSED: "Пауза таймера карточки на обучение интерфейсу",
     AuditEvent.WORKOUT_ADDED: "Отработка",
 }
 

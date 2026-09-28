@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import DateTime, ForeignKey, Integer, String, Uuid, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from aiskra.platform.db import Base
+from aiskra.platform.types import JsonType
 
 
 class UserModel(Base):
@@ -25,6 +27,7 @@ class UserModel(Base):
     failed_attempts: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     search_key: Mapped[str] = mapped_column(String(320), default="", server_default="")  # логин + ФИО для поиска
+    onboarding: Mapped[dict[str, Any] | None] = mapped_column(JsonType)  # п. 5.3: {dismissed, seen[]}; NULL — новый
 
 
 class AuthSessionModel(Base):

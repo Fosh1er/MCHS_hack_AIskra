@@ -42,6 +42,7 @@ NEXT: dict[ServiceStatus, tuple[ServiceStatus, ...]] = {
     S.WORKS_REFUSED: (),
 }
 FINAL = frozenset({S.REJECTED, S.WORKS_COMPLETED, S.WORKS_REFUSED})
+WAITING = frozenset({S.ADDED.value, S.RECEIVED.value})  # решения ещё нет — идёт таймер ожидания (норматив 30 с)
 TITLES: dict[ServiceStatus, str] = {
     S.ADDED: "Добавлена",
     S.RECEIVED: "Получена службой",
