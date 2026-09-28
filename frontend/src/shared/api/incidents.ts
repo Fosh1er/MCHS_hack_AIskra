@@ -140,7 +140,7 @@ export function useCardActions(id: string) {
 /** «Просмотр карточки» в аудите — один раз при открытии (а не при каждом обновлении экрана). */
 export const markCardViewed = (id: string) => http<void>(`${I}/${id}/viewed`, { method: 'POST' });
 
-/** Пауза таймера черновика на время подсказок по карточке (п. 5.3): одна на карточку, до 10 минут. */
+/** Пауза таймера черновика на время подсказок по карточке (п. 5.3): всего до 10 минут на карточку. */
 export const setCardTimerPaused = (id: string, paused: boolean) =>
   http<{ paused_ms: number }>(`${I}/${id}/timer`, { method: 'POST', body: JSON.stringify({ paused }) });
 

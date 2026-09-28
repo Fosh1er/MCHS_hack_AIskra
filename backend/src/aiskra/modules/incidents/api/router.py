@@ -117,7 +117,7 @@ async def save_card(
 @router.post(
     "/cards/{card_id}/timer",
     response_model=CardTimerOut,
-    summary="Пауза таймера черновика на время подсказок по карточке (п. 5.3): одна на карточку, до 10 минут",
+    summary="Пауза таймера черновика на время подсказок по карточке (п. 5.3): всего до 10 минут на карточку",
 )
 async def card_timer(
     card_id: UUID,

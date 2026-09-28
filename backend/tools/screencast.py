@@ -40,6 +40,11 @@ CAPTION_JS = """
 """
 
 
+ONBOARDING_OFF_JS = """() => fetch('/api/v1/auth/onboarding', {
+  method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({action: 'dismiss'})
+}).then((r) => r.status)"""
+
+
 class Show:
     """Одна роль — свой контекст браузера (свои cookie) и свой сегмент видео; сегменты склеиваются в один ролик."""
 
@@ -82,6 +87,10 @@ class Show:
             self.page.get_by_label("номер АРМ").fill(arm)
         time.sleep(0.6)
         self.page.get_by_role("button", name="ВОЙТИ").click()
+        self.page.wait_for_load_state("networkidle")
+        # подсказки для нового обучающегося (п. 5.3) перекрыли бы клики сценария — отключаем и перезагружаем экран
+        self.page.evaluate(ONBOARDING_OFF_JS)
+        self.page.reload()
         self.page.wait_for_load_state("networkidle")
         time.sleep(1)
 
