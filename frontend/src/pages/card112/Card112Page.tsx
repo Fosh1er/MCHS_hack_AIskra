@@ -15,6 +15,7 @@ import { shortName } from '../../shared/ui/ArmTopBar';
 import { CardHeader } from './CardHeader';
 import { CardViewer } from './CardViewer';
 import { CallPanel } from '../../shared/ui/CallPanel';
+import { useScreenTour } from '../../shared/onboarding/OnboardingProvider';
 import { answerCall } from '../../shared/api/training';
 import { ApplicantRow, VictimsRow } from './ApplicantBlock';
 import { AddressBlock, DescriptionBlock } from './AddressBlock';
@@ -108,6 +109,7 @@ function CardEditor({ view, editable, me }: { view: CardView; editable: boolean;
   const flagEnum = useEnum('card_flag');
   const territory = useTerritory();
   const allServices = useServices();
+  useScreenTour('card-112', editable && !!cardTypes.data); // подсказки — только при заполнении своей карточки
   const flagNames = useMemo(() => new Map((flagEnum.data ?? []).map((f) => [f.code, f])), [flagEnum.data]);
   const serviceCatalog = useMemo(() => new Map((allServices.data ?? []).map((s) => [s.code, s])), [allServices.data]);
 

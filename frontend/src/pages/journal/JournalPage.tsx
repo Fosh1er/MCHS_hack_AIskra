@@ -9,6 +9,7 @@ import { CARD_STATUS, useJournal, useOpenCard, type JournalQuery, type JournalRo
 import { endCall, startIncomingCall, useMySession, type CallStarted } from '../../shared/api/training';
 import { SessionBanner } from '../../shared/ui/SessionBanner';
 import { ArmTopBar } from '../../shared/ui/ArmTopBar';
+import { useScreenTour } from '../../shared/onboarding/OnboardingProvider';
 import { ARM_MENU } from '../../shared/ui/armMenu';
 import { useHotkeys } from '../card112/useHotkeys';
 
@@ -99,6 +100,7 @@ export function JournalPage() {
     page_size: pageSize,
   };
   const journal = useJournal(query, autoRefresh);
+  useScreenTour('journal-112', !!journal.data);
   const titles = useMemo(() => new Map((cardTypes.data ?? []).map((t) => [t.code, t.title])), [cardTypes.data]);
 
   // «уведомление»: новые карточки подсвечиваются, пока пользователь их не увидел
@@ -183,10 +185,10 @@ export function JournalPage() {
             <span style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
               {canCreate && (
                 <>
-                  <button type="button" className="arm-newcard arm-newcard--call" onClick={() => { void callIn(); }} disabled={!!ring}>
+                  <button type="button" className="arm-newcard arm-newcard--call" data-tour="call" onClick={() => { void callIn(); }} disabled={!!ring}>
                     <Icon name="phone" size="xs" /> учебный вызов
                   </button>
-                  <button type="button" className="arm-newcard" onClick={() => navigate('/arm/112')}>создать новую карточку (insert)</button>
+                  <button type="button" className="arm-newcard" data-tour="new-card" onClick={() => navigate('/arm/112')}>создать новую карточку (insert)</button>
                 </>
               )}
               <button type="button" className="arm-search__reset" onClick={reset}>сбросить</button>
@@ -221,7 +223,7 @@ export function JournalPage() {
             <Switch label="уведомление" checked={notify} onChange={setNotify} />
             <Switch label="автообновление" checked={autoRefresh} onChange={setAutoRefresh} />
             <Switch label="обращения в очереди" checked={queue} onChange={(v) => { setQueue(v); setPage(1); }} />
-            {canCreate && <Switch label="поток вызовов" checked={stream} onChange={setStream} />}
+            {canCreate && <span data-tour="stream"><Switch label="поток вызовов" checked={stream} onChange={setStream} /></span>}
             <select className="arm-list__filter" aria-label="Выберите что показывать" value={filter} onChange={(e) => { setFilter(e.target.value); setPage(1); }}>
               <option value="" disabled hidden>выберите что показывать</option>
               {FILTERS.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}

@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useMe } from '../../shared/api/auth';
 import { useDdsActions, useDdsCard } from '../../shared/api/incidents';
+import { useScreenTour } from '../../shared/onboarding/OnboardingProvider';
 import { CardViewer } from '../card112/CardViewer';
 import { DdsSoftphone } from './DdsSoftphone';
 
@@ -12,6 +13,7 @@ export function DdsCardPage() {
   const me = useMe().data!;
   const navigate = useNavigate();
   const card = useDdsCard(service, id);
+  useScreenTour('dds-card', !!card.data);
   const actions = useDdsActions(service, id);
   const marked = useRef(false);
   const canAct = (card.data?.next_statuses.length ?? 0) > 0 || card.data?.service_status !== 'added';

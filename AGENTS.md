@@ -135,6 +135,10 @@ cd backend && uv run python -m aiskra.cli create-user --login admin --full-name 
 - **Резервная копия** выгружает все таблицы из `models_registry`, кроме `dict_*` и `auth_sessions`: новая таблица попадает в копию сама.
 - `require(Permission.A, Permission.B)` — «любое из прав».
 
+## Обучение интерфейсу (п. 5.3) — что уже есть
+- Прогресс — `users.onboarding` (JSON `{dismissed, seen[]}`, миграция 0012), домен `identity/domain/onboarding.py`, API `GET/POST /auth/onboarding` (`seen` · `dismiss` · `reset`); автоматически — только праву `training.participate`.
+- Фронт: тексты — `shared/onboarding/tours.ts`, подсветка — `Tour.tsx`, логика показа — `OnboardingProvider.tsx`. **Новый экран обучающегося:** описание в `TOURS`, на странице `useScreenTour('<id>', <данные загружены>)`, цели — `data-tour="…"` или существующие `id`. Меняете разметку экрана — проверьте, что селекторы в `tours.ts` ещё находят элементы (шаг без цели молча пропускается).
+
 ## Учебные материалы (п. 4.4) — что уже есть
 - Домен `training/domain/material.py` (тип по сигнатуре, выдержки, `best_passages`); файлы — `LocalFileStorage` (`materials_dir`), текст — таблица `materials`; извлечение — `DocumentTextExtractor`.
 - API `/training/materials` (загрузка multipart, список, текст, файл, правка, удаление); фронт — `pages/teacher/MaterialsPage.tsx`, `shared/ui/MaterialViewer.tsx`, вкладка в `student/ReferencePage.tsx`.

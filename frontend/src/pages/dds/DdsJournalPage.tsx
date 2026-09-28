@@ -7,6 +7,7 @@ import { Icon, JournalRow } from '@smena112/ui-kit';
 import { useMe } from '../../shared/api/auth';
 import { useCardTypes, useServices } from '../../shared/api/dictionaries';
 import { SERVICE_STATUS, useDdsJournal, type DdsJournalRow } from '../../shared/api/incidents';
+import { useScreenTour } from '../../shared/onboarding/OnboardingProvider';
 import { ArmTopBar, shortName } from '../../shared/ui/ArmTopBar';
 import { ARM_MENU } from '../../shared/ui/armMenu';
 import { rememberDds } from './DdsSelectPage';
@@ -56,6 +57,7 @@ export function DdsJournalPage() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const journal = useDdsJournal(service, { q, statuses: FILTERS.find((f) => f.value === filter)?.statuses ?? [], page, page_size: pageSize }, true);
+  useScreenTour('dds-journal', !!journal.data);
   const titles = useMemo(() => new Map((cardTypes.data ?? []).map((t) => [t.code, t.title])), [cardTypes.data]);
   useEffect(() => { rememberDds(service); }, [service]);
 
