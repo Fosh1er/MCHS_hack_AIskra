@@ -172,3 +172,20 @@ class ServiceStatusIn(_Strict):
     status: ServiceStatus
     order_no: str = Field(default="", max_length=32, description="«Номер наряда»")
     comment: str = Field(default="", max_length=500)
+
+
+class CardTimerIn(BaseModel):
+    paused: bool = Field(description="true — остановить таймер на время подсказок, false — запустить снова")
+
+
+class CardTimerOut(BaseModel):
+    paused_ms: int = Field(description="Сколько таймер карточки стоял на паузе, мс")
+
+
+class DdsTimerIn(BaseModel):
+    paused: bool = Field(description="true — остановить таймер решения на время подсказок, false — запустить снова")
+    card_id: UUID | None = Field(default=None, description="Карточка; без неё — все карточки службы, ждущие решения")
+
+
+class DdsTimerOut(BaseModel):
+    cards: int = Field(description="У скольких карточек таймер остановлен или запущен снова")

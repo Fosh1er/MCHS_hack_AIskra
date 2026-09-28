@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Icon, ServiceBar, ServiceTab, SquareButton } from '@smena112/ui-kit';
 import type { PanelService } from './state';
 import { Hint } from './Hint';
+import { TourHelpButton } from '../../shared/onboarding/OnboardingProvider';
 
 export interface SavedService { code: string; short: string; is_main: boolean; integrated: boolean; status: string }
 
@@ -69,6 +70,7 @@ export function ServicesBar({ panel, saved, onRemove, onAdd, onSave, onClose, on
       <button type="button" className="arm-sqbtn" disabled title={`Перевод вызова — ${LATER} (1.4)`} aria-label="Перевод"><Icon name="hand" /></button>
       <button type="button" className="arm-sqbtn" disabled title={`Важное происшествие — ${LATER}`} aria-label="Важное происшествие"><Icon name="bell" /></button>
       <button type="button" className="arm-sqbtn" disabled title={`Сообщить о проблеме — ${LATER}`} aria-label="Сообщить о проблеме"><Icon name="report" /></button>
+      <TourHelpButton />
       <SquareButton icon="close" label="Закрыть карточку (Esc)" onClick={onClose} />
     </>
   );

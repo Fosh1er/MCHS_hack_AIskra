@@ -1,8 +1,9 @@
-/** Правая часть шапки АРМ (image114): дата, пользователь, «выйти», часы; ниже — меню разделов. */
+/** Правая часть шапки АРМ (image114): дата, пользователь, «обучение» (п. 5.3), «выйти», часы; ниже — меню разделов. */
 import { useEffect, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { Icon, type IconName } from '@smena112/ui-kit';
 import { useLogout, type Me } from '../api/auth';
+import { useTourControls } from '../onboarding/OnboardingProvider';
 
 export interface MenuItem { to: string; label: string; icon: IconName; permission?: string }
 
@@ -28,6 +29,7 @@ function useNow(): Date {
 export function ArmTopBar({ me, menu }: { me: Me; menu: MenuItem[] }) {
   const now = useNow();
   const logout = useLogout();
+  const tour = useTourControls();
   const navigate = useNavigate();
   const items = menu.filter((m) => !m.permission || me.permissions.includes(m.permission));
   const onLogout = () => logout.mutate(undefined, { onSettled: () => navigate('/', { replace: true }) });
@@ -41,6 +43,11 @@ export function ArmTopBar({ me, menu }: { me: Me; menu: MenuItem[] }) {
           </div>
           <div className="arm-clockpanel__user">
             <span>{shortName(me.full_name)}{me.arm_number ? ` · АРМ ${me.arm_number}` : ''}</span>
+            {tour.available && (
+              <button type="button" data-tour="help" onClick={tour.replay} title="Подсказки по кнопкам этого экрана">
+                <Icon name="help" size="xs" /> обучение
+              </button>
+            )}
             <button type="button" onClick={onLogout} disabled={logout.isPending}>
               <Icon name="logout" size="xs" /> выйти
             </button>

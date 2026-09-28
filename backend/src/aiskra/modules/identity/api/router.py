@@ -16,6 +16,8 @@ from aiskra.modules.identity.api.schemas import (
     LoginIn,
     LoginOut,
     MeOut,
+    OnboardingIn,
+    OnboardingOut,
     PasswordResetIn,
     UserCreatedOut,
     UserCreateIn,
@@ -35,12 +37,14 @@ from aiskra.modules.identity.application.commands.groups import (
 )
 from aiskra.modules.identity.application.commands.login import Login, LoginHandler
 from aiskra.modules.identity.application.commands.logout import Logout, LogoutHandler
+from aiskra.modules.identity.application.commands.onboarding import UpdateOnboarding, UpdateOnboardingHandler
 from aiskra.modules.identity.application.commands.reset_password import ResetPassword, ResetPasswordHandler
 from aiskra.modules.identity.application.commands.set_user_blocked import SetUserBlocked, SetUserBlockedHandler
 from aiskra.modules.identity.application.commands.update_user import UpdateUser, UpdateUserHandler
 from aiskra.modules.identity.application.ports.auth import LoginThrottle
 from aiskra.modules.identity.application.ports.groups import GroupMember, GroupView
 from aiskra.modules.identity.application.queries.list_users import ListUsers, ListUsersHandler
+from aiskra.modules.identity.application.queries.onboarding import GetOnboarding, GetOnboardingHandler
 from aiskra.shared.errors import AuthenticationError
 from aiskra.shared.security import Permission, Principal, Role
 from aiskra.shared.web import CurrentPrincipal, Meta, require
@@ -88,6 +92,28 @@ async def logout(
 @auth_router.get("/me", response_model=MeOut, summary="Текущий пользователь, роль и права")
 async def me(principal: CurrentPrincipal) -> MeOut:
     return MeOut.of(principal)
+
+
+@auth_router.get("/onboarding", response_model=OnboardingOut, summary="Обучение интерфейсу: мой прогресс (п. 5.3)")
+async def get_onboarding(
+    principal: CurrentPrincipal, handler: Annotated[GetOnboardingHandler, Depends(deps.provide_get_onboarding)]
+) -> OnboardingOut:
+    return OnboardingOut(**asdict(await handler(GetOnboarding(actor=principal))))
+
+
+@auth_router.post(
+    "/onboarding",
+    response_model=OnboardingOut,
+    summary="Обучение интерфейсу: экран пройден, пропустить всё или начать заново (п. 5.3)",
+)
+async def update_onboarding(
+    body: OnboardingIn,
+    principal: CurrentPrincipal,
+    update: Annotated[UpdateOnboardingHandler, Depends(deps.provide_update_onboarding)],
+    read: Annotated[GetOnboardingHandler, Depends(deps.provide_get_onboarding)],
+) -> OnboardingOut:
+    await update(UpdateOnboarding(actor=principal, action=body.action, tour=body.tour))
+    return OnboardingOut(**asdict(await read(GetOnboarding(actor=principal))))
 
 
 @users_router.get("", response_model=UserPageOut, summary="Пользователи (поиск, фильтры роли и статуса)")

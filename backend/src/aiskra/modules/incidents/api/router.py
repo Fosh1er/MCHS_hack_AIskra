@@ -16,8 +16,12 @@ from aiskra.modules.incidents.api.schemas import (
     CardOpenedOut,
     CardSavedOut,
     CardServiceOut,
+    CardTimerIn,
+    CardTimerOut,
     ChangedOut,
     CreatedOut,
+    DdsTimerIn,
+    DdsTimerOut,
     OpenCardIn,
     SaveCardIn,
     ServiceStatusIn,
@@ -27,6 +31,7 @@ from aiskra.modules.incidents.api.schemas import (
 )
 from aiskra.modules.incidents.application.commands.add_workout import AddWorkout, AddWorkoutHandler
 from aiskra.modules.incidents.application.commands.append_card import AppendCard, AppendCardHandler
+from aiskra.modules.incidents.application.commands.card_timer import SetCardTimerPaused, SetCardTimerPausedHandler
 from aiskra.modules.incidents.application.commands.change_card_status import (
     ChangeCardStatus,
     ChangeCardStatusHandler,
@@ -37,6 +42,8 @@ from aiskra.modules.incidents.application.commands.dds import (
     ChangeServiceStatusHandler,
     MarkServiceReceived,
     MarkServiceReceivedHandler,
+    SetDdsTimerPaused,
+    SetDdsTimerPausedHandler,
 )
 from aiskra.modules.incidents.application.commands.open_card import OpenCard, OpenCardHandler
 from aiskra.modules.incidents.application.commands.record_card_view import RecordCardView, RecordCardViewHandler
@@ -104,6 +111,23 @@ async def save_card(
         saved_at=saved.saved_at,
         processing_ms=saved.processing_ms,
         services=[CardServiceOut(**asdict(s)) for s in saved.services],
+    )
+
+
+@router.post(
+    "/cards/{card_id}/timer",
+    response_model=CardTimerOut,
+    summary="Пауза таймера черновика на время подсказок по карточке (п. 5.3): всего до 10 минут на карточку",
+)
+async def card_timer(
+    card_id: UUID,
+    body: CardTimerIn,
+    actor: Trainee,
+    meta: Meta,
+    handler: Annotated[SetCardTimerPausedHandler, Depends(deps.provide_card_timer)],
+) -> CardTimerOut:
+    return CardTimerOut(
+        paused_ms=await handler(SetCardTimerPaused(actor=actor, card_id=card_id, paused=body.paused, meta=meta))
     )
 
 
@@ -286,6 +310,24 @@ async def dds_card(
     handler: Annotated[GetDdsCardHandler, Depends(deps.provide_dds_card)],
 ) -> DdsCardView:
     return await handler(GetDdsCard(actor=actor, card_id=card_id, service_code=service_code))
+
+
+@router.post(
+    "/dds/{service_code}/timer",
+    response_model=DdsTimerOut,
+    summary="Пауза таймера решения ДДС на время подсказок (п. 5.3): карточка или все ждущие решения; до 10 минут",
+)
+async def dds_timer(
+    service_code: str,
+    body: DdsTimerIn,
+    actor: Trainee,
+    meta: Meta,
+    handler: Annotated[SetDdsTimerPausedHandler, Depends(deps.provide_dds_timer)],
+) -> DdsTimerOut:
+    cards = await handler(
+        SetDdsTimerPaused(actor=actor, service_code=service_code, card_id=body.card_id, paused=body.paused, meta=meta)
+    )
+    return DdsTimerOut(cards=cards)
 
 
 @router.post(

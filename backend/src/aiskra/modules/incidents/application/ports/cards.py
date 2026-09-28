@@ -105,6 +105,8 @@ class CardView:
     workouts: list[WorkoutView]
     incident_types: list[IncidentTypeInfo]
     rework: ReworkNote | None = None  # последний «Вернуть на доработку», пока карточка не отработана снова
+    paused_ms: int = 0  # п. 5.3: пауза таймера на подсказки — не входит во время заполнения
+    timer_paused: bool = False  # пауза идёт сейчас
 
 
 @dataclass(frozen=True, kw_only=True)

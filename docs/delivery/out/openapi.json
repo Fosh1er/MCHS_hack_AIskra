@@ -104,6 +104,66 @@
     }
    }
   },
+  "/api/v1/auth/onboarding": {
+   "get": {
+    "tags": [
+     "auth"
+    ],
+    "summary": "Обучение интерфейсу: мой прогресс (п. 5.3)",
+    "operationId": "get_onboarding_api_v1_auth_onboarding_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/OnboardingOut"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "auth"
+    ],
+    "summary": "Обучение интерфейсу: экран пройден, пропустить всё или начать заново (п. 5.3)",
+    "operationId": "update_onboarding_api_v1_auth_onboarding_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/OnboardingIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/OnboardingOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/users": {
    "get": {
     "tags": [
@@ -2078,6 +2138,59 @@
     }
    }
   },
+  "/api/v1/incidents/cards/{card_id}/timer": {
+   "post": {
+    "tags": [
+     "incidents"
+    ],
+    "summary": "Пауза таймера черновика на время подсказок по карточке (п. 5.3): всего до 10 минут на карточку",
+    "operationId": "card_timer_api_v1_incidents_cards__card_id__timer_post",
+    "parameters": [
+     {
+      "name": "card_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Card Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/CardTimerIn"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/CardTimerOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/incidents/cards/{card_id}": {
    "get": {
     "tags": [
@@ -2721,6 +2834,58 @@
        "application/json": {
         "schema": {
          "$ref": "#/components/schemas/DdsCardView"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/incidents/dds/{service_code}/timer": {
+   "post": {
+    "tags": [
+     "incidents"
+    ],
+    "summary": "Пауза таймера решения ДДС на время подсказок (п. 5.3): карточка или все ждущие решения; до 10 минут",
+    "operationId": "dds_timer_api_v1_incidents_dds__service_code__timer_post",
+    "parameters": [
+     {
+      "name": "service_code",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Service Code"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/DdsTimerIn"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/DdsTimerOut"
         }
        }
       }
@@ -6539,6 +6704,34 @@
     ],
     "title": "CardSource"
    },
+   "CardTimerIn": {
+    "properties": {
+     "paused": {
+      "type": "boolean",
+      "title": "Paused",
+      "description": "true — остановить таймер на время подсказок, false — запустить снова"
+     }
+    },
+    "type": "object",
+    "required": [
+     "paused"
+    ],
+    "title": "CardTimerIn"
+   },
+   "CardTimerOut": {
+    "properties": {
+     "paused_ms": {
+      "type": "integer",
+      "title": "Paused Ms",
+      "description": "Сколько таймер карточки стоял на паузе, мс"
+     }
+    },
+    "type": "object",
+    "required": [
+     "paused_ms"
+    ],
+    "title": "CardTimerOut"
+   },
    "CardTypeRow": {
     "properties": {
      "code": {
@@ -6788,6 +6981,16 @@
         "type": "null"
        }
       ]
+     },
+     "paused_ms": {
+      "type": "integer",
+      "title": "Paused Ms",
+      "default": 0
+     },
+     "timer_paused": {
+      "type": "boolean",
+      "title": "Timer Paused",
+      "default": false
      }
     },
     "type": "object",
@@ -7173,6 +7376,23 @@
        }
       ],
       "title": "Added At"
+     },
+     "paused_ms": {
+      "type": "integer",
+      "title": "Paused Ms",
+      "default": 0
+     },
+     "pause_started_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Pause Started At"
      }
     },
     "type": "object",
@@ -7198,6 +7418,47 @@
     ],
     "title": "DdsJournalRow",
     "description": "Строка реестра ДДС «Список происшествий» (dds/image3–5)."
+   },
+   "DdsTimerIn": {
+    "properties": {
+     "paused": {
+      "type": "boolean",
+      "title": "Paused",
+      "description": "true — остановить таймер решения на время подсказок, false — запустить снова"
+     },
+     "card_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Card Id",
+      "description": "Карточка; без неё — все карточки службы, ждущие решения"
+     }
+    },
+    "type": "object",
+    "required": [
+     "paused"
+    ],
+    "title": "DdsTimerIn"
+   },
+   "DdsTimerOut": {
+    "properties": {
+     "cards": {
+      "type": "integer",
+      "title": "Cards",
+      "description": "У скольких карточек таймер остановлен или запущен снова"
+     }
+    },
+    "type": "object",
+    "required": [
+     "cards"
+    ],
+    "title": "DdsTimerOut"
    },
    "DebriefView": {
     "properties": {
@@ -9391,6 +9652,71 @@
      "prefecture"
     ],
     "title": "OkrugRow"
+   },
+   "OnboardingAction": {
+    "type": "string",
+    "enum": [
+     "seen",
+     "dismiss",
+     "reset"
+    ],
+    "title": "OnboardingAction"
+   },
+   "OnboardingIn": {
+    "properties": {
+     "action": {
+      "$ref": "#/components/schemas/OnboardingAction",
+      "description": "seen — экран пройден; dismiss — пропустить всё; reset — заново"
+     },
+     "tour": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 40
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Tour",
+      "description": "Экран обучения, для seen"
+     }
+    },
+    "type": "object",
+    "required": [
+     "action"
+    ],
+    "title": "OnboardingIn"
+   },
+   "OnboardingOut": {
+    "properties": {
+     "enabled": {
+      "type": "boolean",
+      "title": "Enabled",
+      "description": "Показывать подсказки автоматически (только обучающимся)"
+     },
+     "dismissed": {
+      "type": "boolean",
+      "title": "Dismissed",
+      "description": "Пользователь пропустил обучение"
+     },
+     "seen": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Seen",
+      "description": "Пройденные экраны"
+     }
+    },
+    "type": "object",
+    "required": [
+     "enabled",
+     "dismissed",
+     "seen"
+    ],
+    "title": "OnboardingOut",
+    "description": "Прогресс обучения интерфейсу (п. 5.3)."
    },
    "OpenCardIn": {
     "properties": {

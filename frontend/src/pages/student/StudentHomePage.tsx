@@ -6,6 +6,7 @@ import { useServices } from '../../shared/api/dictionaries';
 import { useMyProgress } from '../../shared/api/assessment';
 import { MODE_TITLE, SESSION_STATUS, armFor, useMySessions, type MySessionRow } from '../../shared/api/training';
 import { CabinetShell } from '../../shared/ui/CabinetShell';
+import { useScreenTour, useTourControls } from '../../shared/onboarding/OnboardingProvider';
 import { num } from '../../shared/format';
 
 function useRole() {
@@ -19,6 +20,8 @@ export function StudentHomePage() {
   const sessions = useMySessions();
   const progress = useMyProgress();
   const role = useRole();
+  const tour = useTourControls();
+  useScreenTour('student-home', !!sessions.data && !!progress.data);
   const all = sessions.data ?? [];
   const running = all.find((s) => s.status === 'running');
   const planned = all.filter((s) => s.status === 'planned');
@@ -26,22 +29,29 @@ export function StudentHomePage() {
   const p = progress.data;
   return (
     <CabinetShell kind="student" active="home" title="Кабинет обучающегося"
-      actions={<Button icon="table" onClick={() => navigate('/arm/112/journal')}>открыть АРМ-112</Button>}>
+      actions={(
+        <>
+          <span data-tour="help"><Button icon="help" variant="ghost" onClick={tour.restart}>пройти обучение заново</Button></span>
+          <Button icon="table" onClick={() => navigate('/arm/112/journal')}>открыть АРМ-112</Button>
+        </>
+      )}>
       {running ? (
-        <Banner actions={<Button variant="primary" icon="play" onClick={() => navigate(armFor(running))}>войти в занятие</Button>}>
-          Идёт занятие <b>«{running.title}»</b> · {MODE_TITLE[running.mode]} · ваша роль — <b>{role(running)}</b>
-        </Banner>
+        <div data-tour="session-banner">
+          <Banner actions={<Button variant="primary" icon="play" onClick={() => navigate(armFor(running))}>войти в занятие</Button>}>
+            Идёт занятие <b>«{running.title}»</b> · {MODE_TITLE[running.mode]} · ваша роль — <b>{role(running)}</b>
+          </Banner>
+        </div>
       ) : (
         <Banner>Сейчас занятий нет. Потренироваться можно в АРМ-112: кнопка «учебный вызов» в журнале.</Banner>
       )}
-      <section className="cab-kpis">
+      <section className="cab-kpis" data-tour="kpis">
         <StatTile label="Средний балл" value={num(p?.avg_score)} />
         <StatTile label="Оценённых работ" value={p?.points.length ?? 0} />
         <StatTile label="Занятий пройдено" value={finished.length} />
         <StatTile label="Запланировано" value={planned.length} />
       </section>
       <div className="cab-grid cab-grid--2">
-        <Card title="Назначенные занятия" flush>
+        <div className="tour-wrap" data-tour="assigned"><Card title="Назначенные занятия" flush>
           <table className="cab-table">
             <tbody>
               {[...(running ? [running] : []), ...planned].map((s) => (
@@ -54,14 +64,14 @@ export function StudentHomePage() {
               {sessions.data && !running && !planned.length && <tr><td className="c-slate">Назначенных занятий нет.</td></tr>}
             </tbody>
           </table>
-        </Card>
-        <Card title="Над чем поработать">
+        </Card></div>
+        <div className="tour-wrap" data-tour="recommendations"><Card title="Над чем поработать">
           {p?.recommendations.length
             ? <ul className="stu-recs">{p.recommendations.map((r) => <li key={r.key}><b>{Math.round(r.average * 100)} %</b> {r.text}</li>)}</ul>
             : 'Рекомендации появятся после первых оценённых карточек.'}
-        </Card>
+        </Card></div>
       </div>
-      <Card title="История занятий" flush>
+      <div data-tour="history"><Card title="История занятий" flush>
         <table className="cab-table">
           <thead><tr><th>Занятие</th><th>Роль</th><th>Завершено</th><th /></tr></thead>
           <tbody>
@@ -74,7 +84,7 @@ export function StudentHomePage() {
             {sessions.data && !finished.length && <tr><td colSpan={4} className="c-slate">Пройденных занятий пока нет.</td></tr>}
           </tbody>
         </table>
-      </Card>
+      </Card></div>
     </CabinetShell>
   );
 }

@@ -16,10 +16,20 @@ class DdsServiceState:
     service_code: str
     service_short: str
     current_status: str
+    paused_ms: int | None = None  # п. 5.3: пауза таймера решения на подсказки
+    pause_started_at: datetime | None = None
 
 
 class DdsRepository(Protocol):
     async def state(self, card_id: UUID, service_code: str) -> DdsServiceState | None: ...
+
+    async def timer_states(self, service_code: str, *, paused: bool) -> list[DdsServiceState]:
+        """Карточки службы для паузы таймера (п. 5.3): `paused=False` — ждут решения, `True` — сейчас на паузе."""
+        ...
+
+    async def set_pause(
+        self, card_id: UUID, service_code: str, *, paused_ms: int | None, pause_started_at: datetime | None
+    ) -> None: ...
 
     async def set_status(
         self,
@@ -67,6 +77,8 @@ class DdsJournalRow:
     service_status: str
     service_status_at: datetime | None
     added_at: datetime | None  # когда карточка поступила в службу — от этого времени идёт таймер ожидания
+    paused_ms: int = 0  # п. 5.3: пауза таймера ожидания на подсказки — не входит во время реакции
+    pause_started_at: datetime | None = None  # пауза идёт сейчас — таймер стоит
 
 
 class DdsReader(Protocol):

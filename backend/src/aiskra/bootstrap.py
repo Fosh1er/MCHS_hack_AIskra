@@ -83,22 +83,29 @@ from aiskra.modules.identity.application.commands.groups import DeleteGroupHandl
 from aiskra.modules.identity.application.commands.groups import ListGroupsHandler as IdentityListGroupsHandler
 from aiskra.modules.identity.application.commands.login import LoginHandler
 from aiskra.modules.identity.application.commands.logout import LogoutHandler
+from aiskra.modules.identity.application.commands.onboarding import UpdateOnboardingHandler
 from aiskra.modules.identity.application.commands.reset_password import ResetPasswordHandler
 from aiskra.modules.identity.application.commands.set_user_blocked import SetUserBlockedHandler
 from aiskra.modules.identity.application.commands.update_user import UpdateUserHandler
 from aiskra.modules.identity.application.ports.auth import AuthPolicy
 from aiskra.modules.identity.application.queries.list_users import ListUsersHandler
+from aiskra.modules.identity.application.queries.onboarding import GetOnboardingHandler
 from aiskra.modules.identity.application.queries.resolve_session import ResolveSession, ResolveSessionHandler
 from aiskra.modules.identity.domain.user import LockoutPolicy
 from aiskra.modules.identity.infrastructure.groups import SqlGroupStore
-from aiskra.modules.identity.infrastructure.reader import SqlSessionReader, SqlUserReader
+from aiskra.modules.identity.infrastructure.reader import SqlOnboardingReader, SqlSessionReader, SqlUserReader
 from aiskra.modules.identity.infrastructure.repositories import SqlSessionRepository, SqlUserRepository
 from aiskra.modules.identity.infrastructure.security import ScryptPasswordHasher, SessionTokenIssuer
 from aiskra.modules.incidents.api import deps as incidents_deps
 from aiskra.modules.incidents.application.commands.add_workout import AddWorkoutHandler
 from aiskra.modules.incidents.application.commands.append_card import AppendCardHandler
+from aiskra.modules.incidents.application.commands.card_timer import SetCardTimerPausedHandler
 from aiskra.modules.incidents.application.commands.change_card_status import ChangeCardStatusHandler
-from aiskra.modules.incidents.application.commands.dds import ChangeServiceStatusHandler, MarkServiceReceivedHandler
+from aiskra.modules.incidents.application.commands.dds import (
+    ChangeServiceStatusHandler,
+    MarkServiceReceivedHandler,
+    SetDdsTimerPausedHandler,
+)
 from aiskra.modules.incidents.application.commands.open_card import OpenCardHandler
 from aiskra.modules.incidents.application.commands.record_card_view import RecordCardViewHandler
 from aiskra.modules.incidents.application.commands.save_card import SaveCardHandler
@@ -337,6 +344,12 @@ def _wire_identity_and_audit(app: FastAPI, services: Services) -> None:
     def list_users(session: Session) -> ListUsersHandler:
         return ListUsersHandler(SqlUserReader(session))
 
+    def get_onboarding(session: Session) -> GetOnboardingHandler:
+        return GetOnboardingHandler(SqlOnboardingReader(session))
+
+    def update_onboarding(session: Session) -> UpdateOnboardingHandler:
+        return UpdateOnboardingHandler(SqlUserRepository(session), SqlAlchemyUnitOfWork(session))
+
     def purge_audit(session: Session) -> PurgeAuditHandler:
         return build_purge_audit_handler(session)
 
@@ -355,6 +368,8 @@ def _wire_identity_and_audit(app: FastAPI, services: Services) -> None:
     ov[identity_deps.provide_set_user_blocked] = set_blocked
     ov[identity_deps.provide_reset_password] = reset_password
     ov[identity_deps.provide_list_users] = list_users
+    ov[identity_deps.provide_get_onboarding] = get_onboarding
+    ov[identity_deps.provide_update_onboarding] = update_onboarding
     ov[audit_deps.provide_search_audit] = search_audit
     ov[audit_deps.provide_event_types] = ListEventTypesHandler
     ov[audit_deps.provide_purge] = purge_audit
@@ -393,6 +408,11 @@ def _wire_incidents(app: FastAPI) -> None:
     def set_flags(session: Session) -> SetCardFlagsHandler:
         return SetCardFlagsHandler(SqlCardRepository(session), SqlAuditRecorder(session), SqlAlchemyUnitOfWork(session))
 
+    def card_timer(session: Session) -> SetCardTimerPausedHandler:
+        return SetCardTimerPausedHandler(
+            SqlCardRepository(session), SqlAuditRecorder(session), SqlAlchemyUnitOfWork(session), clock
+        )
+
     def append(session: Session) -> AppendCardHandler:
         return AppendCardHandler(SqlCardRepository(session), SqlAuditRecorder(session), SqlAlchemyUnitOfWork(session))
 
@@ -409,6 +429,7 @@ def _wire_incidents(app: FastAPI) -> None:
     ov[incidents_deps.provide_search_journal] = journal
     ov[incidents_deps.provide_change_status] = change_status
     ov[incidents_deps.provide_set_flags] = set_flags
+    ov[incidents_deps.provide_card_timer] = card_timer
     ov[incidents_deps.provide_append] = append
     ov[incidents_deps.provide_add_workout] = add_workout
     ov[incidents_deps.provide_record_view] = record_view
@@ -424,6 +445,11 @@ def _wire_incidents(app: FastAPI) -> None:
             SqlDdsRepository(session), SqlAuditRecorder(session), SqlAlchemyUnitOfWork(session), clock
         )
 
+    def dds_timer(session: Session) -> SetDdsTimerPausedHandler:
+        return SetDdsTimerPausedHandler(
+            SqlDdsRepository(session), SqlAuditRecorder(session), SqlAlchemyUnitOfWork(session), clock
+        )
+
     def dds_journal(session: Session) -> SearchDdsJournalHandler:
         return SearchDdsJournalHandler(SqlDdsReader(session))
 
@@ -434,6 +460,7 @@ def _wire_incidents(app: FastAPI) -> None:
     ov[incidents_deps.provide_dds_card] = dds_card
     ov[incidents_deps.provide_dds_received] = dds_received
     ov[incidents_deps.provide_dds_status] = dds_status
+    ov[incidents_deps.provide_dds_timer] = dds_timer
 
 
 def build_generate_handler(router: ModelRouter, session: AsyncSession) -> GenerateScenariosHandler:

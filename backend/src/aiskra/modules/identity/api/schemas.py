@@ -7,6 +7,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from aiskra.modules.identity.domain.onboarding import OnboardingAction
 from aiskra.shared.security import Principal, Role
 
 
@@ -90,3 +91,16 @@ class BlockIn(BaseModel):
 
 class PasswordResetIn(BaseModel):
     new_password: str = Field(max_length=128)
+
+
+class OnboardingOut(BaseModel):
+    """Прогресс обучения интерфейсу (п. 5.3)."""
+
+    enabled: bool = Field(description="Показывать подсказки автоматически (только обучающимся)")
+    dismissed: bool = Field(description="Пользователь пропустил обучение")
+    seen: list[str] = Field(description="Пройденные экраны")
+
+
+class OnboardingIn(BaseModel):
+    action: OnboardingAction = Field(description="seen — экран пройден; dismiss — пропустить всё; reset — заново")
+    tour: str | None = Field(default=None, max_length=40, description="Экран обучения, для seen")
