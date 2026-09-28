@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import StrEnum
 
+from aiskra.modules.identity.domain.onboarding import Onboarding
 from aiskra.shared.domain import Entity
 from aiskra.shared.errors import AuthenticationError, DomainError
 from aiskra.shared.security import Role
@@ -78,6 +79,7 @@ class User(Entity):
     failed_attempts: int = 0
     locked_until: datetime | None = None
     last_login_at: datetime | None = None
+    onboarding: Onboarding = field(default_factory=Onboarding)  # п. 5.3: пройденные экраны обучения
 
     @classmethod
     def create(

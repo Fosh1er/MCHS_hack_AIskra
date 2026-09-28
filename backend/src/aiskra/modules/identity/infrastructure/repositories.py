@@ -8,6 +8,7 @@ from uuid import UUID
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from aiskra.modules.identity.domain.onboarding import Onboarding
 from aiskra.modules.identity.domain.session import AuthSession
 from aiskra.modules.identity.domain.user import User, UserStatus
 from aiskra.modules.identity.infrastructure.models import AuthSessionModel, UserModel
@@ -28,6 +29,7 @@ def _to_user(row: UserModel) -> User:
         failed_attempts=row.failed_attempts or 0,
         locked_until=as_utc(row.locked_until),
         last_login_at=as_utc(row.last_login_at),
+        onboarding=Onboarding.from_json(row.onboarding),
     )
 
 
@@ -42,6 +44,7 @@ def _fill_user(row: UserModel, user: User) -> None:
     row.locked_until = user.locked_until
     row.last_login_at = user.last_login_at
     row.search_key = search_key(user.login, user.full_name)
+    row.onboarding = user.onboarding.to_json()
 
 
 class SqlUserRepository:
