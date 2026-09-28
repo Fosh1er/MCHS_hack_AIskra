@@ -20,6 +20,8 @@ from aiskra.modules.incidents.api.schemas import (
     CardTimerOut,
     ChangedOut,
     CreatedOut,
+    DdsTimerIn,
+    DdsTimerOut,
     OpenCardIn,
     SaveCardIn,
     ServiceStatusIn,
@@ -40,6 +42,8 @@ from aiskra.modules.incidents.application.commands.dds import (
     ChangeServiceStatusHandler,
     MarkServiceReceived,
     MarkServiceReceivedHandler,
+    SetDdsTimerPaused,
+    SetDdsTimerPausedHandler,
 )
 from aiskra.modules.incidents.application.commands.open_card import OpenCard, OpenCardHandler
 from aiskra.modules.incidents.application.commands.record_card_view import RecordCardView, RecordCardViewHandler
@@ -306,6 +310,24 @@ async def dds_card(
     handler: Annotated[GetDdsCardHandler, Depends(deps.provide_dds_card)],
 ) -> DdsCardView:
     return await handler(GetDdsCard(actor=actor, card_id=card_id, service_code=service_code))
+
+
+@router.post(
+    "/dds/{service_code}/timer",
+    response_model=DdsTimerOut,
+    summary="Пауза таймера решения ДДС на время подсказок (п. 5.3): карточка или все ждущие решения; до 10 минут",
+)
+async def dds_timer(
+    service_code: str,
+    body: DdsTimerIn,
+    actor: Trainee,
+    meta: Meta,
+    handler: Annotated[SetDdsTimerPausedHandler, Depends(deps.provide_dds_timer)],
+) -> DdsTimerOut:
+    cards = await handler(
+        SetDdsTimerPaused(actor=actor, service_code=service_code, card_id=body.card_id, paused=body.paused, meta=meta)
+    )
+    return DdsTimerOut(cards=cards)
 
 
 @router.post(

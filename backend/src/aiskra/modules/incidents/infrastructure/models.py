@@ -75,6 +75,9 @@ class CardServiceModel(Base):
     # без поиска каждой карточки по ключу; пишется один раз — строки служб создаются при сохранении карточки
     card_saved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     card_number: Mapped[int | None] = mapped_column(BigInteger)
+    # п. 5.3: пауза таймера решения ДДС на подсказки по экрану — не входит во время реакции
+    paused_ms: Mapped[int | None] = mapped_column(Integer)
+    pause_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class CardServiceStatusModel(Base):

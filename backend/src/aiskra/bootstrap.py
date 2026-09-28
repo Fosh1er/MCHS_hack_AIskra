@@ -101,7 +101,11 @@ from aiskra.modules.incidents.application.commands.add_workout import AddWorkout
 from aiskra.modules.incidents.application.commands.append_card import AppendCardHandler
 from aiskra.modules.incidents.application.commands.card_timer import SetCardTimerPausedHandler
 from aiskra.modules.incidents.application.commands.change_card_status import ChangeCardStatusHandler
-from aiskra.modules.incidents.application.commands.dds import ChangeServiceStatusHandler, MarkServiceReceivedHandler
+from aiskra.modules.incidents.application.commands.dds import (
+    ChangeServiceStatusHandler,
+    MarkServiceReceivedHandler,
+    SetDdsTimerPausedHandler,
+)
 from aiskra.modules.incidents.application.commands.open_card import OpenCardHandler
 from aiskra.modules.incidents.application.commands.record_card_view import RecordCardViewHandler
 from aiskra.modules.incidents.application.commands.save_card import SaveCardHandler
@@ -441,6 +445,11 @@ def _wire_incidents(app: FastAPI) -> None:
             SqlDdsRepository(session), SqlAuditRecorder(session), SqlAlchemyUnitOfWork(session), clock
         )
 
+    def dds_timer(session: Session) -> SetDdsTimerPausedHandler:
+        return SetDdsTimerPausedHandler(
+            SqlDdsRepository(session), SqlAuditRecorder(session), SqlAlchemyUnitOfWork(session), clock
+        )
+
     def dds_journal(session: Session) -> SearchDdsJournalHandler:
         return SearchDdsJournalHandler(SqlDdsReader(session))
 
@@ -451,6 +460,7 @@ def _wire_incidents(app: FastAPI) -> None:
     ov[incidents_deps.provide_dds_card] = dds_card
     ov[incidents_deps.provide_dds_received] = dds_received
     ov[incidents_deps.provide_dds_status] = dds_status
+    ov[incidents_deps.provide_dds_timer] = dds_timer
 
 
 def build_generate_handler(router: ModelRouter, session: AsyncSession) -> GenerateScenariosHandler:

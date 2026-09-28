@@ -2,9 +2,10 @@
  *  Первое открытие ставит «Получена службой» (dds/image10). Службы в карточке ДДС не добавляются (#701). */
 import { useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { useMe } from '../../shared/api/auth';
-import { useDdsActions, useDdsCard } from '../../shared/api/incidents';
-import { useScreenTour } from '../../shared/onboarding/OnboardingProvider';
+import { setDdsTimerPaused, useDdsActions, useDdsCard } from '../../shared/api/incidents';
+import { useScreenTour, useTourPause } from '../../shared/onboarding/OnboardingProvider';
 import { CardViewer } from '../card112/CardViewer';
 import { DdsSoftphone } from './DdsSoftphone';
 
@@ -14,6 +15,13 @@ export function DdsCardPage() {
   const navigate = useNavigate();
   const card = useDdsCard(service, id);
   useScreenTour('dds-card', !!card.data);
+  // п. 5.3: пока новичок впервые читает подсказки карточки, таймер решения своей службы стоит
+  const qc = useQueryClient();
+  const deciding = card.data?.next_statuses.includes('accepted') ?? false;
+  useTourPause('dds-card', deciding, {
+    set: (paused) => setDdsTimerPaused(service, paused, id),
+    onSynced: () => { void qc.invalidateQueries({ queryKey: ['dds-journal', service] }); },
+  });
   const actions = useDdsActions(service, id);
   const marked = useRef(false);
   const canAct = (card.data?.next_statuses.length ?? 0) > 0 || card.data?.service_status !== 'added';

@@ -1,4 +1,4 @@
-"""П. 5.3: пауза таймера карточки через API — только автору, одна на карточку, в журнал аудита."""
+"""П. 5.3: пауза таймера карточки через API — только автору, всего до 10 минут, каждая — в журнал аудита."""
 
 from collections.abc import Callable
 
@@ -28,13 +28,13 @@ def test_pause_and_resume(student: TestClient, app_client: Callable[[], TestClie
     view = student.get(f"/api/v1/incidents/cards/{card['id']}").json()
     assert view["timer_paused"] is False and view["paused_ms"] == resumed.json()["paused_ms"]
 
-    again = student.post(url, json={"paused": True})
-    assert again.status_code == 422 and again.json()["error"] == "timer_pause_used"
+    assert student.post(url, json={"paused": True}).status_code == 200  # вторая пауза — в пределах 10 минут
+    student.post(url, json={"paused": False})
 
     admin = app_client()
     login(admin, "admin")
     audit = admin.get("/api/v1/audit", params={"event": "card.timer_paused"}).json()
-    assert audit["total"] == 1 and audit["items"][0]["card_number"] == card["number"]
+    assert audit["total"] == 2 and audit["items"][0]["card_number"] == card["number"]
 
 
 def test_only_author_can_pause(student: TestClient, app_client: Callable[[], TestClient]) -> None:

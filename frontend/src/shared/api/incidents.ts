@@ -153,6 +153,7 @@ export interface DdsJournalRow {
   empty_call: 'no_contact' | 'call_dropped' | null; has_victims: boolean; victims_count: number;
   address_line: string | null; description: string | null; author_name: string | null;
   service_status: string; service_status_at: string | null; added_at: string | null;
+  paused_ms: number; pause_started_at: string | null; // п. 5.3: пауза таймера ожидания на подсказки
 }
 export interface DdsJournalPage { items: DdsJournalRow[]; total: number; page: number; page_size: number }
 export interface DdsCardView { card: CardView; service_code: string; service_status: string; next_statuses: string[] }
@@ -197,3 +198,9 @@ export function useDdsActions(service: string, id: string) {
     }),
   };
 }
+
+/** Пауза таймера решения ДДС на время подсказок (п. 5.3): по карточке или по всем карточкам службы в очереди. */
+export const setDdsTimerPaused = (service: string, paused: boolean, cardId?: string) =>
+  http<{ cards: number }>(`/api/v1/incidents/dds/${encodeURIComponent(service)}/timer`, {
+    method: 'POST', body: JSON.stringify({ paused, card_id: cardId ?? null }),
+  });

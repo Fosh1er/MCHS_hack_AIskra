@@ -15,7 +15,7 @@ import { shortName } from '../../shared/ui/ArmTopBar';
 import { CardHeader } from './CardHeader';
 import { CardViewer } from './CardViewer';
 import { CallPanel } from '../../shared/ui/CallPanel';
-import { useActiveTour, useScreenTour } from '../../shared/onboarding/OnboardingProvider';
+import { useScreenTour, useTourPause } from '../../shared/onboarding/OnboardingProvider';
 import { answerCall } from '../../shared/api/training';
 import { ApplicantRow, VictimsRow } from './ApplicantBlock';
 import { AddressBlock, DescriptionBlock } from './AddressBlock';
@@ -82,29 +82,18 @@ export function Card112Page() {
 
 type ModalKind = null | 'services' | 'save' | 'close' | 'new' | 'no_contact' | 'call_dropped';
 
-/** Пауза таймера, пока новичок впервые проходит подсказки по карточке (п. 5.3): время инструктажа не идёт
- *  в норматив. Сервер вычитает паузу из времени заполнения (одна на карточку, до 10 минут); ручной повтор
- *  подсказок кнопкой «?» таймер не останавливает. Возвращает, сколько миллисекунд вычесть из часов карточки к моменту `now`. */
+/** Пауза таймера, пока новичок впервые проходит подсказки по карточке (п. 5.3): время инструктажа не идёт в норматив.
+ *  Сервер вычитает паузу из времени заполнения (всего до 10 минут на карточку). Возвращает, сколько миллисекунд
+ *  вычесть из часов карточки к моменту `now`. */
 function useTourTimerPause(view: CardView, editable: boolean, now: number): number {
-  const tour = useActiveTour();
   const qc = useQueryClient();
-  const pausing = editable && tour?.id === 'card-112' && tour.auto;
-  const since = useRef<number | null>(null);
   const [localMs, setLocalMs] = useState(0);
-  useEffect(() => {
-    if (!pausing) return;
-    since.current = Date.now();
-    void setCardTimerPaused(view.id, true).catch(() => undefined);
-    return () => {
-      const ms = Date.now() - (since.current ?? Date.now());
-      since.current = null;
-      setLocalMs((x) => x + ms);
-      void setCardTimerPaused(view.id, false)
-        .catch(() => undefined)
-        .finally(() => qc.invalidateQueries({ queryKey: ['card', view.id] }));
-    };
-  }, [pausing, view.id, qc]);
-  const ongoing = since.current === null ? 0 : Math.max(0, now - since.current);
+  const since = useTourPause('card-112', editable, {
+    set: (paused) => setCardTimerPaused(view.id, paused),
+    onEnd: (ms) => setLocalMs((x) => x + ms),
+    onSynced: () => { void qc.invalidateQueries({ queryKey: ['card', view.id] }); },
+  });
+  const ongoing = since === null ? 0 : Math.max(0, now - since);
   return Math.max(view.paused_ms ?? 0, localMs) + ongoing;
 }
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from datetime import timedelta
 from uuid import UUID
 
 from sqlalchemy import select
@@ -11,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from aiskra.modules.assessment.application.ports.attempts import Card112Attempt, DdsAttempt
 from aiskra.modules.assessment.domain.scoring import StatusStep
 from aiskra.modules.dictionaries.infrastructure.models import EnumValueModel, ServiceModel
-from aiskra.modules.incidents.infrastructure.models import CardServiceStatusModel, IncidentCardModel
+from aiskra.modules.incidents.infrastructure.models import CardServiceModel, CardServiceStatusModel, IncidentCardModel
 from aiskra.modules.incidents.infrastructure.reader import SqlCardReader
 from aiskra.modules.training.domain.actors import topic_of
 from aiskra.modules.training.infrastructure.models import CallMessageModel, CallModel, ScenarioModel
@@ -106,6 +107,15 @@ class IncidentAttempts:
         history = [StatusStep(status=r.status, at=as_utc(r.at), order_no=r.order_no, comment=r.comment) for r in rows]
         actors = {r.actor_id for r in rows if r.actor_id and r.status not in ("added",)}
         added = next((h.at for h in history if h.status == "added"), None) or as_utc(card.saved_at)
+        paused_ms = (
+            await self._s.execute(
+                select(CardServiceModel.paused_ms).where(
+                    CardServiceModel.card_id == card_id, CardServiceModel.service_code == service_code
+                )
+            )
+        ).scalar_one_or_none()
+        if added is not None and paused_ms:  # п. 5.3: пауза на подсказки не входит во время реакции
+            added += timedelta(milliseconds=paused_ms)
         parties = (
             (
                 await self._s.execute(

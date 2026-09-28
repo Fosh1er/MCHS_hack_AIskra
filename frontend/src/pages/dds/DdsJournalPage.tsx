@@ -3,11 +3,12 @@
  *  до «Принята» / «Не принята» с нормативом 30 с. Уведомление — подсветка и звуковой сигнал. */
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { Icon, JournalRow } from '@smena112/ui-kit';
 import { useMe } from '../../shared/api/auth';
 import { useCardTypes, useServices } from '../../shared/api/dictionaries';
-import { SERVICE_STATUS, useDdsJournal, type DdsJournalRow } from '../../shared/api/incidents';
-import { useScreenTour } from '../../shared/onboarding/OnboardingProvider';
+import { SERVICE_STATUS, setDdsTimerPaused, useDdsJournal, type DdsJournalRow } from '../../shared/api/incidents';
+import { useScreenTour, useTourPause } from '../../shared/onboarding/OnboardingProvider';
 import { ArmTopBar, shortName } from '../../shared/ui/ArmTopBar';
 import { ARM_MENU } from '../../shared/ui/armMenu';
 import { rememberDds } from './DdsSelectPage';
@@ -58,6 +59,12 @@ export function DdsJournalPage() {
   const [pageSize, setPageSize] = useState(10);
   const journal = useDdsJournal(service, { q, statuses: FILTERS.find((f) => f.value === filter)?.statuses ?? [], page, page_size: pageSize }, true);
   useScreenTour('dds-journal', !!journal.data);
+  // п. 5.3: пока новичок впервые читает подсказки реестра, таймеры ожидания карточек службы стоят
+  const qc = useQueryClient();
+  const pauseSince = useTourPause('dds-journal', true, {
+    set: (paused) => setDdsTimerPaused(service, paused),
+    onSynced: () => { void qc.invalidateQueries({ queryKey: ['dds-journal', service] }); },
+  });
   const titles = useMemo(() => new Map((cardTypes.data ?? []).map((t) => [t.code, t.title])), [cardTypes.data]);
   useEffect(() => { rememberDds(service); }, [service]);
 
@@ -106,6 +113,8 @@ export function DdsJournalPage() {
   const onSearch = (e: FormEvent) => { e.preventDefault(); setQ(draft.trim()); setPage(1); };
   const open = (id: string) => { setFresh((f) => { const n = new Set(f); n.delete(id); return n; }); navigate(`/arm/dds/${encodeURIComponent(service)}/${id}`); };
 
+  // таймер ожидания стоит на паузе подсказок: с сервера (pause_started_at) или, пока ответ не пришёл, — локально
+  const waitUntil = (r: DdsJournalRow) => (r.pause_started_at ? new Date(r.pause_started_at).getTime() : pauseSince ?? now);
   const toInc = (r: DdsJournalRow) => {
     const reg = r.registered_at ? new Date(r.registered_at) : null;
     const saved = r.added_at ? new Date(r.added_at) : null;
@@ -123,7 +132,7 @@ export function DdsJournalPage() {
       descMeta: saved ? `${saved.toLocaleDateString('ru-RU')} ${saved.toLocaleTimeString('ru-RU')} ${r.operator_number ?? ''} ${r.author_name ? shortName(r.author_name) : ''} -` : '',
       operatorCell: r.channel === 'sms' ? 'СМС' : r.operator_number ?? '',
       arm: r.arm_number ?? '',
-      waitSec: waiting ? Math.max(0, Math.floor((now - saved!.getTime()) / 1000)) : undefined,
+      waitSec: waiting ? Math.max(0, Math.floor((waitUntil(r) - saved!.getTime() - (r.paused_ms ?? 0)) / 1000)) : undefined,
       isNew: fresh.has(r.id),
     };
   };

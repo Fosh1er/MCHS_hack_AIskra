@@ -104,6 +104,34 @@ export function useActiveTour(): { id: TourId; auto: boolean } | null {
   return useContext(Ctx)?.active ?? null;
 }
 
+/** Учебный таймер экрана стоит, пока подсказки этого экрана показаны автоматически — в первый раз (п. 5.3): время
+ *  инструктажа не идёт в норматив. Ручной повтор по кнопке таймер не останавливает — иначе это лазейка «остановить
+ *  время». `set` ставит и снимает паузу на сервере; `onEnd` получает длительность паузы сразу (чтобы цифры на экране
+ *  не прыгнули), `onSynced` — после ответа сервера. Возвращает начало текущей паузы (Date.now) или null. */
+export function useTourPause(tour: TourId, enabled: boolean, handlers: {
+  set: (paused: boolean) => Promise<unknown>;
+  onEnd?: (ms: number) => void;
+  onSynced?: () => void;
+}): number | null {
+  const active = useActiveTour();
+  const pausing = enabled && active?.id === tour && active.auto;
+  const [since, setSince] = useState<number | null>(null);
+  const latest = useRef(handlers);
+  latest.current = handlers;
+  useEffect(() => {
+    if (!pausing) return;
+    const started = Date.now();
+    setSince(started);
+    void latest.current.set(true).catch(() => undefined);
+    return () => {
+      setSince(null);
+      latest.current.onEnd?.(Date.now() - started);
+      void latest.current.set(false).catch(() => undefined).finally(() => latest.current.onSynced?.());
+    };
+  }, [pausing]);
+  return since;
+}
+
 /** Кнопки «обучение» и «пройти обучение заново». */
 export function useTourControls() {
   const ctx = useContext(Ctx);

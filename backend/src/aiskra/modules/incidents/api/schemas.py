@@ -180,3 +180,12 @@ class CardTimerIn(BaseModel):
 
 class CardTimerOut(BaseModel):
     paused_ms: int = Field(description="Сколько таймер карточки стоял на паузе, мс")
+
+
+class DdsTimerIn(BaseModel):
+    paused: bool = Field(description="true — остановить таймер решения на время подсказок, false — запустить снова")
+    card_id: UUID | None = Field(default=None, description="Карточка; без неё — все карточки службы, ждущие решения")
+
+
+class DdsTimerOut(BaseModel):
+    cards: int = Field(description="У скольких карточек таймер остановлен или запущен снова")

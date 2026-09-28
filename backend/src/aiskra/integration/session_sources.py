@@ -149,11 +149,15 @@ class SessionProgress:
                 since = _timer_start(draft) if draft else None
             else:
                 svc = p.dds_service_code or ""
-                statuses = (
-                    dict(
+                service_rows = (
+                    (
                         (
                             await self._s.execute(
-                                select(CardServiceModel.card_id, CardServiceModel.current_status).where(
+                                select(
+                                    CardServiceModel.card_id,
+                                    CardServiceModel.current_status,
+                                    CardServiceModel.paused_ms,
+                                ).where(
                                     CardServiceModel.service_code == svc,
                                     CardServiceModel.card_id.in_([c.id for c in cards]),
                                 )
@@ -161,14 +165,18 @@ class SessionProgress:
                         ).all()
                     )
                     if cards
-                    else {}
+                    else []
                 )
+                statuses = {cid: st for cid, st, _ in service_rows}
+                paused = {cid: ms or 0 for cid, _, ms in service_rows}
                 mine = [c for c in cards if c.id in statuses]
                 done = [c for c in mine if statuses[c.id] not in WAITING]  # решение принято
                 waiting = [c for c in mine if statuses[c.id] in WAITING]
                 marks = await self._assessments([c.id for c in mine], "dds", svc)
                 current = waiting[0] if waiting else None
-                since = current.saved_at if current else None
+                # п. 5.3: пауза на подсказки не входит в таймер ожидания решения
+                arrived = as_utc(current.saved_at) if current else None
+                since = arrived + timedelta(milliseconds=paused[current.id]) if current and arrived else arrived
             if since is not None and since.tzinfo is None:
                 since = since.replace(tzinfo=UTC)
             scores = [m["score"] for m in marks if m["score"] is not None]
@@ -312,6 +320,12 @@ class SessionFactsReader:
             .where(CardServiceStatusModel.card_id.in_(card_ids))
             .order_by(CardServiceStatusModel.id)
         )
+        pauses = await self._s.execute(
+            select(CardServiceModel.card_id, CardServiceModel.service_code, CardServiceModel.paused_ms).where(
+                CardServiceModel.card_id.in_(card_ids), CardServiceModel.paused_ms.is_not(None)
+            )
+        )
+        paused = {(cid, code): (ms or 0) / 1000 for cid, code, ms in pauses.all()}  # п. 5.3: пауза на подсказки
         added: dict[tuple[UUID, str], datetime] = {}
         out: dict[UUID, dict[str, float]] = {}
         for cid, code, status, raw_at in rows.all():
@@ -321,7 +335,8 @@ class SessionFactsReader:
             if status in WAITING:
                 added.setdefault(key, at)
             elif key in added and code not in out.get(cid, {}):
-                out.setdefault(cid, {})[code] = max(0.0, (at - added[key]).total_seconds())
+                secs = (at - added[key]).total_seconds() - paused.get(key, 0.0)
+                out.setdefault(cid, {})[code] = max(0.0, secs)
         return out
 
 

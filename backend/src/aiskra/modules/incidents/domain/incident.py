@@ -10,11 +10,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime
 from enum import StrEnum
 from uuid import UUID
 
 from aiskra.modules.incidents.domain.card import DESCRIPTION_MAX, IncidentCardData
+from aiskra.modules.incidents.domain.timer_pause import end_pause, start_pause
 from aiskra.shared.domain import Entity
 from aiskra.shared.errors import DomainError
 
@@ -62,10 +63,6 @@ def missing_for_save(data: IncidentCardData, services: list[CardService]) -> lis
     return missing
 
 
-# Пауза таймера на подсказки по карточке (п. 5.3): одна на карточку и не дольше — иначе лазейка «остановить время».
-MAX_TIMER_PAUSE = timedelta(minutes=10)
-
-
 @dataclass(eq=False, kw_only=True)
 class IncidentCard(Entity):
     author_id: UUID
@@ -96,23 +93,17 @@ class IncidentCard(Entity):
         return max(0, int((self.saved_at - self.opened_at).total_seconds() * 1000) - (self.paused_ms or 0))
 
     def pause_timer(self, now: datetime) -> None:
-        """Остановить таймер на время подсказок по карточке (п. 5.3). Одна пауза на карточку."""
+        """Остановить таймер на время подсказок по карточке (п. 5.3); всего не больше MAX_TIMER_PAUSE."""
         if self.status is not CardStatus.DRAFT:
             raise DomainError(f"Карточка {self.number} уже сохранена", code="card_already_saved")
-        if self.pause_started_at is not None:
-            return  # уже на паузе — повтор запроса после сбоя связи
-        if self.paused_ms is not None:
-            raise DomainError("Таймер этой карточки уже останавливался", code="timer_pause_used")
-        self.pause_started_at = now
+        self.pause_started_at = start_pause(self.paused_ms, self.pause_started_at, now)
 
     def resume_timer(self, now: datetime) -> int:
-        """Запустить таймер снова. Возвращает, сколько всего таймер стоял на паузе, мс (не больше MAX_TIMER_PAUSE)."""
-        if self.pause_started_at is None:
-            return self.paused_ms or 0  # паузы нет — повтор запроса
-        pause = min(max(now - self.pause_started_at, timedelta(0)), MAX_TIMER_PAUSE)
-        self.paused_ms = (self.paused_ms or 0) + int(pause.total_seconds() * 1000)
-        self.pause_started_at = None
-        return self.paused_ms
+        """Запустить таймер снова. Возвращает, сколько всего таймер стоял на паузе, мс."""
+        if self.pause_started_at is not None:
+            self.paused_ms = end_pause(self.paused_ms, self.pause_started_at, now)
+            self.pause_started_at = None
+        return self.paused_ms or 0
 
     def save(self, data: IncidentCardData, services: list[CardService], now: datetime) -> None:
         if self.status is not CardStatus.DRAFT:
