@@ -3770,6 +3770,129 @@
     }
    }
   },
+  "/api/v1/training/voice-lab/stt": {
+   "post": {
+    "tags": [
+     "training"
+    ],
+    "summary": "Голосовой полигон: распознать фразу (п. 3.6)",
+    "operationId": "voice_lab_stt_api_v1_training_voice_lab_stt_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/VoiceLabSttIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": {
+          "type": "string"
+         },
+         "type": "object",
+         "title": "Response Voice Lab Stt Api V1 Training Voice Lab Stt Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/training/voice-lab/chat": {
+   "post": {
+    "tags": [
+     "training"
+    ],
+    "summary": "Голосовой полигон: ответ заявителя потоком SSE (п. 3.6)",
+    "operationId": "voice_lab_chat_api_v1_training_voice_lab_chat_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/VoiceLabChatIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/training/voice-lab/tts": {
+   "post": {
+    "tags": [
+     "training"
+    ],
+    "summary": "Голосовой полигон: озвучить реплику с эмоцией (п. 3.6)",
+    "operationId": "voice_lab_tts_api_v1_training_voice_lab_tts_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/VoiceLabTtsIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/training/calls/{call_id}/end": {
    "post": {
     "tags": [
@@ -13784,6 +13907,98 @@
     "additionalProperties": false,
     "type": "object",
     "title": "VictimsIn"
+   },
+   "VoiceLabChatIn": {
+    "properties": {
+     "messages": {
+      "items": {
+       "$ref": "#/components/schemas/VoiceLabMessage"
+      },
+      "type": "array",
+      "maxItems": 60,
+      "minItems": 1,
+      "title": "Messages"
+     }
+    },
+    "type": "object",
+    "required": [
+     "messages"
+    ],
+    "title": "VoiceLabChatIn"
+   },
+   "VoiceLabMessage": {
+    "properties": {
+     "role": {
+      "type": "string",
+      "maxLength": 20,
+      "title": "Role"
+     },
+     "content": {
+      "type": "string",
+      "maxLength": 12000,
+      "title": "Content"
+     }
+    },
+    "type": "object",
+    "required": [
+     "role",
+     "content"
+    ],
+    "title": "VoiceLabMessage"
+   },
+   "VoiceLabSttIn": {
+    "properties": {
+     "audio": {
+      "type": "string",
+      "maxLength": 6000000,
+      "title": "Audio",
+      "description": "Запись из браузера в base64"
+     },
+     "format": {
+      "type": "string",
+      "maxLength": 10,
+      "title": "Format",
+      "default": "webm"
+     },
+     "language": {
+      "type": "string",
+      "maxLength": 10,
+      "title": "Language",
+      "default": "auto"
+     }
+    },
+    "type": "object",
+    "required": [
+     "audio"
+    ],
+    "title": "VoiceLabSttIn"
+   },
+   "VoiceLabTtsIn": {
+    "properties": {
+     "input": {
+      "type": "string",
+      "maxLength": 4600,
+      "minLength": 1,
+      "title": "Input"
+     },
+     "voice": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 40
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Voice"
+     }
+    },
+    "type": "object",
+    "required": [
+     "input"
+    ],
+    "title": "VoiceLabTtsIn"
    },
    "WorkoutIn": {
     "properties": {

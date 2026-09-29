@@ -7,6 +7,9 @@ import { useLogout, useMe } from '../api/auth';
 import { useAlerts } from '../api/admin';
 import { TourCabinetButton } from '../onboarding/OnboardingProvider';
 
+/** Голосовой полигон (п. 3.6) — статическая страница `public/voice-lab/`, вне маршрутов SPA. */
+const VOICE_LAB = '/voice-lab/index.html';
+
 export const NAV: Record<'teacher' | 'admin' | 'student', { role: string; items: NavItem[] }> = {
   teacher: {
     role: 'Преподаватель',
@@ -20,6 +23,7 @@ export const NAV: Record<'teacher' | 'admin' | 'student', { role: string; items:
       { id: 'materials', label: 'Учебные материалы', icon: 'description', href: '/teacher/materials' },
       { id: 'journal', label: 'Журнал 112', icon: 'table', href: '/arm/112/journal', group: 'АРМ' },
       { id: 'dds', label: 'АРМ ДДС', icon: 'headset', href: '/arm/dds' },
+      { id: 'voice', label: 'Голосовой полигон', icon: 'headset', href: VOICE_LAB },
     ],
   },
   admin: {
@@ -43,6 +47,7 @@ export const NAV: Record<'teacher' | 'admin' | 'student', { role: string; items:
       { id: 'reference', label: 'Справочная база', icon: 'library', href: '/student/reference' },
       { id: 'journal', label: 'АРМ-112', icon: 'table', href: '/arm/112/journal', group: 'Эмулятор' },
       { id: 'dds', label: 'АРМ ДДС', icon: 'headset', href: '/arm/dds' },
+      { id: 'voice', label: 'Голосовой полигон', icon: 'headset', href: VOICE_LAB },
     ],
   },
 };
@@ -60,7 +65,7 @@ export function CabinetShell({ kind, active, title, subtitle, crumbs, actions, c
   const nav = kind === 'admin' && alerts.length
     ? { ...NAV.admin, items: NAV.admin.items.map((n) => (n.id === 'status' ? { ...n, count: alerts.length, alert: alerts.some((a) => a.level === 'critical') } : n)) }
     : NAV[kind];
-  const go = (id: string) => { const it = nav.items.find((n) => n.id === id); if (it?.href) navigate(it.href); };
+  const go = (id: string) => { const it = nav.items.find((n) => n.id === id); if (it?.href === VOICE_LAB) window.location.assign(VOICE_LAB); else if (it?.href) navigate(it.href); };
   return (
     <AppShell
       sidebar={
