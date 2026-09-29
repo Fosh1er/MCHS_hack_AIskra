@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from aiskra.modules.training.application.ports.scenarios import ScenarioRow
 from aiskra.modules.training.domain.call import Call, CallMessage, CallParty, CallStatus, ReplicaVia, Speaker
+from aiskra.modules.training.domain.review import Decision, review_state
 from aiskra.modules.training.domain.scenario import Scenario, ScenarioStatus
 from aiskra.modules.training.domain.tone import CallerTone, ToneSnapshot
 from aiskra.modules.training.infrastructure.models import CallMessageModel, CallModel, ScenarioModel
@@ -19,6 +20,16 @@ from aiskra.platform.types import as_utc
 def _group(code: str | None) -> int | None:
     """Группа классификатора из кода типа: 1010101 → 1, 22020000 → 22."""
     return int(code[:-6]) if code and len(code) > 6 and code[:-6].isdigit() else None
+
+
+def _review_counts(s: Scenario) -> dict[str, int]:
+    """П. 3.3: сколько разделов эталона принято и на доработке — для плашки «частично» в списке банка."""
+    state = review_state(s)
+    return {
+        "review_accepted": sum(r.decision == Decision.ACCEPTED for r in state),
+        "review_rework": sum(r.decision == Decision.REWORK for r in state),
+        "review_total": len(state),
+    }
 
 
 class SqlScenarioRepository:
@@ -51,6 +62,7 @@ class SqlScenarioRepository:
         row.reference_dds = scenario.reference_dds
         row.source = scenario.source
         row.psy_profile = scenario.psy_profile
+        row.review = dict(scenario.review) or None
         row.author_id = scenario.author_id
         row.approved_by = scenario.approved_by
         if scenario.status is ScenarioStatus.APPROVED and row.approved_at is None:
@@ -58,8 +70,10 @@ class SqlScenarioRepository:
 
     async def get(self, scenario_id: UUID) -> Scenario | None:
         row = await self._s.get(ScenarioModel, scenario_id)
-        if row is None:
-            return None
+        return None if row is None else self._scenario(row)
+
+    @staticmethod
+    def _scenario(row: ScenarioModel) -> Scenario:
         return Scenario(
             id=row.id,
             title=row.title,
@@ -75,6 +89,7 @@ class SqlScenarioRepository:
             author_id=row.author_id,
             approved_by=row.approved_by,
             psy_profile=row.psy_profile,
+            review=dict(row.review or {}),
         )
 
     async def page(
@@ -110,6 +125,7 @@ class SqlScenarioRepository:
                 source=r.source,
                 created_at=as_utc(r.created_at),
                 psy_profile=r.psy_profile,
+                **_review_counts(self._scenario(r)),
             )
             for r in rows
         ], total

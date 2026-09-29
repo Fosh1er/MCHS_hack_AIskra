@@ -4,6 +4,7 @@ from aiskra.shared.di import provider_stub
 
 provide_generate = provider_stub("training.GenerateScenariosHandler")
 provide_review = provider_stub("training.ReviewScenarioHandler")
+provide_review_sections = provider_stub("training.ReviewSectionsHandler")
 provide_list_scenarios = provider_stub("training.ListScenariosHandler")
 provide_get_scenario = provider_stub("training.GetScenarioHandler")
 provide_incoming = provider_stub("training.StartIncomingCallHandler")

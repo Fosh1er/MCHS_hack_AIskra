@@ -22,6 +22,7 @@ from aiskra.ai.tasks import AITask
 from aiskra.modules.training.application.ports.materials import MaterialContext
 from aiskra.modules.training.application.ports.psy import PsyCatalog
 from aiskra.modules.training.application.ports.scenarios import ScenarioFactsSource, ScenarioRepository
+from aiskra.modules.training.domain.review import accept_all
 from aiskra.modules.training.domain.scenario import FLAG_FACTS, Scenario, ScenarioStatus, build_scenario, offline_story
 from aiskra.shared.application import Command, UnitOfWork
 from aiskra.shared.audit import AuditEntry, AuditEvent, AuditRecorder, RequestMeta
@@ -180,7 +181,8 @@ class ReviewScenarioHandler:
         scenario = await self._repo.get(cmd.scenario_id)
         if scenario is None:
             raise NotFoundError("Сценарий не найден", code="scenario_not_found")
-        if cmd.approve:
+        if cmd.approve:  # полное утверждение — все разделы эталона приняты (п. 3.3)
+            accept_all(scenario, by=str(cmd.actor.user_id))
             scenario.approve(cmd.actor.user_id)
         else:
             scenario.archive()

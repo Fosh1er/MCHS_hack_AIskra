@@ -149,6 +149,7 @@ from aiskra.modules.training.application.commands.materials import (
     UpdateMaterialHandler,
     UploadMaterialHandler,
 )
+from aiskra.modules.training.application.commands.scenario_review import ReviewSectionsHandler
 from aiskra.modules.training.application.commands.scenarios import (
     EditScenarioHandler,
     GenerateScenariosHandler,
@@ -517,6 +518,11 @@ def _wire_training(app: FastAPI, services: Services) -> None:
             SqlScenarioRepository(session), SqlAuditRecorder(session), SqlAlchemyUnitOfWork(session)
         )
 
+    def review_sections(session: Session) -> ReviewSectionsHandler:
+        return ReviewSectionsHandler(
+            SqlScenarioRepository(session), SqlAuditRecorder(session), SqlAlchemyUnitOfWork(session)
+        )
+
     def list_scenarios(session: Session) -> ListScenariosHandler:
         return ListScenariosHandler(SqlScenarioRepository(session))
 
@@ -561,6 +567,7 @@ def _wire_training(app: FastAPI, services: Services) -> None:
 
     ov[training_deps.provide_generate] = generate
     ov[training_deps.provide_review] = review
+    ov[training_deps.provide_review_sections] = review_sections
     ov[training_deps.provide_list_scenarios] = list_scenarios
     ov[training_deps.provide_get_scenario] = get_scenario
     ov[training_deps.provide_incoming] = incoming

@@ -34,6 +34,9 @@ class ScenarioRow:
     source: str
     created_at: Any
     psy_profile: str | None = None  # п. 3.7
+    review_accepted: int = 0  # п. 3.3: принято разделов эталона (из review_total)
+    review_rework: int = 0  # разделов на доработке
+    review_total: int = 0
 
 
 class ScenarioRepository(Protocol):

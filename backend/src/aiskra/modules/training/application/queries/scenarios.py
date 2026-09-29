@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 from uuid import UUID
 
 from aiskra.modules.training.application.ports.scenarios import ScenarioRepository, ScenarioRow
 from aiskra.modules.training.domain.actors import applicant_reply
+from aiskra.modules.training.domain.review import SectionReview, review_state
 from aiskra.shared.application import Query
 from aiskra.shared.errors import DomainError, NotFoundError
 
@@ -64,6 +65,7 @@ class ScenarioView:
     reference_card: dict[str, Any]
     reference_dds: dict[str, Any]
     psy_profile: str | None = None  # п. 3.7
+    review: list[SectionReview] = field(default_factory=list)  # п. 3.3: решения по разделам эталона
 
 
 class GetScenarioHandler:
@@ -86,6 +88,7 @@ class GetScenarioHandler:
             reference_card=s.reference_card,
             reference_dds=s.reference_dds,
             psy_profile=s.psy_profile,
+            review=review_state(s),
         )
 
 
