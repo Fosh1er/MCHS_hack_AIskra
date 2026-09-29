@@ -5,6 +5,7 @@ import { Banner, Button, Card, Tag } from '@smena112/ui-kit';
 import { useMe } from '../../shared/api/auth';
 import { KIND_TITLE, useDeleteMaterial, useMaterials, useUpdateMaterial, useUploadMaterial, type MaterialKind } from '../../shared/api/materials';
 import { CabinetShell } from '../../shared/ui/CabinetShell';
+import { useScreenTour } from '../../shared/onboarding/OnboardingProvider';
 import { MaterialViewer } from '../../shared/ui/MaterialViewer';
 import { bytes } from '../../shared/format';
 
@@ -24,7 +25,7 @@ function UploadForm() {
     onSuccess: () => { setFile(null); setTitle(''); setKey((k) => k + 1); },
   });
   return (
-    <Card title="Загрузить материал" subtitle="PDF, DOCX, XLSX, TXT или MD, до 25 МБ. Текст извлекается для поиска и генерации сценариев.">
+    <Card title="Загрузить материал" subtitle="PDF, DOCX, XLSX, TXT или MD, до 25 МБ. Текст извлекается для поиска и генерации сценариев." tour="t-upload">
       <div className="tch-form tch-form--grid">
         <label>Файл<input key={key} type="file" accept=".pdf,.docx,.xlsx,.txt,.md" onChange={(e) => pick(e.target.files?.[0] ?? null)} /></label>
         <label>Название<input value={title} onChange={(e) => setTitle(e.target.value)} /></label>
@@ -45,6 +46,7 @@ export function MaterialsPage() {
   const [q, setQ] = useState('');
   const [open, setOpen] = useState<string | null>(null);
   const list = useMaterials(q);
+  useScreenTour('teacher-materials', !!list.data); // администратору сами не покажутся: аудитория — преподаватель
   const update = useUpdateMaterial();
   const del = useDeleteMaterial();
   return (
@@ -55,7 +57,7 @@ export function MaterialsPage() {
         <input className="cab-select" style={{ width: 320 }} placeholder="поиск по названию и тексту" aria-label="Поиск" value={q} onChange={(e) => setQ(e.target.value)} />
       </div>
       {(update.error ?? del.error) && <Banner status="critical">{(update.error ?? del.error)!.message}</Banner>}
-      <Card flush>
+      <Card flush tour="t-materials">
         <table className="cab-table">
           <thead><tr><th>Материал</th><th>Вид</th><th className="num">Размер</th><th>Обучающимся</th><th>В генерации</th><th /></tr></thead>
           <tbody>

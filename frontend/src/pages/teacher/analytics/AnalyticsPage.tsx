@@ -6,6 +6,7 @@ import { Banner, Card, Segmented } from '@smena112/ui-kit';
 import { useNormReport } from '../../../shared/api/assessment';
 import { useStudents } from '../../../shared/api/training';
 import { TeacherShell } from '../../../shared/ui/TeacherShell';
+import { useScreenTour } from '../../../shared/onboarding/OnboardingProvider';
 import { NormTiles, Share, sec } from './parts';
 
 type Period = '7' | '30' | '90' | '0';
@@ -17,6 +18,7 @@ export function AnalyticsPage() {
   const [period, setPeriod] = useState<Period>('30');
   const q = useNormReport(Number(period) || null);
   const students = useStudents();
+  useScreenTour('teacher-analytics', !!q.data);
   const r = q.data;
   const seen = new Set(r?.by_student.map((s) => s.key));
   return (
@@ -27,9 +29,9 @@ export function AnalyticsPage() {
       {r && (
         <>
           <p className="tch-source">Период — {r.period}; нормативы — {r.source}. Для оператора — время от открытия карточки до сохранения, для ДДС — от поступления карточки до решения.</p>
-          <Card title="Карточка 112: опрос и заполнение"><NormTiles label="Карточки 112" stat={r.card_112} /></Card>
+          <Card title="Карточка 112: опрос и заполнение" tour="t-norms"><NormTiles label="Карточки 112" stat={r.card_112} /></Card>
           <Card title="ДДС: подтверждение приёма карточки"><NormTiles label="Решения ДДС" stat={r.dds} /></Card>
-          <Card title="По обучающимся" subtitle="Нажмите ФИО — профиль по всем занятиям" flush>
+          <Card title="По обучающимся" subtitle="Нажмите ФИО — профиль по всем занятиям" flush tour="t-by-students">
             <table className="cab-table">
               <thead><tr><th>Обучающийся</th><th className="num">Карточек</th><th>В нормативе</th><th className="num">Медиана</th><th className="num">90-й процентиль</th><th className="num">Норматив</th></tr></thead>
               <tbody>
