@@ -148,8 +148,9 @@ cd backend && uv run python -m aiskra.cli create-user --login admin --full-name 
 - **Резервная копия** выгружает все таблицы из `models_registry`, кроме `dict_*` и `auth_sessions`: новая таблица попадает в копию сама.
 - `require(Permission.A, Permission.B)` — «любое из прав».
 
-## Обучение интерфейсу (п. 5.3) — что уже есть
-- Прогресс — `users.onboarding` (JSON `{dismissed, seen[]}`, миграция 0012), домен `identity/domain/onboarding.py`, API `GET/POST /auth/onboarding` (`seen` · `dismiss` · `reset`); автоматически — только праву `training.participate`.
+## Обучение интерфейсу (п. 5.3, 5.4) — что уже есть
+- Прогресс — `users.onboarding` (JSON `{dismissed, seen[]}`, миграция 0012), домен `identity/domain/onboarding.py`, API `GET/POST /auth/onboarding` (`seen` с `tours: [...]` одной записью · `dismiss` · `reset`). Сами подсказки показываются своей **аудитории** — `audience` по правам: `training.participate` → `student`, `lessons.conduct` → `teacher`, администратору — никому.
+- **Экраны преподавателя (5.4)** — `TEACHER_TOURS`, id с префиксом `teacher-` (по нему `tourAudience`), обзор — `TEACHER_WELCOME`; кнопка «подсказки» в шапке кабинета — `TourCabinetButton`. Цель на карточке — `<Card tour="…">` (ui-kit). Какие экраны получают подсказки, а какие нет, и почему — `specs/5.4-teacher-onboarding.md`, таблица 7.1: новый экран преподавателя — сначала туда.
 - Фронт: тексты — `shared/onboarding/tours.ts`, подсветка — `Tour.tsx`, логика показа — `OnboardingProvider.tsx`. **Новый экран обучающегося:** описание в `TOURS`, на странице `useScreenTour('<id>', <данные загружены>)`, цели — `data-tour="…"` или существующие `id`. Меняете разметку экрана — проверьте, что селекторы в `tours.ts` ещё находят элементы (шаг без цели молча пропускается).
 - Пауза учебных таймеров на первые подсказки: правило — `incidents/domain/timer_pause.py` (всего до 10 мин, каждая пауза — в аудит). Карточка 112 — `IncidentCard.pause_timer/resume_timer`, `POST /incidents/cards/{id}/timer`; `processing_ms` уже без паузы. ДДС — `card_services.paused_ms`, `POST /incidents/dds/{service}/timer` (карточка или вся очередь). **Новый расчёт времени** «от открытия» или «от поступления в службу» делайте за вычетом `paused_ms`. Фронт — `useTourPause(tourId, enabled, {set, onEnd, onSynced})`.
 

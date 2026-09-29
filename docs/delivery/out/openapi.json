@@ -9784,6 +9784,15 @@
       ],
       "title": "Tour",
       "description": "Экран обучения, для seen"
+     },
+     "tours": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "maxItems": 5,
+      "title": "Tours",
+      "description": "Несколько экранов одной записью, для seen (обзор и экран)"
      }
     },
     "type": "object",
@@ -9797,7 +9806,23 @@
      "enabled": {
       "type": "boolean",
       "title": "Enabled",
-      "description": "Показывать подсказки автоматически (только обучающимся)"
+      "description": "Показывать подсказки автоматически (обучающемуся или преподавателю)"
+     },
+     "audience": {
+      "anyOf": [
+       {
+        "type": "string",
+        "enum": [
+         "student",
+         "teacher"
+        ]
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Audience",
+      "description": "Чьи подсказки показывать сами: student — экраны обучающегося, teacher — преподавателя"
      },
      "dismissed": {
       "type": "boolean",
@@ -9820,7 +9845,7 @@
      "seen"
     ],
     "title": "OnboardingOut",
-    "description": "Прогресс обучения интерфейсу (п. 5.3)."
+    "description": "Прогресс обучения интерфейсу (п. 5.3, 5.4)."
    },
    "OpenCardIn": {
     "properties": {
