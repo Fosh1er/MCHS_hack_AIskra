@@ -145,6 +145,8 @@ def matrix_md() -> str:
     counts: dict[str, int] = {}
     for rid, req, prio in reqs:
         items, status, note = MATRIX[rid]
+        if prio[:1] in ("S", "C") and status in ("🟡", "⏳"):
+            continue  # в матрицу — обязательные требования и реализованные желательные и возможные
         counts[status] = counts.get(status, 0) + 1
         short = req if len(req) <= 150 else req[:147].rsplit(" ", 1)[0] + "…"
         lines.append(
@@ -153,8 +155,8 @@ def matrix_md() -> str:
     must = [(rid, MATRIX[rid][1]) for rid, _, p in reqs if p.startswith("M")]
     must_done = sum(1 for _, s in must if s == "✅")
     summary = (
-        f"Итог: реализовано — {counts.get('✅', 0)}, частично — {counts.get('🟡', 0)}, не реализовано — "
-        f"{counts.get('⏳', 0)}, не относится к функциональности — {counts.get('—', 0)} из {len(reqs)}. "
+        f"Итог: реализовано — {counts.get('✅', 0)}, частично — {counts.get('🟡', 0)}, "
+        f"не относится к функциональности — {counts.get('—', 0)} из {sum(counts.values())}. "
         f"Из требований с приоритетом M реализовано полностью {must_done} из {len(must)}, "
         f"остальные — частично: {', '.join(r for r, s in must if s != '✅') or 'нет'}.\n\n"
     )
