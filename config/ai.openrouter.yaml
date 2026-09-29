@@ -49,6 +49,7 @@ ai:
     service_actor:       {provider: demo_small, temperature: 0.6, cache: task,  cache_ttl: 1d, max_tokens: 160}
     judge:               {provider: demo,       temperature: 0,   cache: exact, cache_ttl: 7d, max_tokens: 600}
     insights:            {provider: demo,       temperature: 0.3, cache: off}
+    feedback_draft:      {provider: demo,       temperature: 0.4, cache: off, max_tokens: 700}
   # Голос собеседника (п. 3.6): Gemini TTS через OpenRouter — эмоция передаётся стилем (speech_metadata.style), голос — по роли.
   # Синтез на OpenRouter ПЛАТНЫЙ (по символам; 29.09.2026 — доли цента за реплику): нужен пополненный счёт.
   # Выключен, пока TTS_KIND не задан, — тогда реплики озвучивает браузер.

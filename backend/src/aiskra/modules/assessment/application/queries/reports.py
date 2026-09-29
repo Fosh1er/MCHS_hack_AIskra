@@ -16,6 +16,7 @@ from typing import Any
 from uuid import UUID
 
 from aiskra.modules.assessment.application.ports.attempts import AssessmentRecord, AssessmentRepository
+from aiskra.modules.assessment.application.ports.feedback import FeedbackRecord, FeedbackStore
 from aiskra.modules.assessment.application.ports.reports import (
     ReportCard,
     ReportParticipant,
@@ -57,6 +58,15 @@ class CardResult:
     errors: list[str]
     criteria: dict[str, float | None]
     call_mode: str | None = None  # text | voice | hands_free: в голосовом режиме во время входит речь собеседника
+    critical: list[str] = field(default_factory=list)  # критерии с критической ошибкой: «не зачтено» при любом балле
+
+
+@dataclass(frozen=True)
+class FeedbackView:
+    """Отзыв преподавателя по занятию (п. 4.7): видят преподаватель и сам обучающийся."""
+
+    text: str
+    updated_at: datetime | None
 
 
 @dataclass(frozen=True)
@@ -70,6 +80,7 @@ class StudentReport:
     passed_share: float | None
     avg_time_s: float | None
     not_assessed: int
+    feedback: FeedbackView | None = None
 
 
 @dataclass(frozen=True)
@@ -117,6 +128,7 @@ def _result(card: ReportCard, rec: AssessmentRecord | None, norm: float, role: s
         errors=list(rec.details.get("errors", [])) if rec else [],
         criteria={c["key"]: c.get("score") for c in rec.details.get("criteria", [])} if rec else {},
         call_mode=card.call_mode if role == "112" else None,
+        critical=[str(x) for x in rec.details.get("critical", [])] if rec else [],
     )
 
 
@@ -134,19 +146,25 @@ class GetSessionReport(Query):
 
 
 class GetSessionReportHandler:
-    def __init__(self, source: SessionFactsSource, repo: AssessmentRepository) -> None:
+    def __init__(self, source: SessionFactsSource, repo: AssessmentRepository, feedback: FeedbackStore) -> None:
         self._source = source
         self._repo = repo
+        self._feedback = feedback
 
     async def __call__(self, q: GetSessionReport) -> SessionReport:
         facts = await self._source.session(q.session_id)
         if facts is None or facts.teacher_id != q.actor.user_id:
             raise NotFoundError("Занятие не найдено", code="session_not_found")
-        return await build_report(facts, self._repo)
+        return await build_report(facts, self._repo, feedback=await self._feedback.for_session(q.session_id))
 
 
-async def build_report(facts: SessionFacts, repo: AssessmentRepository, only: UUID | None = None) -> SessionReport:
-    """Отчёт по фактам занятия; `only` — только этот обучающийся (его кабинет, п. 5.1)."""
+async def build_report(
+    facts: SessionFacts,
+    repo: AssessmentRepository,
+    only: UUID | None = None,
+    feedback: dict[UUID, FeedbackRecord] | None = None,
+) -> SessionReport:
+    """Отчёт по фактам занятия; `only` — только этот обучающийся (его кабинет, п. 5.1); `feedback` — отзывы (п. 4.7)."""
     norm112 = float(facts.settings.get("norm_112", CARD_NORM_SECONDS))
     norm_dds = float(facts.settings.get("norm_dds", DDS_NORM_SECONDS))
     students, heat_rows, all_scores, all_passed, times, series = [], [], [], [], [], []
@@ -190,6 +208,7 @@ async def build_report(facts: SessionFacts, repo: AssessmentRepository, only: UU
                 passed_share=round(sum(passed) / len(passed), 3) if passed else None,
                 avg_time_s=_avg(ptimes),
                 not_assessed=sum(1 for r in results if r.score is None),
+                feedback=_feedback(feedback, p.student_id),
             )
         )
     buckets = [{"label": label, "count": sum(1 for t in times if lo <= t < hi)} for lo, hi, label in TIME_BUCKETS]
@@ -209,6 +228,11 @@ async def build_report(facts: SessionFacts, repo: AssessmentRepository, only: UU
         time_buckets=buckets,
         score_series=sorted(series, key=lambda x: x["t"]),
     )
+
+
+def _feedback(feedback: dict[UUID, FeedbackRecord] | None, student_id: UUID) -> FeedbackView | None:
+    rec = (feedback or {}).get(student_id)
+    return FeedbackView(text=rec.text, updated_at=rec.updated_at) if rec else None
 
 
 def report_csv(r: SessionReport) -> str:
@@ -234,10 +258,11 @@ def report_csv(r: SessionReport) -> str:
             "Экспертная правка",
             "Комментарий эксперта",
             "Замечания",
+            "Отзыв преподавателя",
         ]
     )
     for s in r.students:
-        for c in s.cards:
+        for i, c in enumerate(s.cards):
             w.writerow(
                 [
                     s.full_name,
@@ -254,6 +279,7 @@ def report_csv(r: SessionReport) -> str:
                     "да" if c.expert else "",
                     c.expert_comment,
                     " | ".join(c.errors),
+                    s.feedback.text if s.feedback and i == 0 else "",  # отзыв — по занятию, один раз у обучающегося
                 ]
             )
     return "﻿" + buf.getvalue()
@@ -335,14 +361,18 @@ class MySessionReport:
 class GetMySessionReportHandler:
     """Свои результаты по занятию (п. 5.1): только участнику и только его карточки."""
 
-    def __init__(self, source: SessionFactsSource, repo: AssessmentRepository) -> None:
+    def __init__(self, source: SessionFactsSource, repo: AssessmentRepository, feedback: FeedbackStore) -> None:
         self._source = source
         self._repo = repo
+        self._feedback = feedback
 
     async def __call__(self, q: GetMySessionReport) -> MySessionReport:
         facts = await self._source.session(q.session_id)
         if facts is None or all(p.student_id != q.actor.user_id for p in facts.participants):
             raise NotFoundError("Занятие не найдено", code="session_not_found")
-        report = await build_report(facts, self._repo, only=q.actor.user_id)
+        mine = await self._feedback.get(q.session_id, q.actor.user_id)
+        report = await build_report(
+            facts, self._repo, only=q.actor.user_id, feedback={q.actor.user_id: mine} if mine else None
+        )
         row = report.heatmap.rows[0]["values"] if report.heatmap.rows else {}
         return MySessionReport(report=report, recommendations=recommend(row))

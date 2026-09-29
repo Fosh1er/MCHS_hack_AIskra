@@ -27,6 +27,7 @@ from aiskra.integration.validation_sources import ScenarioBankCases
 from aiskra.modules.assessment.api import deps as assessment_deps
 from aiskra.modules.assessment.application.commands.assess import AssessCardHandler
 from aiskra.modules.assessment.application.commands.evaluate_session import EvaluateSessionHandler
+from aiskra.modules.assessment.application.commands.feedback import SaveFeedbackHandler
 from aiskra.modules.assessment.application.commands.override import OverrideAssessmentHandler
 from aiskra.modules.assessment.application.judge import Judge
 from aiskra.modules.assessment.application.queries.analytics import (
@@ -37,13 +38,14 @@ from aiskra.modules.assessment.application.queries.analytics import (
     SuggestAssignmentHandler,
 )
 from aiskra.modules.assessment.application.queries.assessments import GetAssessmentHandler, GroupInsightsHandler
+from aiskra.modules.assessment.application.queries.feedback import DraftFeedbackHandler, MyFeedbackHandler
 from aiskra.modules.assessment.application.queries.reports import (
     GetMySessionReportHandler,
     GetSessionReportHandler,
     MyProgressHandler,
 )
 from aiskra.modules.assessment.application.queries.validation import ValidationHandler
-from aiskra.modules.assessment.infrastructure.repositories import SqlAssessmentRepository
+from aiskra.modules.assessment.infrastructure.repositories import SqlAssessmentRepository, SqlFeedbackStore
 from aiskra.modules.audit.api import deps as audit_deps
 from aiskra.modules.audit.application.commands.purge import PurgeAuditHandler
 from aiskra.modules.audit.application.queries.search_audit import ListEventTypesHandler, SearchAuditHandler
@@ -686,10 +688,14 @@ def _wire_assessment(app: FastAPI, services: Services) -> None:
         )
 
     def report(session: Session) -> GetSessionReportHandler:
-        return GetSessionReportHandler(SessionFactsReader(session), SqlAssessmentRepository(session))
+        return GetSessionReportHandler(
+            SessionFactsReader(session), SqlAssessmentRepository(session), SqlFeedbackStore(session)
+        )
 
     def my_report(session: Session) -> GetMySessionReportHandler:
-        return GetMySessionReportHandler(SessionFactsReader(session), SqlAssessmentRepository(session))
+        return GetMySessionReportHandler(
+            SessionFactsReader(session), SqlAssessmentRepository(session), SqlFeedbackStore(session)
+        )
 
     def evaluate_session(session: Session) -> EvaluateSessionHandler:
         return EvaluateSessionHandler(SessionFactsReader(session), assess(session))
@@ -745,6 +751,31 @@ def _wire_assessment(app: FastAPI, services: Services) -> None:
         return ValidationHandler(ScenarioBankCases(session), SqlAssessmentRepository(session))
 
     ov[assessment_deps.provide_validation] = validation
+
+    # отзыв преподавателя по занятию (specs/4.7)
+    def feedback_draft(session: Session) -> DraftFeedbackHandler:
+        return DraftFeedbackHandler(
+            SessionFactsReader(session),
+            SqlAssessmentRepository(session),
+            SqlFeedbackStore(session),
+            services.model_router,
+        )
+
+    def feedback_save(session: Session) -> SaveFeedbackHandler:
+        return SaveFeedbackHandler(
+            SessionFactsReader(session),
+            SqlAssessmentRepository(session),
+            SqlFeedbackStore(session),
+            SqlAuditRecorder(session),
+            SqlAlchemyUnitOfWork(session),
+        )
+
+    def my_feedback(session: Session) -> MyFeedbackHandler:
+        return MyFeedbackHandler(SqlFeedbackStore(session))
+
+    ov[assessment_deps.provide_feedback_draft] = feedback_draft
+    ov[assessment_deps.provide_feedback_save] = feedback_save
+    ov[assessment_deps.provide_my_feedback] = my_feedback
 
 
 def _wire_admin(app: FastAPI, services: Services) -> None:

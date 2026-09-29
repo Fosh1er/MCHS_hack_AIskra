@@ -66,6 +66,7 @@ class AuditEvent(StrEnum):
     CARD_APPENDED = "card.appended"
     CARD_TIMER_PAUSED = "card.timer_paused"
     WORKOUT_ADDED = "card.workout_added"
+    FEEDBACK_SAVED = "assessment.feedback_saved"
 
     @property
     def label(self) -> str:
@@ -118,6 +119,7 @@ AUDIT_EVENT_TITLES: Mapping[AuditEvent, str] = {
     AuditEvent.CARD_APPENDED: "Дополнение карточки",
     AuditEvent.CARD_TIMER_PAUSED: "Пауза таймера карточки на обучение интерфейсу",
     AuditEvent.WORKOUT_ADDED: "Отработка",
+    AuditEvent.FEEDBACK_SAVED: "Отзыв преподавателя по занятию",
 }
 
 

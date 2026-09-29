@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from datetime import datetime
+from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
@@ -16,8 +17,10 @@ from aiskra.modules.assessment.application.commands.evaluate_session import (
     EvaluateSessionHandler,
     EvaluateSummary,
 )
+from aiskra.modules.assessment.application.commands.feedback import SaveFeedback, SaveFeedbackHandler
 from aiskra.modules.assessment.application.commands.override import OverrideAssessment, OverrideAssessmentHandler
 from aiskra.modules.assessment.application.ports.attempts import AssessmentRecord
+from aiskra.modules.assessment.application.ports.feedback import FeedbackRecord
 from aiskra.modules.assessment.application.queries.analytics import (
     AssignmentSuggestion,
     DebriefView,
@@ -41,6 +44,14 @@ from aiskra.modules.assessment.application.queries.assessments import (
     GroupInsights,
     GroupInsightsHandler,
     Insights,
+)
+from aiskra.modules.assessment.application.queries.feedback import (
+    DraftFeedback,
+    DraftFeedbackHandler,
+    FeedbackDraft,
+    FeedbackItem,
+    MyFeedback,
+    MyFeedbackHandler,
 )
 from aiskra.modules.assessment.application.queries.reports import (
     GetMySessionReport,
@@ -186,6 +197,80 @@ async def my_session_report(
     handler: Annotated[GetMySessionReportHandler, Depends(deps.provide_my_report)],
 ) -> MySessionReport:
     return await handler(GetMySessionReport(actor=actor, session_id=session_id))
+
+
+# ------------------------------------------------------------------ отзыв преподавателя по занятию (specs/4.7)
+
+Conductor = Annotated[Principal, Depends(require(Permission.LESSONS_CONDUCT))]
+
+
+@router.post(
+    "/sessions/{session_id}/students/{student_id}/feedback/draft",
+    response_model=FeedbackDraft,
+    summary="Черновик отзыва обучающемуся по занятию: ИИ, без модели — по правилам; ничего не публикует",
+)
+async def feedback_draft(
+    session_id: UUID,
+    student_id: UUID,
+    actor: Conductor,
+    handler: Annotated[DraftFeedbackHandler, Depends(deps.provide_feedback_draft)],
+) -> FeedbackDraft:
+    return await handler(DraftFeedback(actor=actor, session_id=session_id, student_id=student_id))
+
+
+class FeedbackIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    text: str = Field(min_length=10, max_length=3000, description="Текст отзыва — его увидит обучающийся")
+    draft_text: str | None = Field(default=None, max_length=6000, description="С какого черновика начали")
+    draft_source: Literal["ai", "rules"] | None = None
+    draft_model: str | None = Field(default=None, max_length=200)
+
+
+class FeedbackOut(BaseModel):
+    session_id: UUID
+    student_id: UUID
+    text: str
+    updated_at: datetime | None
+
+
+def _out(r: FeedbackRecord) -> FeedbackOut:
+    return FeedbackOut(session_id=r.session_id, student_id=r.student_id, text=r.text, updated_at=r.updated_at)
+
+
+@router.put(
+    "/sessions/{session_id}/students/{student_id}/feedback",
+    response_model=FeedbackOut,
+    summary="Сохранить отзыв обучающемуся по занятию (заменяет прежний; в аудит)",
+)
+async def feedback_save(
+    session_id: UUID,
+    student_id: UUID,
+    body: FeedbackIn,
+    actor: Conductor,
+    meta: Meta,
+    handler: Annotated[SaveFeedbackHandler, Depends(deps.provide_feedback_save)],
+) -> FeedbackOut:
+    saved = await handler(
+        SaveFeedback(
+            actor=actor,
+            session_id=session_id,
+            student_id=student_id,
+            text=body.text,
+            draft_text=body.draft_text,
+            draft_source=body.draft_source,
+            draft_model=body.draft_model,
+            meta=meta,
+        )
+    )
+    return _out(saved)
+
+
+@router.get("/my/feedback", response_model=list[FeedbackItem], summary="Отзывы преподавателей по моим занятиям")
+async def my_feedback(
+    actor: Annotated[Principal, Depends(require(Permission.RESULTS_READ_OWN))],
+    handler: Annotated[MyFeedbackHandler, Depends(deps.provide_my_feedback)],
+) -> list[FeedbackItem]:
+    return await handler(MyFeedback(actor=actor))
 
 
 # ------------------------------------------------------------------ аналитика преподавателя (specs/4.5)

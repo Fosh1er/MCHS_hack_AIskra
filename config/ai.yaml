@@ -17,6 +17,7 @@ ai:
     service_actor:       {provider: fake, temperature: 0.6, cache: task,  cache_ttl: 1d}
     judge:               {provider: fake, temperature: 0,   cache: exact, cache_ttl: 7d}
     insights:            {provider: fake, temperature: 0.3, cache: off}
+    feedback_draft:      {provider: fake, temperature: 0.4, cache: off}
   # Голос собеседника (п. 3.6): серверный синтез за OpenAI-совместимым /audio/speech. Выключен, пока TTS_KIND не задан, —
   # тогда реплики озвучивает браузер (темп, высота, громкость по состоянию заявителя).
   # Изолированный контур: Speaches с Piper на CPU (speaches-ai/piper-ru_RU-irina|denis|dmitri|ruslan-medium), TTS_STYLE=none —

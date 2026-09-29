@@ -8,8 +8,10 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from aiskra.modules.assessment.application.ports.attempts import AssessmentRecord
-from aiskra.modules.assessment.infrastructure.models import AssessmentModel, ExpertOverrideModel
+from aiskra.modules.assessment.application.ports.feedback import FeedbackRecord
+from aiskra.modules.assessment.infrastructure.models import AssessmentModel, ExpertOverrideModel, TeacherFeedbackModel
 from aiskra.platform.types import as_utc
+from aiskra.shared.domain import utcnow
 
 
 def _record(r: AssessmentModel) -> AssessmentRecord:
@@ -100,3 +102,69 @@ class SqlAssessmentRepository:
             "expert": {"score": score, "comment": comment, "teacher_id": str(teacher_id), "auto_score": before},
         }
         await self._s.flush()
+
+
+def _feedback(r: TeacherFeedbackModel) -> FeedbackRecord:
+    return FeedbackRecord(
+        session_id=r.session_id,
+        student_id=r.student_id,
+        teacher_id=r.teacher_id,
+        session_title=r.session_title,
+        session_started_at=as_utc(r.session_started_at),
+        text=r.text,
+        details=dict(r.details or {}),
+        created_at=as_utc(r.created_at),
+        updated_at=as_utc(r.updated_at),
+    )
+
+
+class SqlFeedbackStore:
+    """Отзывы преподавателя (п. 4.7), таблица `teacher_feedback`."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._s = session
+
+    async def _row(self, session_id: UUID, student_id: UUID) -> TeacherFeedbackModel | None:
+        return (
+            await self._s.execute(
+                select(TeacherFeedbackModel).where(
+                    TeacherFeedbackModel.session_id == session_id, TeacherFeedbackModel.student_id == student_id
+                )
+            )
+        ).scalar_one_or_none()
+
+    async def get(self, session_id: UUID, student_id: UUID) -> FeedbackRecord | None:
+        row = await self._row(session_id, student_id)
+        return _feedback(row) if row else None
+
+    async def for_session(self, session_id: UUID) -> dict[UUID, FeedbackRecord]:
+        rows = (
+            await self._s.execute(select(TeacherFeedbackModel).where(TeacherFeedbackModel.session_id == session_id))
+        ).scalars()
+        return {r.student_id: _feedback(r) for r in rows}
+
+    async def for_student(self, student_id: UUID) -> list[FeedbackRecord]:
+        rows = (
+            await self._s.execute(select(TeacherFeedbackModel).where(TeacherFeedbackModel.student_id == student_id))
+        ).scalars()
+        # от новых занятий к старым; занятие без времени начала — по времени отзыва
+        return sorted(
+            (_feedback(r) for r in rows),
+            key=lambda f: f.session_started_at or f.created_at or utcnow(),
+            reverse=True,
+        )
+
+    async def save(self, record: FeedbackRecord) -> FeedbackRecord:
+        row = await self._row(record.session_id, record.student_id)
+        now = utcnow()
+        if row is None:
+            row = TeacherFeedbackModel(session_id=record.session_id, student_id=record.student_id, created_at=now)
+            self._s.add(row)
+        row.teacher_id = record.teacher_id
+        row.session_title = record.session_title[:255]
+        row.session_started_at = record.session_started_at
+        row.text = record.text
+        row.details = record.details
+        row.updated_at = now
+        await self._s.flush()
+        return _feedback(row)
