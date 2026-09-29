@@ -49,6 +49,7 @@ class AuditEvent(StrEnum):
     SCENARIO_APPROVED = "scenarios.approved"
     SCENARIO_ARCHIVED = "scenarios.archived"
     CALL_ENDED = "calls.ended"
+    CALL_PAUSED = "calls.paused"
     CARD_ASSESSED = "assessment.card_assessed"
     ASSESSMENT_OVERRIDDEN = "assessment.overridden"
     SESSION_CREATED = "sessions.created"
@@ -102,6 +103,7 @@ AUDIT_EVENT_TITLES: Mapping[AuditEvent, str] = {
     AuditEvent.SCENARIO_APPROVED: "Утверждение сценария",
     AuditEvent.SCENARIO_ARCHIVED: "Сценарий в архив",
     AuditEvent.CALL_ENDED: "Учебный звонок завершён",
+    AuditEvent.CALL_PAUSED: "Учебный звонок остановлен обучающимся",
     AuditEvent.CARD_ASSESSED: "Автооценка",
     AuditEvent.ASSESSMENT_OVERRIDDEN: "Экспертная правка оценки",
     AuditEvent.SESSION_CREATED: "Создание занятия",

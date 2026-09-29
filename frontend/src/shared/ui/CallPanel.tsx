@@ -10,10 +10,13 @@
  *  распознаются и уходят собеседнику по очереди; оператор заговорил — собеседник замолкает (перебивание). */
 import { useEffect, useRef, useState } from 'react';
 import { Composer, Icon, Transcript, type TranscriptMessage } from '@smena112/ui-kit';
-import { endCall, getCall, replicaAudioUrl, sendReplica, transcribe, useSpeechStatus, type CallMessage, type ReplicaVia, type Tone } from '../api/training';
+import { endCall, getCall, pauseCall, replicaAudioUrl, sendReplica, transcribe, useSpeechStatus, type CallMessage, type ReplicaVia, type Tone } from '../api/training';
 import { useActiveTour } from '../onboarding/OnboardingProvider';
 import { useHandsFree, type HandsFreeState } from '../voice/useHandsFree';
 import { VAD_PROFILES, isLikelyEcho, type VadProfileName } from '../voice/vad';
+
+/** Ремарки заявителя (п. 3.7): «плачет», «кричит» — показываются курсивом перед репликой, в озвучку не идут. */
+const note = (m: CallMessage) => (m.remarks && m.remarks.length ? `(${m.remarks.join(', ')})` : undefined);
 
 const pad = (n: number) => String(n).padStart(2, '0');
 const MAX_TALK_MS = 30_000; // реплика в трубку — не дольше 30 с, дальше запись останавливается сама
@@ -105,6 +108,7 @@ export function CallPanel({ callId, title, subtitle, partyName, initial, onEnded
   const [startedAt, setStartedAt] = useState<number>(() => Date.now());
   const [now, setNow] = useState(() => Date.now());
   const [voice, setVoice] = useState(() => { try { return localStorage.getItem(VOICE_KEY) === '1'; } catch { return false; } });
+  const [psy, setPsy] = useState(false); // п. 3.7: у заявителя психологический профиль — доступна «Пауза»
   const spoken = useRef(0);
   const audio = useRef<HTMLAudioElement | null>(null);
   const lastParty = useRef<{ text: string; at: number } | null>(null); // для отсева эха собеседника
@@ -140,6 +144,7 @@ export function CallPanel({ callId, title, subtitle, partyName, initial, onEnded
       setMessages(c.messages);
       setStartedAt(new Date(c.answered_at ?? c.started_at).getTime());
       setEnded(c.status === 'ended');
+      setPsy(!!c.psy);
     }).catch(() => undefined);
   }, [callId]);
   useEffect(() => { if (ended) return; const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, [ended]);
@@ -158,7 +163,13 @@ export function CallPanel({ callId, title, subtitle, partyName, initial, onEnded
     setMessages((m) => [...m, { speaker: 'operator', text: t, at: new Date().toISOString() }]);
     try {
       const r = await sendReplica(callId, t, via);
-      setMessages((m) => [...m, { speaker: r.speaker, text: r.text, at: new Date().toISOString(), id: r.message_id, tone: r.tone }]);
+      if (r.voice) setPsy(true);
+      setMessages((m) => [...m, { speaker: r.speaker, text: r.text, at: new Date().toISOString(), id: r.message_id, tone: r.tone, remarks: r.remarks }]);
+      if (r.hung_up) { // заявитель положил трубку — по ПП РФ № 1931 обратный вызов через 10 с
+        setMessages((m) => [...m, { speaker: 'system', text: 'Заявитель положил трубку. Перезвоните ему по номеру АОН.', at: new Date().toISOString() }]);
+        setEnded(true);
+        onEnded?.();
+      }
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -187,6 +198,13 @@ export function CallPanel({ callId, title, subtitle, partyName, initial, onEnded
       pending.current = [];
       draining.current = false;
     }
+  };
+  const pause = async () => { // п. 3.7: тяжёлый звонок можно остановить — он не оценивается
+    await pauseCall(callId).catch(() => undefined);
+    stopVoice();
+    setMessages((m) => [...m, { speaker: 'system', text: 'Звонок остановлен (пауза) — в работе с заявителем не оценивается', at: new Date().toISOString() }]);
+    setEnded(true);
+    onEnded?.();
   };
   const hangup = async () => {
     if (!ended) await endCall(callId).catch(() => undefined);
@@ -245,6 +263,7 @@ export function CallPanel({ callId, title, subtitle, partyName, initial, onEnded
     from: m.speaker === 'operator' ? 'me' : m.speaker === 'party' ? 'them' : 'sys',
     who: m.speaker === 'operator' ? 'Вы' : m.tone ? `${partyName} · ${m.tone.emotion_title}` : partyName,
     text: m.text,
+    note: m.speaker === 'party' ? note(m) : undefined,
   }));
   if (busy) transcript.push({ from: 'sys', text: `${partyName} отвечает…` });
 
@@ -297,6 +316,11 @@ export function CallPanel({ callId, title, subtitle, partyName, initial, onEnded
             </label>
           )}
         </span>
+        {!ended && psy && (
+          <button type="button" className="call-panel__close" title="Остановить тяжёлый учебный звонок: он не будет оценён" onClick={() => { void pause(); }}>
+            пауза
+          </button>
+        )}
         {!ended
           ? <button type="button" className="call-panel__end" onClick={() => { void hangup(); }}><Icon name="call_end" size="sm" /> завершить</button>
           : onClose && <button type="button" className="call-panel__close" onClick={onClose}>закрыть</button>}

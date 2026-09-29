@@ -30,6 +30,7 @@ from aiskra.modules.assessment.application.commands.evaluate_session import Eval
 from aiskra.modules.assessment.application.commands.feedback import SaveFeedbackHandler
 from aiskra.modules.assessment.application.commands.override import OverrideAssessmentHandler
 from aiskra.modules.assessment.application.judge import Judge
+from aiskra.modules.assessment.application.psy_judge import PsyJudge
 from aiskra.modules.assessment.application.queries.analytics import (
     NormReportHandler,
     ReadinessHandler,
@@ -134,6 +135,7 @@ from aiskra.modules.training.application.actors import Actors
 from aiskra.modules.training.application.commands.calls import (
     AnswerCallHandler,
     EndCallHandler,
+    PauseCallHandler,
     SendReplicaHandler,
     StartDdsCallHandler,
     StartIncomingCallHandler,
@@ -148,12 +150,14 @@ from aiskra.modules.training.application.commands.scenarios import (
     GenerateScenariosHandler,
     ReviewScenarioHandler,
     ScenarioGenerator,
+    SetScenarioPsyHandler,
 )
 from aiskra.modules.training.application.commands.sessions import (
     ChangeSessionStateHandler,
     CreateSessionHandler,
     FeedDdsCardHandler,
 )
+from aiskra.modules.training.application.psy import PsyDirector
 from aiskra.modules.training.application.queries.calls import CardCallsHandler, GetCallHandler
 from aiskra.modules.training.application.queries.materials import GetMaterialHandler, ListMaterialsHandler
 from aiskra.modules.training.application.queries.scenarios import (
@@ -177,6 +181,7 @@ from aiskra.modules.training.infrastructure.materials import (
     SqlMaterialContext,
     SqlMaterialRepository,
 )
+from aiskra.modules.training.infrastructure.psy_catalog import YamlPsyCatalog
 from aiskra.modules.training.infrastructure.repositories import SqlCallRepository, SqlScenarioRepository
 from aiskra.modules.training.infrastructure.sessions import SqlSessionRepository as SqlTrainingSessionRepository
 from aiskra.modules.training.infrastructure.sessions import SqlStudentDirectory
@@ -480,6 +485,8 @@ def _wire_training(app: FastAPI, services: Services) -> None:
     clock = SystemClock()
     router = services.model_router
 
+    catalog = YamlPsyCatalog(services.settings.dictionaries_dir / "psy_profiles.yaml")  # п. 3.7, проверка при старте
+
     def call_parts(session: AsyncSession) -> tuple[object, ...]:
         return (
             SqlCallRepository(session),
@@ -489,6 +496,10 @@ def _wire_training(app: FastAPI, services: Services) -> None:
             SqlAlchemyUnitOfWork(session),
             clock,
         )
+
+    def psy_parts(session: AsyncSession) -> dict[str, object]:
+        """Психологический модификатор (п. 3.7): ведущий и занятия — чтобы выбрать профиль по настройкам."""
+        return {"psy": PsyDirector(catalog, Actors(router)), "sessions": SqlTrainingSessionRepository(session)}
 
     def generate(session: Session) -> GenerateScenariosHandler:
         return build_generate_handler(router, session)
@@ -508,19 +519,28 @@ def _wire_training(app: FastAPI, services: Services) -> None:
         return StartIncomingCallHandler(
             *call_parts(session),
             generator=ScenarioGenerator(DictionaryScenarioFacts(session), router, SqlMaterialContext(session)),
+            **psy_parts(session),
         )
 
     def answer(session: Session) -> AnswerCallHandler:
-        return AnswerCallHandler(*call_parts(session))  # type: ignore[arg-type]
+        return AnswerCallHandler(*call_parts(session), **psy_parts(session))  # type: ignore[arg-type]
 
     def dds_call(session: Session) -> StartDdsCallHandler:
-        return StartDdsCallHandler(*call_parts(session))  # type: ignore[arg-type]
+        return StartDdsCallHandler(*call_parts(session), **psy_parts(session))  # type: ignore[arg-type]
 
     def replica(session: Session) -> SendReplicaHandler:
-        return SendReplicaHandler(*call_parts(session))  # type: ignore[arg-type]
+        return SendReplicaHandler(*call_parts(session), **psy_parts(session))  # type: ignore[arg-type]
 
     def end_call(session: Session) -> EndCallHandler:
         return EndCallHandler(*call_parts(session), audit=SqlAuditRecorder(session))
+
+    def pause_call(session: Session) -> PauseCallHandler:
+        return PauseCallHandler(*call_parts(session), audit=SqlAuditRecorder(session))
+
+    def set_scenario_psy(session: Session) -> SetScenarioPsyHandler:
+        return SetScenarioPsyHandler(
+            SqlScenarioRepository(session), catalog, SqlAuditRecorder(session), SqlAlchemyUnitOfWork(session)
+        )
 
     def get_call(session: Session) -> GetCallHandler:
         return GetCallHandler(SqlCallRepository(session))
@@ -543,6 +563,9 @@ def _wire_training(app: FastAPI, services: Services) -> None:
     # голос собеседника (п. 3.6): сервисы читаются при каждом запросе — адаптер можно подменить в тестах
     ov[training_deps.provide_speech_status] = lambda: SpeechStatus(stt=services.stt.enabled, tts=services.tts.enabled)
     ov[training_deps.provide_end_call] = end_call
+    ov[training_deps.provide_pause_call] = pause_call
+    ov[training_deps.provide_set_scenario_psy] = set_scenario_psy
+    ov[training_deps.provide_psy_catalog] = lambda: catalog
     ov[training_deps.provide_get_call] = get_call
     ov[training_deps.provide_replica_audio] = replica_audio
     ov[training_deps.provide_card_calls] = card_calls
@@ -572,6 +595,7 @@ def _wire_sessions(app: FastAPI, services: Services) -> None:
             SqlAlchemyUnitOfWork(session),
             clock,
             defaults=SystemSessionDefaults(session),
+            catalog=YamlPsyCatalog(services.settings.dictionaries_dir / "psy_profiles.yaml"),
         )
 
     def session_defaults(session: Session) -> GetSessionDefaultsHandler:
@@ -680,6 +704,7 @@ def _wire_assessment(app: FastAPI, services: Services) -> None:
             Judge(services.model_router),
             SqlAuditRecorder(session),
             SqlAlchemyUnitOfWork(session),
+            psy_judge=PsyJudge(services.model_router),
         )
 
     def override(session: Session) -> OverrideAssessmentHandler:

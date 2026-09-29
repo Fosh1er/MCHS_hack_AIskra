@@ -20,6 +20,7 @@ from aiskra.ai.prompts import load_prompt
 from aiskra.ai.router import ModelRouter
 from aiskra.ai.tasks import AITask
 from aiskra.modules.training.application.ports.materials import MaterialContext
+from aiskra.modules.training.application.ports.psy import PsyCatalog
 from aiskra.modules.training.application.ports.scenarios import ScenarioFactsSource, ScenarioRepository
 from aiskra.modules.training.domain.scenario import FLAG_FACTS, Scenario, ScenarioStatus, build_scenario, offline_story
 from aiskra.shared.application import Command, UnitOfWork
@@ -291,3 +292,49 @@ class EditScenarioHandler:
             await self._uow.rollback()
             raise
         return s.status.value
+
+
+@dataclass(frozen=True, kw_only=True)
+class SetScenarioPsy(Command):
+    """Закрепить психологический профиль заявителя за сценарием (п. 3.7). Легенда и эталоны не меняются, поэтому
+    сценарий остаётся утверждённым: профиль — модификатор, а не правка сценария (ADR-0012)."""
+
+    actor: Principal
+    scenario_id: UUID
+    profile: str | None
+    meta: RequestMeta = field(default_factory=RequestMeta)
+
+
+class SetScenarioPsyHandler:
+    def __init__(self, repo: ScenarioRepository, catalog: PsyCatalog, audit: AuditRecorder, uow: UnitOfWork) -> None:
+        self._repo = repo
+        self._catalog = catalog
+        self._audit = audit
+        self._uow = uow
+
+    async def __call__(self, cmd: SetScenarioPsy) -> str | None:
+        s = await self._repo.get(cmd.scenario_id)
+        if s is None:
+            raise NotFoundError("Сценарий не найден", code="scenario_not_found")
+        profile = self._catalog.get(cmd.profile) if cmd.profile else None
+        if cmd.profile and profile is None:
+            raise DomainError("Нет такого психологического профиля", code="unknown_psy_profile")
+        s.psy_profile = profile.id if profile else None
+        try:
+            await self._repo.save(s)
+            await self._audit.record(
+                AuditEntry(
+                    event=AuditEvent.SCENARIO_EDITED,
+                    actor=cmd.actor,
+                    meta=cmd.meta,
+                    description=f"{s.title}: профиль заявителя — {profile.title if profile else 'без профиля'}",
+                    object_type="scenario",
+                    object_id=str(s.id),
+                    data={"psy_profile": s.psy_profile},
+                )
+            )
+            await self._uow.commit()
+        except Exception:
+            await self._uow.rollback()
+            raise
+        return s.psy_profile

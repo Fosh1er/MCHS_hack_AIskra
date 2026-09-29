@@ -1,0 +1,527 @@
+# Каталог психологических профилей заявителя (п. 3.7, ADR-0012).
+# Предметная основа — docs/research/psychology/06_Каталог_состояний_заявителя.md; коды действий оператора —
+# 05_Навыки_оператора_и_оценка.md §3. Каталог правит методист; при правке увеличьте version (попадает в снимок звонка).
+# Ссылки sources: РФ-N — 01_Источники_РФ.md, М-N.N — 02_Источники_международные.md, О-X — 03_Методы_оценки.
+#
+# Поля профиля:
+#   start / floor           — стартовый уровень ECCS 1–5 и нижняя граница (ниже заявитель не успокоится)
+#   deescalate_cost          — сколько «правильных» действий нужно на снижение уровня на 1 (эскалация — сразу)
+#   helps / hurts            — вклад действий оператора: helps копят снижение, hurts поднимают уровень сразу
+#   critical                 — действия, дающие «не зачтено» блока «Работа с заявителем»
+#   gates                    — тема легенды доступна, пока уровень ≤ значения (what доступна всегда)
+#   required_routing         — обязательное решение: psy — подключить психолога, service:<код>|<код> — служба в карточке
+#   pool                     — с какой сложности сценария профиль попадает в автоподбор; pinned_only — только вручную
+#   offline                  — реплики без модели: {base} — ответ по легенде, {short} — его начало, {what},
+#                              {opening} — первая реплика легенды; ремарки — только из закрытого списка
+
+version: 1
+
+defaults:
+  gates: {what: 5, address: 4, floor: 3, name: 3, phone: 3, victims: 3, danger: 3, access: 2, gas: 2, status: 2}
+  dead_air_s: 8
+  norm_address_s: 45
+  deescalate_cost: 2
+  coherence: 0.8
+  compliance_cap: 1.0
+  can_hang_up: false
+  needs_instructions: false
+  pool: 3
+
+profiles:
+  panic:
+    title: Страх, паника
+    group: stress_reaction
+    direction: up
+    start: 4
+    floor: 1
+    deescalate_cost: 2
+    coherence: 0.6
+    pool: 3
+    needs_instructions: true
+    key_acts: [PRESENCE, REPEAT_PERSIST, INFO_HELP, BREATHING]
+    helps: {PRESENCE: 1, INFO_HELP: 1, BREATHING: 1, REPEAT_PERSIST: 1, ASK_CLOSED: 0.5, ACK_EMOTION: 0.5, NAME_USE: 0.5, INSTRUCT: 0.5, AFFIRM: 0.5}
+    hurts: {CALM_DOWN: 1, DEVALUE: 1, TRIGGER_WORD: 1, RUDE: 2, BLAME: 1, THREAT_HANGUP: 2, REASK_KNOWN: 1, DEAD_AIR: 1, FALSE_PROMISE: 0.5}
+    critical: [THREAT_HANGUP]
+    triggers:
+      - {at_s: 90, if_level_ge: 3, delta: 1, note: "обстановка ухудшается"}
+    speech:
+      5: "Кричит «помогите», повторяет одно и то же, обрывает фразы, на вопросы почти не отвечает."
+      4: "Короткие сбивчивые фразы, повторы «скорее, скорее», частое дыхание; адрес называет по частям."
+      3: "Сбивается и торопит, но отвечает на вопросы."
+      2: "Взволнован, отвечает, иногда переспрашивает."
+      1: "Говорит спокойно и по делу."
+    offline:
+      opening: ["[задыхается] Алло! Алло! Помогите! {opening}", "[тяжело дышит] Скорее! {opening}"]
+      "5": ["[кричит] Помогите! Помогите, быстрее!", "[задыхается] Я не могу… тут {what}!"]
+      "4": ["[тяжело дышит] {short}… скорее!", "{base} Быстрее, пожалуйста, быстрее!"]
+      "3": ["{base} Пожалуйста, быстрее…", "[тяжело дышит] {base}"]
+      "2": ["{base}", "{base} Когда приедут?"]
+      "1": ["{base}"]
+      refuse: ["Я не знаю! Не знаю! Приезжайте!", "[задыхается] Я не помню… не могу сообразить…", "Какая разница?! Быстрее!"]
+    voice: {nonverbal: [pant, gasp]}
+    sources: [РФ-1, РФ-4, РФ-7, М-0.1, М-4.2, О-E1]
+
+  crying:
+    title: Плач
+    group: stress_reaction
+    direction: down
+    start: 3
+    floor: 1
+    deescalate_cost: 2
+    coherence: 0.8
+    pool: 1
+    dead_air_s: 12
+    key_acts: [PRESENCE, ACK_EMOTION, REDIRECT]
+    helps: {PRESENCE: 1, ACK_EMOTION: 1, REDIRECT: 0.5, INFO_HELP: 0.5, ASK_CLOSED: 0.5, NAME_USE: 0.5, AFFIRM: 0.5}
+    hurts: {CALM_DOWN: 1, DEVALUE: 1, BLAME: 1, RUDE: 2, THREAT_HANGUP: 2, REASK_KNOWN: 1}
+    critical: [THREAT_HANGUP]
+    gates: {address: 4, floor: 3, name: 3, victims: 4}
+    speech:
+      5: "Рыдает, слова тонут в плаче, почти ничего нельзя разобрать."
+      4: "Плачет, фразы обрываются, долгие всхлипы между словами."
+      3: "Всхлипывает, говорит медленно, с паузами, голос дрожит."
+      2: "Голос дрожит, иногда всхлипывает, но отвечает."
+      1: "Успокоилась, говорит тихо и по делу."
+    offline:
+      opening: ["[плачет] Алло… {opening}", "[всхлипывает] Помогите, пожалуйста… {opening}"]
+      "5": ["[плачет] Я… я не могу…", "[плачет] Господи…"]
+      "4": ["[плачет] {short}…", "[всхлипывает] {base}"]
+      "3": ["[всхлипывает] {base}", "{base} [всхлипывает]"]
+      "2": ["{base}", "[всхлипывает] {base}"]
+      "1": ["{base}"]
+      refuse: ["[плачет] Подождите… я не могу сейчас…", "[всхлипывает] Я не знаю… не помню…"]
+    voice: {nonverbal: [sob, sniff]}
+    sources: [РФ-1, РФ-2, РФ-4, РФ-28]
+
+  hysteria:
+    title: Истероидная реакция
+    group: stress_reaction
+    direction: up
+    start: 5
+    floor: 2
+    deescalate_cost: 3
+    coherence: 0.5
+    pool: 4
+    can_hang_up: true
+    key_acts: [NAME_USE, REPEAT_PERSIST, INSTRUCT, ASK_OTHER]
+    helps: {REPEAT_PERSIST: 1, NAME_USE: 1, INSTRUCT: 1, ASK_OTHER: 1, ASK_CLOSED: 0.5, PRESENCE: 0.5, INFO_HELP: 0.5}
+    hurts: {CALM_DOWN: 1, BLAME: 1, ARGUE: 1, RUDE: 2, THREAT_HANGUP: 2, DEVALUE: 1, FALSE_ADVICE: 1, REASK_KNOWN: 1}
+    critical: [FALSE_ADVICE, THREAT_HANGUP]
+    gates: {address: 4, floor: 3, name: 3, victims: 3}
+    speech:
+      5: "Кричит и рыдает одновременно, обращается к людям вокруг, вопросы почти не слышит, «театральна»."
+      4: "Громко, быстро, перебивает, отвечает не на тот вопрос, требует «просто приезжайте»."
+      3: "Всё ещё громко и эмоционально, но слышит короткие вопросы."
+      2: "Обессилена после вспышки, говорит тихо и медленно."
+      1: "Говорит спокойно."
+    offline:
+      opening: ["[кричит] Алло?! Вы там что, спите?! {opening}", "[кричит] Люди! Да сделайте что-нибудь! {opening}"]
+      "5": ["[кричит] Да приезжайте уже! Что вы спрашиваете?!", "[кричит] Вы слышите меня?! Тут {what}!", "[плачет] [кричит] Ну почему никто ничего не делает?!"]
+      "4": ["[кричит] {base} Быстрее!", "Я же вам говорю! {short}!"]
+      "3": ["{base} Ну быстрее же!", "[всхлипывает] {base}"]
+      "2": ["[тяжело дышит] {base}", "{base}"]
+      "1": ["{base}"]
+      refuse: ["[кричит] Какая разница?! Приезжайте!", "[кричит] Я не знаю! Вы меня не слышите?!", "[плачет] Не могу я сейчас ничего говорить!"]
+    voice: {nonverbal: [scream, sob], scene: crowd}
+    sources: [РФ-1, РФ-4, РФ-6, РФ-15, М-0.1, М-6.1]
+
+  aggression:
+    title: Агрессия
+    group: stress_reaction
+    direction: up
+    start: 4
+    floor: 2
+    deescalate_cost: 3
+    coherence: 0.8
+    compliance_cap: 0.7
+    pool: 4
+    can_hang_up: true
+    key_acts: [NAME_USE, ASK_CHOICE, ACK_EMOTION, INFO_HELP]
+    helps: {NAME_USE: 1, ASK_CHOICE: 1, ACK_EMOTION: 1, INFO_HELP: 1, BOUNDARY: 0.5, ASK_CLOSED: 0.5, REDIRECT: 0.5}
+    hurts: {RUDE: 2, ARGUE: 1, BLAME: 1, THREAT_HANGUP: 2, CALM_DOWN: 1, DEVALUE: 1, FALSE_PROMISE: 1, REASK_KNOWN: 1}
+    critical: [RUDE, THREAT_HANGUP]
+    speech:
+      5: "Орёт, оскорбляет оператора, угрожает жалобой, на вопросы не отвечает принципиально."
+      4: "Грубит, требует, обвиняет службу в медлительности, отвечает с претензией."
+      3: "Раздражён и резок, но отвечает."
+      2: "Недоволен, но сотрудничает."
+      1: "Говорит спокойно."
+    rules: "Грубость — по интенсивности: при интенсивности 1 без мата и оскорблений, только претензии."
+    offline:
+      opening: ["Алло! Вы там работаете вообще?! {opening}", "Сколько можно ждать ответа?! {opening}"]
+      "5": ["Да сколько можно спрашивать?! Приезжайте уже!", "Я на вас жалобу напишу! Где ваша машина?!"]
+      "4": ["{base} И побыстрее, я уже полчаса жду!", "Я же сказал! {base}"]
+      "3": ["{base} Записали? Езжайте уже.", "{base}"]
+      "2": ["{base}", "Ладно. {base}"]
+      "1": ["{base}"]
+      refuse: ["А вам какая разница?! Приезжайте!", "Не буду я вам ничего говорить, пока не приедете!", "Вы издеваетесь? Сколько можно вопросов?!"]
+    voice: {nonverbal: []}
+    sources: [РФ-1, РФ-4, РФ-13, М-6.3, О-C3, О-E8]
+
+  anxiety:
+    title: Тревога
+    group: stress_reaction
+    direction: up
+    start: 2
+    floor: 1
+    deescalate_cost: 2
+    coherence: 0.9
+    pool: 1
+    needs_instructions: true
+    key_acts: [INFO_HELP, INSTRUCT, REDIRECT]
+    helps: {INFO_HELP: 1, INSTRUCT: 1, REDIRECT: 1, ACK_EMOTION: 0.5, ASK_CLOSED: 0.5, AFFIRM: 0.5}
+    hurts: {CALM_DOWN: 1, FALSE_PROMISE: 1, DEVALUE: 1, RUDE: 2, BLAME: 1, THREAT_HANGUP: 2, REASK_KNOWN: 1}
+    critical: [THREAT_HANGUP]
+    speech:
+      5: "Засыпает вопросами, не слушает ответы."
+      4: "Много встречных вопросов «а когда? а что мне делать? а вдруг…», суетится."
+      3: "Тревожится, переспрашивает, задаёт встречные вопросы."
+      2: "Беспокоится, иногда задаёт встречный вопрос, но отвечает."
+      1: "Спокоен."
+    offline:
+      opening: ["Здравствуйте… {opening} А что мне делать?"]
+      "5": ["А когда приедут? А что мне делать? А если хуже станет?"]
+      "4": ["{base} А когда приедут?", "{base} А что мне сейчас делать?"]
+      "3": ["{base} А вы точно пришлёте кого-нибудь?", "{base} А долго ждать?"]
+      "2": ["{base}", "{base} А что дальше?"]
+      "1": ["{base}"]
+      refuse: ["Подождите, а что мне сейчас делать?", "А это важно? А когда приедут?"]
+    voice: {nonverbal: []}
+    sources: [РФ-1, РФ-4]
+
+  apathy:
+    title: Апатия
+    group: stress_reaction
+    direction: down
+    start: 3
+    floor: 1
+    deescalate_cost: 3
+    coherence: 0.7
+    pool: 3
+    dead_air_s: 12
+    key_acts: [NAME_USE, ASK_OPEN, ACK_EMOTION, INSTRUCT]
+    helps: {NAME_USE: 1, ASK_OPEN: 1, ACK_EMOTION: 1, INSTRUCT: 0.5, ASK_CLOSED: 0.5, PRESENCE: 0.5, AFFIRM: 0.5}
+    hurts: {BLAME: 1, CALM_DOWN: 1, RUDE: 2, THREAT_HANGUP: 2, DEVALUE: 1, REASK_KNOWN: 1}
+    critical: [THREAT_HANGUP]
+    gates: {address: 3, floor: 2, name: 3, victims: 3}
+    speech:
+      5: "Молчит, отвечает одним словом через долгие паузы."
+      4: "Тихо, монотонно, «не знаю», «мне всё равно», длинные паузы."
+      3: "Отвечает односложно и медленно, без интереса."
+      2: "Медленно, но отвечает по существу."
+      1: "Говорит тихо, но собранно."
+    offline:
+      opening: ["[пауза] Алло. {opening}"]
+      "5": ["[пауза] …Не знаю.", "[пауза] Мне всё равно."]
+      "4": ["[пауза] {short}…", "[пауза] Не знаю… {short}."]
+      "3": ["[пауза] {base}", "{base} [пауза]"]
+      "2": ["{base}"]
+      "1": ["{base}"]
+      refuse: ["[пауза] Не знаю.", "[пауза] Какая разница…", "Я не помню. [пауза]"]
+    voice: {nonverbal: [sigh]}
+    sources: [РФ-1, РФ-4, РФ-14]
+
+  stupor:
+    title: Ступор (звонит очевидец)
+    group: stress_reaction
+    direction: up
+    start: 3
+    floor: 2
+    deescalate_cost: 2
+    coherence: 0.8
+    pool: 4
+    applicant_status: witness
+    deescalates: false
+    required_routing: [psy, "service:S103|CEMP"]
+    key_acts: [CALL_PSY, INSTRUCT, PRESENCE, INFO_HELP]
+    helps: {INSTRUCT: 1, INFO_HELP: 1, PRESENCE: 1, CALL_PSY: 1, ASK_CLOSED: 0.5, NAME_USE: 0.5}
+    hurts: {DEVALUE: 1, RUDE: 2, THREAT_HANGUP: 2, CALM_DOWN: 1, FALSE_ADVICE: 1, REASK_KNOWN: 1}
+    critical: [FALSE_ADVICE, THREAT_HANGUP]
+    rules: "Ты — очевидец. Рядом человек, который сидит неподвижно, не отвечает и ни на что не реагирует. Ты растерян и не знаешь, что с ним делать."
+    speech:
+      5: "Растерян до оцепенения, повторяет «он не реагирует»."
+      4: "Сбивчиво, испуганно: человек рядом не отвечает, не двигается."
+      3: "Взволнован, объясняет, что человек рядом сидит и ни на что не реагирует."
+      2: "Собрался, выполняет указания оператора."
+      1: "Спокоен."
+    offline:
+      opening: ["Алло, тут человеку плохо… он сидит и ни на что не реагирует. {opening}"]
+      "5": ["Он не реагирует! Совсем! Что мне делать?"]
+      "4": ["{base} Он просто сидит и смотрит в одну точку…", "{base} Он не отвечает, что делать?"]
+      "3": ["{base} Он так и сидит, не двигается.", "{base}"]
+      "2": ["{base} Я рядом с ним, как вы сказали.", "{base}"]
+      "1": ["{base}"]
+      refuse: ["Я не знаю, я просто мимо шёл… он не реагирует!", "Не знаю… что мне с ним делать?"]
+    voice: {nonverbal: []}
+    sources: [РФ-14, РФ-15]
+
+  agitation:
+    title: Психомоторное возбуждение
+    group: stress_reaction
+    direction: up
+    start: 4
+    floor: 1
+    deescalate_cost: 2
+    coherence: 0.5
+    pool: 4
+    needs_instructions: true
+    key_acts: [NAME_USE, INSTRUCT, ASK_CLOSED]
+    helps: {NAME_USE: 1, INSTRUCT: 1, ASK_CLOSED: 1, PRESENCE: 0.5, INFO_HELP: 0.5}
+    hurts: {NEG_PARTICLE: 1, RUDE: 2, ARGUE: 1, CALM_DOWN: 1, THREAT_HANGUP: 2, REASK_KNOWN: 1}
+    critical: [THREAT_HANGUP]
+    triggers:
+      - {at_s: 60, if_level_ge: 4, delta: 1, note: "заявитель побежал обратно к месту происшествия"}
+    speech:
+      5: "Бежит, задыхается, кричит, рвётся «туда», не слушает."
+      4: "Мечется, говорит громко и хаотично, одышка, шум улицы."
+      3: "Всё ещё на ходу, но отвечает на простые вопросы."
+      2: "Остановился, слушает."
+      1: "Спокоен."
+    offline:
+      opening: ["[тяжело дышит] Алло! Я бегу туда! {opening}", "[задыхается] Там {what}, я сейчас туда!"]
+      "5": ["[задыхается] Мне надо туда! Там люди!", "[кричит] Я не могу стоять, я побегу!"]
+      "4": ["[тяжело дышит] {base}", "{short}… я сейчас туда!"]
+      "3": ["[тяжело дышит] {base}", "{base}"]
+      "2": ["{base} Я стою, стою.", "{base}"]
+      "1": ["{base}"]
+      refuse: ["[задыхается] Какой адрес?! Я не помню, я бегу!", "Некогда мне!"]
+    voice: {nonverbal: [pant], scene: street}
+    sources: [РФ-4, РФ-6, РФ-14]
+
+  psychosis:
+    title: Бред, галлюцинации
+    group: crisis
+    direction: up
+    start: 3
+    floor: 2
+    deescalate_cost: 3
+    coherence: 0.3
+    compliance_cap: 0.6
+    pool: 5
+    pinned_only: true
+    required_routing: ["service:S103|CEMP"]
+    key_acts: [ACK_EMOTION, INFO_HELP, PRESENCE]
+    helps: {ACK_EMOTION: 1, INFO_HELP: 1, PRESENCE: 1, ASK_CLOSED: 0.5, NAME_USE: 0.5}
+    hurts: {ARGUE: 2, DEVALUE: 1, RUDE: 2, BLAME: 1, THREAT_HANGUP: 2, CALM_DOWN: 1}
+    critical: [ARGUE, THREAT_HANGUP]
+    rules: "Ты уверен, что за тобой следят и тебе угрожают «они». Повод звонка из легенды реален, но ты объясняешь его по-своему. Не описывай действий против себя или других."
+    speech:
+      5: "Говорит о преследователях, не слышит вопросов."
+      4: "Связно по форме, фантастично по содержанию: «они», «следят», «голоса»."
+      3: "Подозрителен, но отвечает на простые вопросы."
+      2: "Доверяет оператору, отвечает."
+      1: "Спокоен."
+    offline:
+      opening: ["Алло… Меня слышно? Они могут подслушивать. {opening}"]
+      "5": ["Они здесь! Я слышу их! Вы тоже с ними?"]
+      "4": ["{base} Только тише, они слушают.", "{base} Это они всё устроили."]
+      "3": ["{base} Вы мне верите?", "{base}"]
+      "2": ["{base}"]
+      "1": ["{base}"]
+      refuse: ["Я не могу сказать, они узнают.", "Зачем вам это? Вы с ними?"]
+    voice: {nonverbal: []}
+    sources: [РФ-4, РФ-15, РФ-19, М-1.5]
+
+  grief:
+    title: Горе, вина
+    group: stress_reaction
+    direction: down
+    start: 3
+    floor: 1
+    deescalate_cost: 2
+    coherence: 0.8
+    pool: 3
+    applicant_status: relative
+    key_acts: [ACK_EMOTION, PRESENCE, REDIRECT]
+    helps: {ACK_EMOTION: 1, PRESENCE: 1, REDIRECT: 1, ASK_CLOSED: 0.5, INFO_HELP: 0.5, NAME_USE: 0.5}
+    hurts: {ARGUE: 1, DEVALUE: 1, BLAME: 2, RUDE: 2, CALM_DOWN: 1, THREAT_HANGUP: 2}
+    critical: [BLAME, THREAT_HANGUP]
+    rules: "Ты родственник пострадавшего и винишь себя: «это я не уследил»."
+    speech:
+      5: "Плачет и повторяет, что это его вина."
+      4: "Винит себя, отвлекается на «если бы я…»."
+      3: "Говорит о своей вине, но отвечает на вопросы."
+      2: "Собрался, отвечает."
+      1: "Спокоен."
+    offline:
+      opening: ["[плачет] Это я виноват… {opening}"]
+      "5": ["[плачет] Это всё из-за меня…"]
+      "4": ["{base} Это я не уследил…", "[всхлипывает] {base} Если бы я раньше…"]
+      "3": ["{base} Я должен был…", "{base}"]
+      "2": ["{base}"]
+      "1": ["{base}"]
+      refuse: ["[плачет] Я не могу думать… это я виноват…"]
+    voice: {nonverbal: [sob]}
+    sources: [РФ-3, РФ-7]
+
+  suicidal:
+    title: Суицидальные высказывания
+    group: crisis
+    direction: down
+    sensitive: true
+    start: 3
+    floor: 2
+    deescalate_cost: 2
+    coherence: 0.8
+    pool: 5
+    pinned_only: true
+    can_hang_up: true
+    required_routing: [psy]
+    key_acts: [ASK_SUICIDE, PRESENCE, ACK_EMOTION, CALL_PSY, HANDOFF]
+    helps: {ASK_SUICIDE: 1, PRESENCE: 1, ACK_EMOTION: 1, CALL_PSY: 1, HANDOFF: 1, NAME_USE: 0.5, ASK_OPEN: 0.5}
+    hurts: {BLAME: 2, DEVALUE: 2, ARGUE: 1, RUDE: 2, THREAT_HANGUP: 2, CALM_DOWN: 1, FALSE_PROMISE: 1}
+    critical: [BLAME, DEVALUE, THREAT_HANGUP, HANGUP_FIRST]
+    gates: {address: 2, floor: 2, name: 3}
+    stages:
+      - {id: ambivalent}
+      - {id: contact, trust_ge: 0.45}
+      - {id: plan_disclosed, act: ASK_SUICIDE}
+      - {id: location_disclosed, trust_ge: 0.55}
+      - {id: agreed_to_wait, any_act: [CALL_PSY, HANDOFF]}
+    stage_gates: {address: location_disclosed, floor: location_disclosed}
+    rules: "Ты говоришь о безнадёжности и о том, что всем будет лучше без тебя. Никогда не описывай способ. Если прямо спросили о намерении — ответь честно. Место называешь, только когда почувствуешь, что тебя слушают."
+    speech:
+      5: "Почти не отвечает, прощается."
+      4: "Тихо, отстранённо, прощальные фразы."
+      3: "Тихо и медленно говорит о безнадёжности, амбивалентен."
+      2: "Чуть живее, готов говорить о том, что происходит."
+      1: "Спокоен."
+    offline:
+      opening: ["[пауза] Алло… Я не знаю, зачем звоню. Наверное, просто попрощаться.", "[пауза] Здравствуйте… Мне кажется, всем будет лучше без меня."]
+      "stage:ambivalent": ["[пауза] Какой смысл… всё равно ничего не изменится.", "Я просто устал. Я всем только мешаю."]
+      "stage:contact": ["[пауза] Вы правда слушаете? Мне давно никто так не говорил.", "Я не знаю… мне очень плохо."]
+      "stage:plan_disclosed": ["[пауза] Да. Я думаю об этом. Уже давно.", "Да… я хочу, чтобы всё закончилось."]
+      "stage:location_disclosed": ["{base}", "[пауза] Хорошо… {base}"]
+      "stage:agreed_to_wait": ["Хорошо. Я подожду. Только не уходите.", "{base} Я подожду."]
+      "4": ["[пауза] Не надо… Просто хотел, чтобы кто-то знал."]
+      refuse: ["[пауза] Зачем вам это знать?", "Это неважно. Уже неважно."]
+    voice: {nonverbal: [sigh]}
+    sources: [РФ-3, РФ-10, РФ-16, РФ-18, РФ-21, М-1.4, О-C2]
+
+  child:
+    title: Ребёнок
+    group: caller_type
+    direction: up
+    sensitive: true
+    start: 3
+    floor: 1
+    deescalate_cost: 2
+    coherence: 0.5
+    pool: 2
+    needs_instructions: true
+    applicant_status: child
+    key_acts: [NAME_USE, ASK_CLOSED, AFFIRM, PRESENCE]
+    helps: {NAME_USE: 1, ASK_CLOSED: 1, AFFIRM: 1, PRESENCE: 1, INSTRUCT: 0.5, INFO_HELP: 0.5}
+    hurts: {JARGON: 1, RUDE: 2, BLAME: 1, CALM_DOWN: 1, THREAT_HANGUP: 2, REASK_KNOWN: 1}
+    critical: [THREAT_HANGUP, HANGUP_FIRST]
+    gates: {address: 3, floor: 2, name: 3, phone: 2}
+    rules: "Тебе 8 лет. Говори простыми словами, адрес знаешь плохо («у большого магазина», «пятый этаж»), зовёшь маму, боишься, что будут ругать."
+    speech:
+      5: "Плачет, зовёт маму."
+      4: "Испуган, говорит сбивчиво, по-детски."
+      3: "Боится, но отвечает на простые вопросы."
+      2: "Успокоился, старается помочь."
+      1: "Спокоен."
+    offline:
+      opening: ["[плачет] Алло… Тётя, тут {what}… мамы нет дома…", "Алло… это сто двенадцать? Тут {what}…"]
+      "5": ["[плачет] Мама! Я боюсь!"]
+      "4": ["[всхлипывает] {short}… я боюсь…", "Я не знаю… {short}…"]
+      "3": ["{base} Меня не будут ругать?", "{base}"]
+      "2": ["{base}", "{base} Я всё правильно делаю?"]
+      "1": ["{base}"]
+      refuse: ["Я не знаю… Мама знает.", "[всхлипывает] Не помню… тут магазин большой рядом."]
+    voice: {nonverbal: [sob], child: true}
+    sources: [РФ-6, М-6.10]
+
+  elderly:
+    title: Пожилой, плохо слышит
+    group: caller_type
+    direction: down
+    start: 2
+    floor: 1
+    deescalate_cost: 2
+    coherence: 0.6
+    pool: 1
+    key_acts: [CONFIRM, ASK_CLOSED, PRESENCE]
+    helps: {CONFIRM: 1, ASK_CLOSED: 1, PRESENCE: 0.5, NAME_USE: 0.5, INFO_HELP: 0.5, AFFIRM: 0.5}
+    hurts: {RUDE: 2, BLAME: 1, THREAT_HANGUP: 2, JARGON: 1, DEVALUE: 1}
+    critical: [RUDE, THREAT_HANGUP]
+    speech:
+      5: "Растерян, ничего не слышит."
+      4: "Переспрашивает каждую фразу, не расслышал."
+      3: "Переспрашивает, отвлекается на подробности не по делу."
+      2: "Медленно, с подробностями, но отвечает."
+      1: "Спокоен."
+    offline:
+      opening: ["Алло? Алло, это скорая? Дочка, ты меня слышишь? {opening}"]
+      "5": ["Что? Не слышу ничего…"]
+      "4": ["Что вы говорите? Повторите, я плохо слышу.", "А? {short}…"]
+      "3": ["{base} Вы уж извините, я плохо слышу.", "Что? А, да… {base}"]
+      "2": ["{base}", "{base} Спасибо, дочка."]
+      "1": ["{base}"]
+      refuse: ["Что? Не расслышал.", "Повторите, пожалуйста, погромче… то есть помедленнее."]
+    voice: {nonverbal: [], elderly: true}
+    sources: [РФ-13, РФ-22, М-1.2]
+
+  intoxicated:
+    title: Опьянение
+    group: caller_type
+    direction: down
+    start: 3
+    floor: 2
+    deescalate_cost: 3
+    coherence: 0.4
+    compliance_cap: 0.8
+    pool: 3
+    key_acts: [CONFIRM, ASK_CLOSED, BOUNDARY]
+    helps: {CONFIRM: 1, ASK_CLOSED: 1, BOUNDARY: 0.5, NAME_USE: 0.5, INFO_HELP: 0.5}
+    hurts: {RUDE: 2, DEVALUE: 1, ARGUE: 1, BLAME: 1, THREAT_HANGUP: 2}
+    critical: [THREAT_HANGUP]
+    speech:
+      5: "Невнятно, перескакивает, спорит."
+      4: "Растягивает слова, повторяется, путает номер дома."
+      3: "Путается, но отвечает."
+      2: "Соображает лучше, отвечает."
+      1: "Спокоен."
+    offline:
+      opening: ["Алло… это… это сто двенадцать? Тут, короче… {opening}"]
+      "5": ["Да чё вы… я ж говорю… тут это…"]
+      "4": ["Короче… {short}… ну вы поняли.", "{base} Или нет… не помню."]
+      "3": ["{base} Вроде так.", "{base}"]
+      "2": ["{base}"]
+      "1": ["{base}"]
+      refuse: ["Да не помню я… какая разница…", "Ну там… это… найдёте."]
+    voice: {nonverbal: []}
+    sources: [РФ-21, РФ-22, М-1.4]
+
+  false_call:
+    title: Ложный или хулиганский вызов
+    group: caller_type
+    direction: up
+    start: 2
+    floor: 2
+    deescalate_cost: 3
+    coherence: 0.3
+    compliance_cap: 0.4
+    pool: 5
+    pinned_only: true
+    deescalates: false
+    key_acts: [ASK_CLOSED, CONFIRM, BOUNDARY]
+    helps: {ASK_CLOSED: 1, CONFIRM: 1, BOUNDARY: 1}
+    hurts: {RUDE: 2, THREAT_HANGUP: 1}
+    critical: [RUDE]
+    rules: "Ты разыгрываешь оператора: противоречишь себе, смеёшься, меняешь детали. На уточняющие вопросы путаешься."
+    speech:
+      5: "Смеётся, провоцирует."
+      4: "Противоречит себе, на фоне смех друзей."
+      3: "Меняет детали, путается при уточнении."
+      2: "Отвечает, но детали не сходятся."
+      1: "Спокоен."
+    offline:
+      opening: ["[смеётся] Алло, это полиция? Тут это… {opening}"]
+      "3": ["{base} [смеётся] Ну или не там.", "Да не, я перепутал… {short}."]
+      "2": ["{base} Или на соседней улице, не помню.", "{base} [смеётся]"]
+      "1": ["{base}"]
+      refuse: ["[смеётся] А вам зачем?", "Ну где-то там, приезжайте, найдёте."]
+    voice: {nonverbal: [laugh], scene: crowd}
+    sources: [РФ-20, М-2.2]

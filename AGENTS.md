@@ -124,6 +124,14 @@ cd backend && uv run python -m aiskra.cli create-user --login admin --full-name 
 - **Преподавателю (V4):** разбор разговора — `shared/ui/CallReview.tsx` (кнопка «разговор» в отчёте занятия и «разговор с заявителем» в просмотре карточки); эмоция и напряжение — в пометке критерия в панели оценки; критерий `caller_care` «Работа с заявителем (информативно)» — `assessment/domain/scoring.py`, **вес 0** в `WEIGHTS_112` (не удаляйте ноль: критерий без веса получает 1,0 в `total`), факты — `IncidentAttempts._caller`; на плитке мониторинга — `ParticipantProgress.caller_emotion`, `caller_tension`.
 - Дальше — потоковые ответы и шаг модели (V5): [спецификация](specs/3.6-emotional-voice.md), [ADR-0011](docs/adr/0011-voice-emotional-caller.md).
 
+## Психологический модификатор (п. 3.7, ADR-0012) — что уже есть
+- **Каталог** — `data/dictionaries/psy_profiles.yaml` (15 профилей, у каждого `sources` — ссылки на `docs/research/psychology/`), проверяется при старте (`YamlPsyCatalog`). Новый код действия — в `training/domain/psy.py` (`GOOD_ACTS`/`BAD_ACTS`/`EVENTS`, `ACT_TITLES`), словарь — `psy_acts.py`, объяснение ошибки — `assessment/domain/psy_scoring.py:WHY`.
+- **Состояние хранит движок, не модель:** `psy.py:step` (ECCS 1–5), `gates` (что заявитель может сказать), `voice_for` (контракт голоса). Ход — `training/application/psy.py:PsyDirector.turn`; снимок профиля — `training_calls.psy`, разметка — `training_call_messages.meta` (миграция 0018).
+- **Выключен — ничего не меняется:** все ветки только при `call.psy`. Меняете звонки или оценку — прогоните `unit/test_psy.py` (бенчмарк мутаций) и прежние тесты.
+- **Оценка** — блок `details.psy` (`assess_psy`, `timeline`), вес в итоге — `settings.psy.weight` (снимок в звонке). ИИ-судья блока — `psy_judge`, без модели «не проверено».
+- **Голос** — эмоциональный голос п. 3.6: при профиле `CallerTone` выводится из состояния профиля (`psy.py:tone_from_psy`), так что синтез озвучивает то же состояние; модификатор отдаёт `ReplicaOut.voice`/`remarks`/`hung_up`, принимает `ReplicaIn.latency_ms`/`interrupted` (дуплекс-адаптер — `docs/ai/Психологический_модификатор.md` §11).
+- **Фронт:** `SessionsPage.tsx:PsyForm`, `ScenariosPage.tsx:PsyPick`, `CallPanel` (ремарки, «пауза»), `shared/ui/PsyBlock.tsx` в `AssessmentPanel`.
+
 ## Автооценка (п. 3.4) — что уже есть
 - **Правила** — `modules/assessment/domain/scoring.py` (формулы и веса описаны в `specs/3.4-assessment.md`); ИИ-судья — `application/judge.py` (без модели критерии «не проверено»).
 - **Попытка** (карточка, сценарий, статусы, звонки) — `aiskra/integration/assessment_sources.py`.

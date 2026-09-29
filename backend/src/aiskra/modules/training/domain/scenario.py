@@ -184,6 +184,7 @@ class Scenario:
     status: ScenarioStatus = ScenarioStatus.DRAFT
     author_id: UUID | None = None
     approved_by: UUID | None = None
+    psy_profile: str | None = None  # п. 3.7: закреплённый психологический профиль заявителя
     id: UUID = field(default_factory=uuid4)
 
     def approve(self, by: UUID) -> None:

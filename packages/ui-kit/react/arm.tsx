@@ -386,13 +386,14 @@ export function LineKeys({ lines }: { lines: { label: string; state: LineState }
   );
 }
 
-export interface TranscriptMessage { from: 'me' | 'them' | 'sys'; who?: string; text: string; }
+export interface TranscriptMessage { from: 'me' | 'them' | 'sys'; who?: string; text: string; note?: string }
 export function Transcript({ messages }: { messages: TranscriptMessage[] }) {
   return (
     <div className="arm-transcript u-scroll" aria-live="polite">
       {messages.map((m, i) => (
         <div key={i} className={cx('arm-msg', `arm-msg--${m.from}`)}>
           {m.who && m.from !== 'sys' && <span className="arm-msg__who">{m.who}</span>}
+          {m.note && <em className="arm-msg__note">{m.note} </em>}
           {m.text}
         </div>
       ))}

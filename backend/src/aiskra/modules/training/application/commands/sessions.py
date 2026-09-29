@@ -6,8 +6,10 @@ import random
 from dataclasses import dataclass, field
 from uuid import UUID
 
+from aiskra.modules.training.application.ports.psy import PsyCatalog
 from aiskra.modules.training.application.ports.scenarios import ScenarioRepository
 from aiskra.modules.training.application.ports.sessions import SessionDefaults, SessionRepository, SystemCards
+from aiskra.modules.training.domain.psy import check_settings
 from aiskra.modules.training.domain.session import CardSource, Participant, SessionMode, TrainingSession
 from aiskra.shared.application import Clock, Command, UnitOfWork
 from aiskra.shared.audit import AuditEntry, AuditEvent, AuditRecorder, RequestMeta
@@ -65,9 +67,11 @@ class CreateSessionHandler(_Base):
         uow: UnitOfWork,
         clock: Clock,
         defaults: SessionDefaults | None = None,
+        catalog: PsyCatalog | None = None,
     ) -> None:
         super().__init__(repo, audit, uow, clock)
         self._defaults = defaults
+        self._catalog = catalog
 
     async def __call__(self, cmd: CreateSession) -> UUID:
         seen: set[UUID] = set()
@@ -86,15 +90,23 @@ class CreateSessionHandler(_Base):
             participants=participants,
             settings={**(await self._defaults.get() if self._defaults else {}), **cmd.settings},
         )
+        if self._catalog is not None:  # п. 3.7: профили модификатора — только из каталога
+            try:
+                check_settings(session.settings["psy"], set(self._catalog.profiles()))
+            except ValueError as e:
+                raise DomainError(str(e), code="bad_psy_setting") from e
+        psy = session.settings["psy"]
         await self._repo.add(session)
         await self._commit(
             AuditEntry(
                 event=AuditEvent.SESSION_CREATED,
                 actor=cmd.actor,
                 meta=cmd.meta,
-                description=session.title,
+                description=session.title
+                + (f" (психологический модификатор: доля {psy['share']:.0%})" if psy.get("enabled") else ""),
                 object_type="training_session",
                 object_id=str(session.id),
+                data={"psy": psy} if psy.get("enabled") else {},
             )
         )
         return session.id

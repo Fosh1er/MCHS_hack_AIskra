@@ -8,6 +8,7 @@ from datetime import datetime
 from typing import Any, Protocol
 from uuid import UUID
 
+from aiskra.modules.assessment.domain.psy_scoring import PsyAttempt
 from aiskra.modules.assessment.domain.scoring import CallerFacts, StatusStep
 
 
@@ -26,6 +27,7 @@ class Card112Attempt:
     service_names: dict[str, str] = field(default_factory=dict)
     flag_names: dict[str, str] = field(default_factory=dict)
     caller: CallerFacts | None = None  # как менялось состояние ИИ-заявителя (п. 3.6); None — без состояния
+    psy: PsyAttempt | None = None  # п. 3.7: разговор с заявителем, у которого был психологический профиль
 
 
 @dataclass(frozen=True)
@@ -38,6 +40,7 @@ class DdsAttempt:
     reference: dict[str, Any] | None
     calls: list[str]  # стороны звонков по карточке: brigade | applicant | service
     actor_ids: set[UUID]  # кто ставил статусы
+    psy: PsyAttempt | None = None  # п. 3.7: звонок заявителю из ДДС с психологическим профилем
 
 
 class AttemptSource(Protocol):

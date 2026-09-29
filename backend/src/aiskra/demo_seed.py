@@ -57,6 +57,7 @@ DEMO_USERS = [
     DemoUser("dds2", "Лебедев Артём Николаевич", Role.STUDENT, "202", "dds", "S103"),  # Служба 103 (скорая)
 ]
 GROUP = "Смена 1 (демо)"
+DEMO_PSY = ("panic", "crying", "hysteria", "aggression", "apathy", "stupor")  # п. 3.7, реакции на стресс (ЦЭПП МЧС)
 KIND_BY_EXT = {".docx": MaterialKind.INSTRUCTION, ".pdf": MaterialKind.REGULATION, ".xlsx": MaterialKind.CLASSIFIER}
 
 
@@ -100,6 +101,34 @@ async def seed(
                 print(f"Сценарии: добавлено и утверждено {len(new)} (всего {have + len(new)})")
             else:
                 print(f"Сценарии: утверждено {have}")
+
+        async with factory() as s:  # п. 3.7: сценарии с психологическим профилем заявителя для показа модификатора
+            pinned = (
+                await s.execute(
+                    select(func.count()).select_from(ScenarioModel).where(ScenarioModel.psy_profile.is_not(None))
+                )
+            ).scalar_one()
+            if not pinned:
+                rows = (
+                    (
+                        await s.execute(
+                            select(ScenarioModel)
+                            .where(ScenarioModel.status == "approved", ScenarioModel.psy_profile.is_(None))
+                            .order_by(ScenarioModel.created_at)
+                            .limit(len(DEMO_PSY))
+                        )
+                    )
+                    .scalars()
+                    .all()
+                )
+                for row, profile in zip(rows, DEMO_PSY, strict=False):
+                    row.psy_profile = profile
+                await s.commit()
+                print(
+                    f"Психологические профили заявителя: закреплены за {len(rows)} сценариями ({', '.join(DEMO_PSY)})"
+                )
+            else:
+                print(f"Психологические профили заявителя: уже закреплены за {pinned} сценариями")
 
         ids: dict[str, UUID] = {}
         for u in DEMO_USERS:

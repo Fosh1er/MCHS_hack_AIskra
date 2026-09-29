@@ -50,6 +50,7 @@ class SqlScenarioRepository:
         row.reference_card = scenario.reference_card
         row.reference_dds = scenario.reference_dds
         row.source = scenario.source
+        row.psy_profile = scenario.psy_profile
         row.author_id = scenario.author_id
         row.approved_by = scenario.approved_by
         if scenario.status is ScenarioStatus.APPROVED and row.approved_at is None:
@@ -73,6 +74,7 @@ class SqlScenarioRepository:
             status=ScenarioStatus(row.status),
             author_id=row.author_id,
             approved_by=row.approved_by,
+            psy_profile=row.psy_profile,
         )
 
     async def page(
@@ -107,6 +109,7 @@ class SqlScenarioRepository:
                 incident_type_code=r.incident_type_code,
                 source=r.source,
                 created_at=as_utc(r.created_at),
+                psy_profile=r.psy_profile,
             )
             for r in rows
         ], total
@@ -160,6 +163,8 @@ class SqlCallRepository:
         row.status = call.status.value
         row.revealed = list(call.revealed)
         row.tone = call.tone.to_json() if call.tone else None
+        row.psy = dict(call.psy) if call.psy is not None else None
+        row.ended_by = call.ended_by
         row.answered_at = call.answered_at
         row.ended_at = call.ended_at
 
@@ -184,6 +189,8 @@ class SqlCallRepository:
             ended_at=as_utc(row.ended_at),
             revealed=list(row.revealed or []),
             tone=CallerTone.from_json(row.tone),
+            psy=dict(row.psy) if row.psy else None,
+            ended_by=row.ended_by,
         )
 
     async def get(self, call_id: UUID) -> Call | None:
@@ -200,6 +207,7 @@ class SqlCallRepository:
                 at=message.at,
                 tone=message.tone.to_json() if message.tone else None,
                 via=message.via.value if message.via else None,
+                meta=message.meta,
             )
         )
         await self._s.flush()
@@ -225,6 +233,7 @@ class SqlCallRepository:
                     at=at,
                     tone=ToneSnapshot.from_json(r.tone),
                     via=ReplicaVia(r.via) if r.via else None,
+                    meta=dict(r.meta) if r.meta else None,
                 )
             )
         return out

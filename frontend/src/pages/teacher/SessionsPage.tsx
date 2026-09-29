@@ -5,8 +5,9 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Banner, Button, Card, StatusPill } from '@smena112/ui-kit';
 import { useIncidentGroups, useServices } from '../../shared/api/dictionaries';
 import {
-  MODE_TITLE, SESSION_STATUS, SOURCE_TITLE, useCreateSession, useSessionDefaults, useSessions, useStudents,
-  type CardSource, type CreateSessionBody, type SessionMode, type SessionSettings,
+  MODE_TITLE, PSY_DEFAULTS, PSY_GROUP_TITLE, SESSION_STATUS, SOURCE_TITLE, useCreateSession, usePsyProfiles, useSessionDefaults,
+  useSessions, useStudents, type CardSource, type CreateSessionBody, type PsyProfile, type PsySettings, type SessionMode,
+  type SessionSettings,
 } from '../../shared/api/training';
 import { useGroups } from '../../shared/api/admin';
 import { fetchSuggestion, type AssignmentSuggestion } from '../../shared/api/assessment';
@@ -15,7 +16,7 @@ import { useScreenTour } from '../../shared/onboarding/OnboardingProvider';
 import { GroupPicker } from './ScenariosPage';
 
 const DEFAULTS: SessionSettings = { norm_112: 75, norm_dds: 30, threshold: 70, difficulty: 2, call_interval_s: 40, feed_interval_s: 45, max_waiting: 3 };
-const SETTING_LABELS: [keyof SessionSettings, string, number, number][] = [
+const SETTING_LABELS: [Exclude<keyof SessionSettings, 'psy'>, string, number, number][] = [
   ['norm_112', 'Норматив карточки 112, с', 5, 3600],
   ['norm_dds', 'Норматив решения ДДС, с', 5, 3600],
   ['threshold', 'Порог «зачтено», балл', 0, 100],
@@ -40,6 +41,7 @@ function CreateForm({ onCreated, assign }: { onCreated: (id: string) => void; as
   const [picked, setPicked] = useState<number[]>([]);
   const [roles, setRoles] = useState<Record<string, { role: Role; service: string }>>({});
   const [settings, setSettings] = useState<SessionSettings>(DEFAULTS);
+  const [psy, setPsy] = useState<PsySettings>(PSY_DEFAULTS); // п. 3.7: психологический модификатор
   // значения по умолчанию — из настроек администратора (п. 5.2)
   const defaults = useSessionDefaults().data;
   useEffect(() => { if (defaults) setSettings(defaults); }, [defaults]);
@@ -87,7 +89,7 @@ function CreateForm({ onCreated, assign }: { onCreated: (id: string) => void; as
     }
   }, [assign, defaults]); // eslint-disable-line react-hooks/exhaustive-deps
   const submit = () => {
-    const body: CreateSessionBody = { title: title.trim(), mode, card_source: source, groups: picked, participants, settings };
+    const body: CreateSessionBody = { title: title.trim(), mode, card_source: source, groups: picked, participants, settings: { ...settings, psy } };
     create.mutate(body, { onSuccess: (r) => onCreated(r.id) });
   };
   return (
@@ -160,6 +162,7 @@ function CreateForm({ onCreated, assign }: { onCreated: (id: string) => void; as
           </label>
         ))}
       </div>
+      <PsyForm value={psy} onChange={setPsy} />
       <div className="cab-filters" style={{ marginTop: 12 }}>
         <Button variant="primary" icon="plus" onClick={submit} disabled={create.isPending || title.trim().length < 3 || !participants.length || missingService}>
           создать занятие
@@ -170,6 +173,66 @@ function CreateForm({ onCreated, assign }: { onCreated: (id: string) => void; as
       </div>
       {create.isError && <Banner status="critical">{create.error.message}</Banner>}
     </Card>
+  );
+}
+
+/** Психологический модификатор занятия (п. 3.7, ADR-0012): заявитель в стрессе и отдельный блок оценки. */
+function PsyForm({ value, onChange }: { value: PsySettings; onChange: (v: PsySettings) => void }) {
+  const profiles = usePsyProfiles().data ?? [];
+  const set = (patch: Partial<PsySettings>) => onChange({ ...value, ...patch });
+  const chosen = value.profiles === 'auto' ? [] : value.profiles;
+  const toggle = (p: PsyProfile) => {
+    const on = chosen.includes(p.id);
+    const next = on ? chosen.filter((x) => x !== p.id) : [...chosen, p.id];
+    set({
+      profiles: next.length ? next : 'auto',
+      sensitive: p.sensitive ? (on ? value.sensitive.filter((x) => x !== p.id) : [...value.sensitive, p.id]) : value.sensitive,
+    });
+  };
+  const groups = (Object.keys(PSY_GROUP_TITLE) as PsyProfile['group'][]).map((g) => [g, profiles.filter((p) => p.group === g)] as const);
+  return (
+    <fieldset className="tch-groups" style={{ display: 'block', marginTop: 14 }}>
+      <legend>
+        <label className="tch-inline"><input type="checkbox" checked={value.enabled} onChange={(e) => set({ enabled: e.target.checked })} />{' '}
+          <b>Психологический модификатор</b> — заявитель в стрессе: паника, плач, агрессия, ступор и др.
+        </label>
+      </legend>
+      {value.enabled && (
+        <>
+          <p className="cab-filters__label" style={{ margin: '0 0 8px' }}>
+            Состояния и правильные действия оператора — по пособиям ЦЭПП МЧС России (2012, 2023) и Минздрава «Первая помощь» (2025),
+            уровень состояния — по шкале ECCS IAED, оценка — по профстандарту 12.002 (ТФ C/04.6). Реальные звонящие в основном спокойны,
+            поэтому модификатор — прицельная тренировка: по умолчанию 30 % звонков.
+          </p>
+          <div className="tch-form tch-form--grid">
+            <label>Доля звонков с профилем, %
+              <input type="number" min={0} max={100} value={Math.round(value.share * 100)} onChange={(e) => set({ share: Math.min(100, Math.max(0, Number(e.target.value))) / 100 })} />
+            </label>
+            <label>Интенсивность
+              <select value={value.intensity} onChange={(e) => set({ intensity: Number(e.target.value) as 1 | 2 | 3 })}>
+                <option value={1}>1 — сдержанно</option><option value={2}>2 — обычно</option><option value={3}>3 — ярко</option>
+              </select>
+            </label>
+            <label>Вес блока «Работа с заявителем» в итоге, %
+              <input type="number" min={0} max={100} value={Math.round(value.weight * 100)} onChange={(e) => set({ weight: Math.min(100, Math.max(0, Number(e.target.value))) / 100 })} />
+            </label>
+          </div>
+          <p className="cab-filters__label" style={{ margin: '8px 0 4px' }}>
+            Профили {chosen.length ? `(выбрано ${chosen.length})` : '— не выбраны: подбираются по сложности сценария'}. 0 % веса — блок показывается рядом с баллом, в итог не входит.
+          </p>
+          {groups.map(([g, list]) => list.length > 0 && (
+            <div key={g} style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 6 }}>
+              <span className="cab-filters__label" style={{ width: '100%' }}>{PSY_GROUP_TITLE[g]}</span>
+              {list.map((p) => (
+                <label key={p.id} className={chosen.includes(p.id) ? 'is-on' : ''} title={p.sensitive ? 'Тяжёлая тема: обучающийся увидит предупреждение и сможет отказаться, после звонка нужен разбор' : p.speech[String(p.start)]}>
+                  <input type="checkbox" checked={chosen.includes(p.id)} onChange={() => toggle(p)} /> {p.title}{p.sensitive ? ' ⚠' : ''}
+                </label>
+              ))}
+            </div>
+          ))}
+        </>
+      )}
+    </fieldset>
   );
 }
 

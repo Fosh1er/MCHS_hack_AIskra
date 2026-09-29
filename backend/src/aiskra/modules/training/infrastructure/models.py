@@ -28,6 +28,7 @@ class ScenarioModel(Base):
     reference_card: Mapped[dict[str, Any]] = mapped_column(JsonType, default=dict)
     reference_dds: Mapped[dict[str, Any]] = mapped_column(JsonType, default=dict)
     source: Mapped[str] = mapped_column(String(16), default="ai")  # ai | manual | trainee | ticket
+    psy_profile: Mapped[str | None] = mapped_column(String(32))  # п. 3.7: закреплённый профиль заявителя
     version: Mapped[int] = mapped_column(Integer, default=1)
     author_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
     approved_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
@@ -90,6 +91,8 @@ class CallModel(Base):
     status: Mapped[str] = mapped_column(String(16), default="ringing")
     revealed: Mapped[list[str]] = mapped_column(JsonType, default=list)
     tone: Mapped[dict[str, Any] | None] = mapped_column(JsonType)  # состояние заявителя (п. 3.6)
+    psy: Mapped[dict[str, Any] | None] = mapped_column(JsonType)  # п. 3.7: профиль и состояние заявителя
+    ended_by: Mapped[str | None] = mapped_column(String(16))  # operator | party
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     answered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -104,6 +107,7 @@ class CallMessageModel(Base):
     at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     tone: Mapped[dict[str, Any] | None] = mapped_column(JsonType)  # снимок состояния у реплики собеседника (п. 3.6)
     via: Mapped[str | None] = mapped_column(String(12))  # у реплик оператора: text | voice | hands_free (п. 3.6)
+    meta: Mapped[dict[str, Any] | None] = mapped_column(JsonType)  # п. 3.7: действия, состояние, ремарки, голос
 
 
 class MaterialModel(Base):

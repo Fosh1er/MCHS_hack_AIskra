@@ -39,6 +39,8 @@ ai:
     service_actor:       {provider: local_small, temperature: 0.6, cache: task,  cache_ttl: 1d, max_tokens: 160}
     judge:               {provider: local,       temperature: 0,   cache: exact, cache_ttl: 7d, max_tokens: 600}
     insights:            {provider: local,       temperature: 0.3, cache: off}
+    psy_acts:            {provider: local_small, temperature: 0,   cache: exact, cache_ttl: 7d, max_tokens: 300}
+    psy_judge:           {provider: local, temperature: 0,   cache: exact, cache_ttl: 7d, max_tokens: 700}
     feedback_draft:      {provider: local,       temperature: 0.4, cache: off, max_tokens: 700}
   # Голос собеседника (п. 3.6): серверный синтез за OpenAI-совместимым /audio/speech. Выключен, пока TTS_KIND не задан, —
   # тогда реплики озвучивает браузер (темп, высота, громкость по состоянию заявителя).
