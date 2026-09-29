@@ -1,4 +1,4 @@
-"""Команда: отметить экран обучения пройденным, отказаться от подсказок или начать обучение заново (п. 5.3).
+"""Команда: отметить экраны обучения пройденными, отказаться от подсказок или начать обучение заново (п. 5.3, 5.4).
 
 Меняет только свою учётную запись. В журнал аудита не пишется: это настройка интерфейса, а не действие с данными.
 """
@@ -19,6 +19,7 @@ class UpdateOnboarding(Command):
     actor: Principal
     action: OnboardingAction
     tour: str | None = None
+    tours: tuple[str, ...] = ()  # несколько экранов одной записью (п. 5.4)
 
 
 class UpdateOnboardingHandler:
@@ -28,7 +29,7 @@ class UpdateOnboardingHandler:
 
     async def __call__(self, cmd: UpdateOnboarding) -> None:
         user = await load_user(self._users, cmd.actor.user_id)
-        user.onboarding.apply(cmd.action, cmd.tour)
+        user.onboarding.apply(cmd.action, cmd.tour, list(cmd.tours))
         try:
             await self._users.save(user)
             await self._uow.commit()

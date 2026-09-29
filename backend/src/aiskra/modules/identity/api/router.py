@@ -112,7 +112,7 @@ async def update_onboarding(
     update: Annotated[UpdateOnboardingHandler, Depends(deps.provide_update_onboarding)],
     read: Annotated[GetOnboardingHandler, Depends(deps.provide_get_onboarding)],
 ) -> OnboardingOut:
-    await update(UpdateOnboarding(actor=principal, action=body.action, tour=body.tour))
+    await update(UpdateOnboarding(actor=principal, action=body.action, tour=body.tour, tours=tuple(body.tours)))
     return OnboardingOut(**asdict(await read(GetOnboarding(actor=principal))))
 
 

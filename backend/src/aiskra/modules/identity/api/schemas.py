@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -94,9 +95,13 @@ class PasswordResetIn(BaseModel):
 
 
 class OnboardingOut(BaseModel):
-    """Прогресс обучения интерфейсу (п. 5.3)."""
+    """Прогресс обучения интерфейсу (п. 5.3, 5.4)."""
 
-    enabled: bool = Field(description="Показывать подсказки автоматически (только обучающимся)")
+    enabled: bool = Field(description="Показывать подсказки автоматически (обучающемуся или преподавателю)")
+    audience: Literal["student", "teacher"] | None = Field(
+        default=None,
+        description="Чьи подсказки показывать сами: student — экраны обучающегося, teacher — преподавателя",
+    )
     dismissed: bool = Field(description="Пользователь пропустил обучение")
     seen: list[str] = Field(description="Пройденные экраны")
 
@@ -104,3 +109,6 @@ class OnboardingOut(BaseModel):
 class OnboardingIn(BaseModel):
     action: OnboardingAction = Field(description="seen — экран пройден; dismiss — пропустить всё; reset — заново")
     tour: str | None = Field(default=None, max_length=40, description="Экран обучения, для seen")
+    tours: list[str] = Field(
+        default_factory=list, max_length=5, description="Несколько экранов одной записью, для seen (обзор и экран)"
+    )
