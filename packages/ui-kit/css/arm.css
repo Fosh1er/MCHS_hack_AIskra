@@ -326,6 +326,7 @@
   gap: 12px;
   padding: 4px 6px 6px 8px;
   background: var(--c-white);
+  color: var(--text-strong); /* внутри тёмной панели служб текст наследовал белый — на белом фоне ввод был не виден */
   box-shadow: var(--shadow-popover);
 }
 .arm-uline {
@@ -1091,6 +1092,17 @@ body:has(.dds-editor) .ipphone > .arm-dock__section:not(.ipphone__screen) { disp
 .call-panel__talk.is-on { background: var(--s-critical); border-color: var(--s-critical); animation: call-talk-pulse 1.2s ease-in-out infinite; }
 @keyframes call-talk-pulse { 50% { opacity: .75; } }
 @media (prefers-reduced-motion: reduce) { .call-panel__talk.is-on { animation: none; } }
+/* Разговор без рук (п. 3.6): индикатор микрофона и чувствительность */
+.call-panel__switches { display: inline-flex; gap: 14px; align-items: center; }
+.call-panel__hf { display: flex; gap: 8px; align-items: center; min-height: 34px; margin-top: 6px; padding: 0 8px; border: 1px solid var(--border-strong, #5b6b7d); color: var(--text-inverse); font-size: var(--fs-xs); }
+.call-panel__hf-dot { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--text-inverse-muted); }
+.call-panel__hf.is-listening .call-panel__hf-dot { background: var(--s-ok); }
+.call-panel__hf.is-hearing .call-panel__hf-dot { background: var(--s-critical); animation: call-talk-pulse 1.2s ease-in-out infinite; }
+.call-panel__hf.is-party .call-panel__hf-dot, .call-panel__hf.is-calibrating .call-panel__hf-dot { background: var(--s-warn); }
+.call-panel__hf-text { flex: 1; min-width: 0; }
+.call-panel__hf-level { max-width: 118px; height: 24px; border: 1px solid var(--border-strong, #5b6b7d); background: transparent; color: var(--text-inverse); font-size: var(--fs-xs); }
+.call-panel__hf-level option { color: initial; }
+@media (prefers-reduced-motion: reduce) { .call-panel__hf.is-hearing .call-panel__hf-dot { animation: none; } }
 .call-panel__close { height: 32px; padding: 0 14px; border: 1px solid var(--c-mist-100); background: transparent; color: var(--text-inverse); cursor: pointer; }
 .arm-newcard--call { display: inline-flex; gap: 4px; align-items: center; background: var(--accent); }
 .arm-newcard:disabled { opacity: .6; cursor: default; }
@@ -1126,6 +1138,8 @@ body:has(.dds-editor) .ipphone > .arm-dock__section:not(.ipphone__screen) { disp
 .assess__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .assess__item { display: grid; grid-template-columns: minmax(160px, 38%) 1fr; gap: 4px 12px; align-items: center; font-size: var(--fs-sm); }
 .assess__na { font-size: var(--fs-xs); color: var(--text-muted); }
+.arm112v-talk { margin-top: 8px; } /* разбор разговора с заявителем в просмотре карточки (п. 3.6) */
+.assess__detail { grid-column: 1 / -1; font-size: var(--fs-xs); color: var(--text-muted); } /* пояснение к проверенному критерию: «заявитель: страх 4/10 → облегчение 1/10» */
 .assess__bar { height: 8px; background: var(--border-subtle); position: relative; }
 .assess__bar > span { position: absolute; inset: 0 auto 0 0; }
 .assess__bar .ok { background: var(--s-ok); }
@@ -1143,7 +1157,7 @@ body:has(.dds-editor) .ipphone > .arm-dock__section:not(.ipphone__screen) { disp
 }
 .session-banner__go { margin-left: auto; color: var(--accent); font-weight: 500; }
 .progress-page { display: flex; flex-direction: column; gap: 12px; }
-/* ---- Работа с заявителем (п. 3.6): психологический модификатор, лента разбора ----------------- */
+/* ---- Работа с заявителем (п. 3.7): психологический модификатор, лента разбора ----------------- */
 .assess__psy { border-top: 1px solid var(--border-subtle); padding-top: 8px; display: flex; flex-direction: column; gap: 6px; }
 .assess__psy-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: var(--fs-sm); }
 .assess__psy-sources { margin: 0; font-size: var(--fs-2xs); color: var(--text-muted); }

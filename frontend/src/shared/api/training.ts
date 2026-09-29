@@ -3,23 +3,34 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import { ApiError, http } from './http';
 
 export interface CallStarted { call_id: string; scenario_id: string | null; aon: string; channel: string; warning?: string | null }
-/** Параметры голоса реплики (п. 3.6): контракт для синтеза речи и дуплекс-адаптера — модуль голоса делается отдельно. */
+/** Параметры голоса профиля заявителя (п. 3.7): для синтеза речи и дуплекс-адаптера. */
 export interface VoiceParams {
   profile: string; direction: 'up' | 'down'; level: number; rate: number; pitch_st: number; gain_db: number;
   nonverbal: string[]; scene: string | null; voice: 'child' | 'elderly' | null; intensity: number;
 }
-export interface Replica { speaker: 'party' | 'operator' | 'system'; text: string; remarks?: string[]; voice?: VoiceParams | null; hung_up?: boolean }
 export interface PsyAct { code: string; title: string; quote: string }
-export interface CallMessage {
-  speaker: 'party' | 'operator' | 'system'; text: string; at: string; remarks?: string[];
-  meta?: { acts?: PsyAct[]; level?: number; level_before?: number; level_after?: number } | null;
-}
 export interface CallPsy { profile: string; title: string; sensitive: boolean; start: number; level: number; peak: number; stage: string; paused: boolean; hung_up: boolean }
+/** Что изменило состояние заявителя: код правила и сработавший фрагмент реплики оператора (п. 3.6). */
+export interface ToneChange { reason: 'calming' | 'invalidating' | 'pressure' | 'on_topic'; fragment: string; tension: number; trust: number; readiness: number }
+/** Состояние ИИ-заявителя у его реплики (п. 3.6): шкалы 0–10 и подача голоса. Фактов легенды здесь нет. */
+export interface Tone {
+  emotion: string; emotion_title: string; tension: number; trust: number; readiness: number; band: 'calm' | 'tense' | 'panic';
+  pace: 'slow' | 'normal' | 'fast' | 'very_fast'; volume: 'whisper' | 'low' | 'normal' | 'loud'; breathing: string; changes: ToneChange[];
+}
+export interface Replica {
+  speaker: 'party' | 'operator' | 'system'; text: string; message_id?: string | null; tone?: Tone | null;
+  remarks?: string[]; voice?: VoiceParams | null; hung_up?: boolean; // п. 3.7
+}
+export interface CallMessage {
+  speaker: 'party' | 'operator' | 'system'; text: string; at: string; id?: string | null; tone?: Tone | null;
+  remarks?: string[]; meta?: { acts?: PsyAct[]; level?: number; level_before?: number; level_after?: number } | null; // п. 3.7
+}
 export interface CallView {
   id: string; role: string; party: 'applicant' | 'brigade' | 'service'; direction: 'in' | 'out'; status: string; aon: string;
   card_id: string | null; service_code: string | null; target_service: string | null;
-  started_at: string; answered_at: string | null; ended_at: string | null; messages: CallMessage[];
-  ended_by?: string | null; psy?: CallPsy | null;
+  started_at: string; answered_at: string | null; ended_at: string | null; messages: CallMessage[]; tone?: Tone | null;
+  mode?: ReplicaVia; // как оператор вёл разговор: самый «голосовой» из способов его реплик
+  ended_by?: string | null; psy?: CallPsy | null; // п. 3.7
 }
 
 const T = '/api/v1/training';
@@ -27,22 +38,27 @@ const post = <R,>(path: string, body: unknown = {}) => http<R>(`${T}${path}`, { 
 
 export const startIncomingCall = (b: { groups?: number[]; difficulty?: number } = {}) => post<CallStarted>('/calls/incoming', b);
 export const answerCall = (id: string, cardId: string | null) => post<Replica | null>(`/calls/${id}/answer`, { card_id: cardId });
-/** `signals` — задержка ответа и перебивание: их передаёт голосовой канал (дуплекс-адаптер); в тексте не нужны. */
-export const sendReplica = (id: string, text: string, signals: { latency_ms?: number; interrupted?: boolean } = {}) =>
-  post<Replica>(`/calls/${id}/replicas`, { text, ...signals });
-export const endCall = (id: string) => post<{ status: string }>(`/calls/${id}/end`);
-/** «Пауза» (п. 3.6): остановить тяжёлый учебный звонок; блок «Работа с заявителем» не оценивается. */
+/** Как оператор сказал реплику (п. 3.6): напечатал, кнопкой «говорить» или без рук — режим звонка видит отчёт. */
+export type ReplicaVia = 'text' | 'voice' | 'hands_free';
+/** `signals` (п. 3.7) — задержка ответа и перебивание: их передаёт голосовой канал; в тексте не нужны. */
+export const sendReplica = (id: string, text: string, via: ReplicaVia = 'text', signals: { latency_ms?: number; interrupted?: boolean } = {}) =>
+  post<Replica>(`/calls/${id}/replicas`, { text, via, ...signals });
+/** «Пауза» (п. 3.7): остановить тяжёлый учебный звонок; блок «Работа с заявителем» не оценивается. */
 export const pauseCall = (id: string) => post<{ status: string }>(`/calls/${id}/pause`);
+export const endCall = (id: string) => post<{ status: string }>(`/calls/${id}/end`);
 export const startDdsCall = (b: { card_id: string; service_code: string; party: CallView['party']; target_service?: string | null; incoming?: boolean }) =>
   post<CallStarted>('/calls/dds', b);
 export const getCall = (id: string) => http<CallView>(`${T}/calls/${id}`);
 
-// ------------------------------------------------------------------ голосовой ввод (п. 1.4): Whisper на сервере
+// ------------------------------------------------------------------ речь: голосовой ввод (п. 1.4) и голос собеседника (п. 3.6)
+/** `enabled` — распознавание (кнопка «говорить»); `tts` — серверный синтез, иначе озвучивает браузер. */
 export const useSpeechStatus = () =>
-  useQuery({ queryKey: ['speech-status'], queryFn: () => http<{ enabled: boolean }>(`${T}/speech`), staleTime: 60_000 });
+  useQuery({ queryKey: ['speech-status'], queryFn: () => http<{ enabled: boolean; tts: boolean }>(`${T}/speech`), staleTime: 60_000 });
+/** Звук реплики собеседника — адрес своего сайта: CSP стенда не пускает `blob:` в медиа (п. 3.6). */
+export const replicaAudioUrl = (callId: string, messageId: string) => `${T}/calls/${callId}/messages/${messageId}/audio`;
 export async function transcribe(audio: Blob): Promise<string> {
   const body = new FormData();
-  body.append('audio', audio, audio.type.includes('ogg') ? 'speech.ogg' : 'speech.webm');
+  body.append('audio', audio, audio.type.includes('wav') ? 'speech.wav' : audio.type.includes('ogg') ? 'speech.ogg' : 'speech.webm');
   const res = await fetch(`${T}/speech`, { method: 'POST', body, credentials: 'same-origin' });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new ApiError(res.status, data.error ?? 'http_error', data.message ?? res.statusText);
@@ -88,7 +104,7 @@ export const useGenerateScenarios = () =>
 export const useReviewScenario = () =>
   useInvalidating(({ id, approve }: { id: string; approve: boolean }) => post<{ status: string }>(`/scenarios/${id}/${approve ? 'approve' : 'archive'}`), [['scenarios'], ['scenario']]);
 export interface ScenarioEdit { title?: string; difficulty?: number; opening?: string; what?: string; details?: string; comment?: string }
-// ------------------------------------------------------------------ п. 3.6: психологический модификатор
+// ------------------------------------------------------------------ п. 3.7: психологический модификатор
 export interface PsyProfile {
   id: string; title: string; group: 'stress_reaction' | 'crisis' | 'caller_type'; sensitive: boolean; pinned_only: boolean;
   start: number; floor: number; pool: number; key_acts: string[]; critical: string[]; required_routing: string[];
@@ -127,6 +143,7 @@ export interface StudentRow { id: string; login: string; full_name: string; oper
 export interface ParticipantProgress {
   student_id: string; cards_done: number; current_card: number | null; current_label: string; current_since: string | null;
   waiting: number; avg_score: number | null; errors: number; last_errors: string[];
+  caller_emotion?: string; caller_tension?: number | null; // заявитель в идущем звонке (п. 3.6)
 }
 export interface MonitorView { session: SessionView; rows: { participant: Participant; progress: ParticipantProgress }[] }
 export interface MySession {

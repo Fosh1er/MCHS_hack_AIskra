@@ -9,8 +9,9 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from aiskra.modules.training.application.ports.scenarios import ScenarioRow
-from aiskra.modules.training.domain.call import Call, CallMessage, CallParty, CallStatus, Speaker
+from aiskra.modules.training.domain.call import Call, CallMessage, CallParty, CallStatus, ReplicaVia, Speaker
 from aiskra.modules.training.domain.scenario import Scenario, ScenarioStatus
+from aiskra.modules.training.domain.tone import CallerTone, ToneSnapshot
 from aiskra.modules.training.infrastructure.models import CallMessageModel, CallModel, ScenarioModel
 from aiskra.platform.types import as_utc
 
@@ -161,6 +162,7 @@ class SqlCallRepository:
         row.aon = call.aon
         row.status = call.status.value
         row.revealed = list(call.revealed)
+        row.tone = call.tone.to_json() if call.tone else None
         row.psy = dict(call.psy) if call.psy is not None else None
         row.ended_by = call.ended_by
         row.answered_at = call.answered_at
@@ -186,6 +188,7 @@ class SqlCallRepository:
             answered_at=as_utc(row.answered_at),
             ended_at=as_utc(row.ended_at),
             revealed=list(row.revealed or []),
+            tone=CallerTone.from_json(row.tone),
             psy=dict(row.psy) if row.psy else None,
             ended_by=row.ended_by,
         )
@@ -202,6 +205,8 @@ class SqlCallRepository:
                 speaker=message.speaker.value,
                 text=message.text,
                 at=message.at,
+                tone=message.tone.to_json() if message.tone else None,
+                via=message.via.value if message.via else None,
                 meta=message.meta,
             )
         )
@@ -226,6 +231,8 @@ class SqlCallRepository:
                     speaker=Speaker(r.speaker),
                     text=r.text,
                     at=at,
+                    tone=ToneSnapshot.from_json(r.tone),
+                    via=ReplicaVia(r.via) if r.via else None,
                     meta=dict(r.meta) if r.meta else None,
                 )
             )

@@ -1,4 +1,4 @@
-"""Порт каталога психологических профилей (п. 3.6): источник — data/dictionaries/psy_profiles.yaml."""
+"""Порт каталога психологических профилей (п. 3.7): источник — data/dictionaries/psy_profiles.yaml."""
 
 from __future__ import annotations
 

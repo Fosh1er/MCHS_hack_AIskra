@@ -1,7 +1,7 @@
-"""Ведущий психологического модификатора (п. 3.6, ADR-0011): один ход разговора с заявителем в стрессе.
+"""Ведущий психологического модификатора (п. 3.7, ADR-0012): один ход разговора с заявителем в стрессе.
 
 Шаг: действия оператора (офлайн-словарь, по флагу — ИИ-задача PSY_ACTS) → движок состояния → ворота раскрытия →
-реплика (модель по промпту applicant_actor/v2 или офлайн-шаблон профиля) → проверка → голос. Всё, что нужно для
+реплика (модель по промпту applicant_actor/v3 или офлайн-шаблон профиля) → проверка → голос. Всё, что нужно для
 оценки и разбора, пишется в `meta` реплик.
 
 Голос. Синтез и распознавание речи делаются отдельным модулем; под полнодуплексный голосовой канал нужен адаптер.
@@ -31,6 +31,8 @@ from aiskra.modules.training.domain.psy import (
     gates,
     initial_state,
     step,
+    tone_changes,
+    tone_from_psy,
     voice_for,
 )
 from aiskra.modules.training.domain.psy_acts import Act, ActContext, classify_offline, norm
@@ -41,6 +43,7 @@ from aiskra.modules.training.domain.psy_render import (
     parse_remarks,
     validate,
 )
+from aiskra.modules.training.domain.tone import CallerTone, ToneSnapshot
 
 log = logging.getLogger(__name__)
 COMPLY_LOW = ("Хорошо… делаю.", "Да, сейчас сделаю.", "Хорошо, так и делаю.")
@@ -63,6 +66,8 @@ class PsyTurn:
     hung_up: bool
     revealed: list[str]
     psy: dict[str, Any]  # новое содержимое call.psy
+    tone: CallerTone | None = None  # голосовое состояние заявителя (выведено из профиля) — для синтеза речи
+    snapshot: ToneSnapshot | None = None  # снимок у этой реплики
     operator_meta: dict[str, Any] = field(default_factory=dict)
     party_meta: dict[str, Any] = field(default_factory=dict)
 
@@ -108,14 +113,18 @@ class PsyDirector:
     def profile(self, psy: dict[str, Any] | None) -> PsyProfile | None:
         return self.catalog.get(str(psy.get("profile"))) if psy else None
 
-    def opening(self, psy: dict[str, Any], legend: dict[str, Any]) -> tuple[str, list[str], dict[str, Any]] | None:
+    def opening(
+        self, psy: dict[str, Any], legend: dict[str, Any]
+    ) -> tuple[str, list[str], dict[str, Any], CallerTone] | None:
         p = self.profile(psy)
         if p is None:
             return None
         state = PsyState.from_dict(psy["state"])
         text, remarks = parse_remarks(opening_line(p, _legend(legend, psy), call_rng(int(psy["seed"]), 0)))
         voice = voice_for(p, state, remarks, int(psy.get("intensity", 2)))
-        return text, remarks, {"level": state.level, "remarks": remarks, "voice": voice, "source": "offline"}
+        tone = tone_from_psy(p, state, whisper="шёпотом" in remarks)
+        meta = {"level": state.level, "remarks": remarks, "voice": voice, "source": "offline", "emotional": True}
+        return text, remarks, meta, tone
 
     async def turn(
         self,
@@ -226,7 +235,10 @@ class PsyDirector:
             "emotional": state.level >= 3 or bool({"плачет", "кричит", "задыхается"} & set(remarks)),
             "source": source,
         }
+        tone = tone_from_psy(p, state, whisper="шёпотом" in remarks)
         return PsyTurn(
+            tone=tone,
+            snapshot=tone.snapshot(tone_changes(deltas)),
             text=clean,
             remarks=remarks,
             voice=voice,

@@ -1,10 +1,14 @@
 /** Отчёт по занятию (п. 4.3). ТЗ, сценарии 2–3: действия, ошибки, время против норматива, грамматика; наглядные
- *  диаграммы; экспертная правка оценки с комментарием; выгрузка в Excel (CSV) и PDF (печать страницы). */
+ *  диаграммы; экспертная правка оценки с комментарием; отзыв обучающемуся по занятию с черновиком от ИИ (п. 4.7);
+ *  выгрузка в Excel (CSV) и PDF (печать страницы). */
 import { Fragment, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { Banner, Button, Card, LineChart, StatTile, StatusPill } from '@smena112/ui-kit';
+import { Banner, Button, Card, Icon, LineChart, StatTile, StatusPill } from '@smena112/ui-kit';
 import { reportCsvUrl, useEvaluateSession, useOverride, useSessionReport, type CardResult, type SessionReport } from '../../shared/api/assessment';
+import { CallReview } from '../../shared/ui/CallReview';
 import { TeacherShell } from '../../shared/ui/TeacherShell';
+import { StudentFeedback } from './StudentFeedback';
+import { useScreenTour } from '../../shared/onboarding/OnboardingProvider';
 import { num } from '../../shared/format';
 
 const pct = (x: number | null) => (x === null ? '—' : `${Math.round(x * 100)} %`);
@@ -32,6 +36,7 @@ function OverrideForm({ card, sessionId, threshold, onClose }: { card: CardResul
 function StudentsTable({ r }: { r: SessionReport }) {
   const [open, setOpen] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
+  const [talk, setTalk] = useState<string | null>(null); // разбор разговора с заявителем (п. 3.6)
   const [all, setAll] = useState(false);
   useEffect(() => { // в PDF — все карточки раскрыты
     const on = () => setAll(true);
@@ -40,7 +45,7 @@ function StudentsTable({ r }: { r: SessionReport }) {
   }, []);
   const threshold = r.settings.threshold ?? 70;
   return (
-    <Card title="Результаты обучающихся" subtitle="Нажмите строку, чтобы раскрыть карточки" flush
+    <Card title="Результаты обучающихся" subtitle="Нажмите строку, чтобы раскрыть карточки и отзыв" flush tour="t-results"
       actions={<Button size="sm" variant="ghost" onClick={() => setAll(!all)}>{all ? 'свернуть все' : 'раскрыть все'}</Button>}>
       <table className="cab-table">
         <thead><tr><th>ФИО</th><th>Роль</th><th className="num">Карточек</th><th className="num">Средний балл</th><th className="num">Зачтено</th><th className="num">Среднее время, с</th><th className="num">Не оценено</th></tr></thead>
@@ -48,7 +53,10 @@ function StudentsTable({ r }: { r: SessionReport }) {
           {r.students.map((s) => (
             <Fragment key={s.student_id}>
               <tr onClick={() => setOpen(open === s.student_id ? null : s.student_id)} style={{ cursor: 'pointer' }} aria-expanded={open === s.student_id}>
-                <td><b>{s.full_name}</b></td>
+                <td>
+                  <b>{s.full_name}</b>
+                  {s.feedback && <span className="tch-feedback__mark" title="Отзыв по занятию сохранён"><Icon name="chat" size="sm" /> отзыв</span>}
+                </td>
                 <td>{s.role === '112' ? 'оператор 112' : `ДДС ${s.service_code}`}</td>
                 <td className="num">{s.cards.length}</td>
                 <td className="num">{num(s.avg_score)}</td>
@@ -67,17 +75,29 @@ function StudentsTable({ r }: { r: SessionReport }) {
                           {Math.round(c.processing_s)} с (норматив {c.norm_s}, {c.deviation_s !== null && c.deviation_s > 0 ? '+' : ''}{c.deviation_s})
                         </span>
                       )}
+                      {c.call_mode && c.call_mode !== 'text' && (
+                        <span title="В голосовом режиме во время заполнения входит речь заявителя">
+                          <Icon name="mic" size="sm" /> {c.call_mode === 'hands_free' ? 'голосом без рук' : 'голосом'}
+                        </span>
+                      )}
                       {c.score !== null
                         ? <StatusPill status={c.passed ? 'ok' : 'critical'}>{num(c.score)} {c.expert ? '· эксперт' : ''}</StatusPill>
                         : <StatusPill status="neutral">не оценена</StatusPill>}
                       {c.assessment_id && <Button size="sm" variant="ghost" icon="edit" onClick={() => setEditing(editing === c.card_id ? null : c.card_id)}>правка</Button>}
+                      {s.role === '112' && <Button size="sm" variant="ghost" icon="phone" aria-expanded={talk === c.card_id} onClick={() => setTalk(talk === c.card_id ? null : c.card_id)}>разговор</Button>}
                     </div>
                     {c.expert_comment && <div className="tch-expert">Эксперт: {c.expert_comment}</div>}
                     {c.errors.length > 0 && <ul className="tch-errors">{c.errors.map((e) => <li key={e}>{e}</li>)}</ul>}
                     {editing === c.card_id && <OverrideForm card={c} sessionId={r.session_id} threshold={threshold} onClose={() => setEditing(null)} />}
+                    {talk === c.card_id && <CallReview cardId={c.card_id} />}
                   </td>
                 </tr>
               ))}
+              {(all || open === s.student_id) && (
+                <tr className="tch-subrow">
+                  <td colSpan={7}><StudentFeedback key={s.student_id + s.role} sessionId={r.session_id} student={s} /></td>
+                </tr>
+              )}
             </Fragment>
           ))}
         </tbody>
@@ -117,7 +137,7 @@ function Heatmap({ r }: { r: SessionReport }) {
   }).filter((p) => p.criteria.length);
   if (!parts.length) return null;
   return (
-    <Card title="Тепловая карта: обучающийся × критерий" subtitle="Средний балл критерия, 0–100 %; чем темнее, тем лучше">
+    <Card title="Тепловая карта: обучающийся × критерий" subtitle="Средний балл критерия, 0–100 %; чем темнее, тем лучше" tour="t-heatmap">
       <div className="tch-heat-parts">
         {parts.map((p) => (
           <div key={p.role}>
@@ -153,15 +173,18 @@ export function SessionReportPage() {
   const q = useSessionReport(id);
   const evaluate = useEvaluateSession(id);
   const r = q.data;
+  useScreenTour('teacher-report', !!r);
   return (
     <TeacherShell active="sessions" crumbs="Пульт / Занятия / Отчёт" title={r ? `Отчёт: ${r.title}` : 'Отчёт по занятию'}
       subtitle={r?.started_at ? new Date(r.started_at).toLocaleString('ru-RU') : undefined}
       actions={
         <span className="tch-noprint cab-filters">
-          <Button icon="refresh" disabled={evaluate.isPending} onClick={() => evaluate.mutate()}>{evaluate.isPending ? 'оценка…' : 'оценить все карточки'}</Button>
-          <Link className="cab-btn" to={`/teacher/sessions/${id}/debrief`}>разбор</Link>
-          <a className="cab-btn" href={reportCsvUrl(id)} download>Excel (CSV)</a>
-          <Button icon="description" onClick={() => window.print()}>PDF</Button>
+          <span data-tour="t-evaluate"><Button icon="refresh" disabled={evaluate.isPending} onClick={() => evaluate.mutate()}>{evaluate.isPending ? 'оценка…' : 'оценить все карточки'}</Button></span>
+          <span className="tch-tour-group" data-tour="t-report-more">
+            <Link className="cab-btn" to={`/teacher/sessions/${id}/debrief`}>разбор</Link>
+            <a className="cab-btn" href={reportCsvUrl(id)} download>Excel (CSV)</a>
+            <Button icon="description" onClick={() => window.print()}>PDF</Button>
+          </span>
         </span>
       }>
       {q.isError && <Banner status="critical">{q.error.message}</Banner>}

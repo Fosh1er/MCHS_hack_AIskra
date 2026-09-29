@@ -13,7 +13,7 @@ export interface Assessment {
     psy?: PsyBlock;
   };
 }
-/** Блок «Работа с заявителем» (п. 3.6): отдельный от балла роли, с лентой разбора. */
+/** Блок «Работа с заявителем» (п. 3.7): отдельный от балла роли, с лентой разбора. */
 export interface PsyTimelineItem {
   at_s: number; speaker: 'operator' | 'party' | 'system'; text: string;
   acts?: { code: string; good: boolean; title: string; why: string }[]; level_before?: number | null; level_after?: number | null;
@@ -63,12 +63,16 @@ export const useInsights = (enabled: boolean) =>
 // ------------------------------------------------------------------ п. 4.3: отчёт по занятию
 export interface CardResult {
   card_id: string; card_number: number; card_types: string[]; processing_s: number | null; norm_s: number; deviation_s: number | null;
+  call_mode?: 'text' | 'voice' | 'hands_free' | null; // как вёл разговор оператор 112 (п. 3.6)
   assessment_id: string | null; score: number | null; passed: boolean | null; expert: boolean; expert_comment: string; errors: string[];
-  criteria: Record<string, number | null>;
+  criteria: Record<string, number | null>; critical?: string[];
 }
+/** Отзыв преподавателя по занятию (specs/4.7): видят преподаватель и сам обучающийся. */
+export interface FeedbackView { text: string; updated_at: string | null }
 export interface StudentReport {
   student_id: string; full_name: string; role: '112' | 'dds'; service_code: string | null; cards: CardResult[];
   avg_score: number | null; passed_share: number | null; avg_time_s: number | null; not_assessed: number;
+  feedback?: FeedbackView | null;
 }
 export interface SessionReport {
   session_id: string; title: string; mode: string; status: string; started_at: string | null; finished_at: string | null;
@@ -114,6 +118,30 @@ export interface Recommendation { key: string; average: number; text: string }
 export interface MySessionReport { report: SessionReport; recommendations: Recommendation[] }
 export const useMySessionReport = (id: string) =>
   useQuery({ queryKey: ['my-report', id], queryFn: () => http<MySessionReport>(`${A}/sessions/${id}/mine`) });
+
+// ------------------------------------------------------------------ отзыв преподавателя по занятию (specs/4.7)
+export interface FeedbackDraft {
+  text: string; source: 'ai' | 'rules'; model: string | null;
+  focus: { key: string; title: string; average: number }[]; warnings: string[];
+  previous: { session_title: string; text: string; updated_at: string | null } | null;
+}
+export interface FeedbackItem { session_id: string; session_title: string; text: string; updated_at: string | null }
+const feedbackUrl = (sessionId: string, studentId: string) => `${A}/sessions/${sessionId}/students/${studentId}/feedback`;
+
+/** Черновик ничего не сохраняет: обучающийся увидит отзыв только после «сохранить». */
+export const useFeedbackDraft = (sessionId: string, studentId: string) =>
+  useMutation({ mutationFn: () => http<FeedbackDraft>(`${feedbackUrl(sessionId, studentId)}/draft`, { method: 'POST' }) });
+
+export function useSaveFeedback(sessionId: string, studentId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { text: string; draft_text?: string; draft_source?: 'ai' | 'rules'; draft_model?: string | null }) =>
+      http<FeedbackView>(feedbackUrl(sessionId, studentId), { method: 'PUT', body: JSON.stringify(body) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['report', sessionId] }),
+  });
+}
+
+export const useMyFeedback = () => useQuery({ queryKey: ['my-feedback'], queryFn: () => http<FeedbackItem[]>(`${A}/my/feedback`) });
 
 // ------------------------------------------------------------------ аналитика преподавателя (specs/4.5)
 /** «Норматив / факт» (ПП РФ № 1931; форма 1/112): у каждого занятия может быть свой норматив. */

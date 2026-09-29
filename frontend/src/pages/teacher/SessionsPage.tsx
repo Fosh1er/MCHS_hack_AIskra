@@ -12,6 +12,7 @@ import {
 import { useGroups } from '../../shared/api/admin';
 import { fetchSuggestion, type AssignmentSuggestion } from '../../shared/api/assessment';
 import { TeacherShell } from '../../shared/ui/TeacherShell';
+import { useScreenTour } from '../../shared/onboarding/OnboardingProvider';
 import { GroupPicker } from './ScenariosPage';
 
 const DEFAULTS: SessionSettings = { norm_112: 75, norm_dds: 30, threshold: 70, difficulty: 2, call_interval_s: 40, feed_interval_s: 45, max_waiting: 3 };
@@ -40,7 +41,7 @@ function CreateForm({ onCreated, assign }: { onCreated: (id: string) => void; as
   const [picked, setPicked] = useState<number[]>([]);
   const [roles, setRoles] = useState<Record<string, { role: Role; service: string }>>({});
   const [settings, setSettings] = useState<SessionSettings>(DEFAULTS);
-  const [psy, setPsy] = useState<PsySettings>(PSY_DEFAULTS); // п. 3.6: психологический модификатор
+  const [psy, setPsy] = useState<PsySettings>(PSY_DEFAULTS); // п. 3.7: психологический модификатор
   // значения по умолчанию — из настроек администратора (п. 5.2)
   const defaults = useSessionDefaults().data;
   useEffect(() => { if (defaults) setSettings(defaults); }, [defaults]);
@@ -93,7 +94,7 @@ function CreateForm({ onCreated, assign }: { onCreated: (id: string) => void; as
   };
   return (
     <Card title="Новое занятие">
-      <div className="tch-form tch-form--grid">
+      <div className="tch-form tch-form--grid" data-tour="t-form-main">
         <label>Название<input value={title} placeholder="Например: пожары в жилом секторе" onChange={(e) => setTitle(e.target.value)} /></label>
         <label>Тип занятия
           <select value={mode} onChange={(e) => setMode(e.target.value as SessionMode)}>
@@ -106,7 +107,7 @@ function CreateForm({ onCreated, assign }: { onCreated: (id: string) => void; as
           </select>
         </label>
       </div>
-      <GroupPicker groups={groups.data ?? []} value={picked} onChange={setPicked} />
+      <div data-tour="t-form-groups"><GroupPicker groups={groups.data ?? []} value={picked} onChange={setPicked} /></div>
       {groupList.length > 0 && (
         <div className="cab-filters" style={{ marginTop: 10 }}>
           <label className="cab-filters__label">Назначить группу{' '}
@@ -118,7 +119,7 @@ function CreateForm({ onCreated, assign }: { onCreated: (id: string) => void; as
           <span className="cab-filters__label">роли и службы подставятся из состава группы, их можно поправить</span>
         </div>
       )}
-      <div className="cab-filters" style={{ marginTop: 10 }}>
+      <div className="cab-filters" style={{ marginTop: 10 }} data-tour="t-form-suggest">
         <Button icon="bolt" disabled={suggesting || !participants.length} onClick={() => runSuggest(participants.map((p) => p.student_id), false)}>
           {suggesting ? 'подбор…' : 'подобрать по слабым местам'}
         </Button>
@@ -126,7 +127,7 @@ function CreateForm({ onCreated, assign }: { onCreated: (id: string) => void; as
       </div>
       {suggestError && <Banner status="critical">{suggestError}</Banner>}
       {suggest && <SuggestionNote s={suggest} />}
-      <table className="cab-table" style={{ marginTop: 8 }}>
+      <table className="cab-table" style={{ marginTop: 8 }} data-tour="t-form-roles">
         <thead><tr><th>Обучающийся</th><th>Логин</th><th>Роль на занятии</th><th>Служба (для ДДС)</th></tr></thead>
         <tbody>
           {students.data?.map((s) => {
@@ -154,7 +155,7 @@ function CreateForm({ onCreated, assign }: { onCreated: (id: string) => void; as
           {students.data && !students.data.length && <tr><td colSpan={4} className="c-slate">Обучающихся нет — администратор заводит их в разделе пользователей.</td></tr>}
         </tbody>
       </table>
-      <div className="tch-form tch-form--grid" style={{ marginTop: 12 }}>
+      <div className="tch-form tch-form--grid" style={{ marginTop: 12 }} data-tour="t-form-settings">
         {SETTING_LABELS.map(([k, label, min, max]) => (
           <label key={k}>{label}
             <input type="number" min={min} max={max} value={settings[k]} onChange={(e) => setSettings({ ...settings, [k]: Number(e.target.value) })} />
@@ -175,7 +176,7 @@ function CreateForm({ onCreated, assign }: { onCreated: (id: string) => void; as
   );
 }
 
-/** Психологический модификатор занятия (п. 3.6, ADR-0011): заявитель в стрессе и отдельный блок оценки. */
+/** Психологический модификатор занятия (п. 3.7, ADR-0012): заявитель в стрессе и отдельный блок оценки. */
 function PsyForm({ value, onChange }: { value: PsySettings; onChange: (v: PsySettings) => void }) {
   const profiles = usePsyProfiles().data ?? [];
   const set = (patch: Partial<PsySettings>) => onChange({ ...value, ...patch });
@@ -252,11 +253,14 @@ export function SessionsPage() {
   const [params] = useSearchParams();
   const assign = params.get('assign') ?? undefined;
   const [creating, setCreating] = useState(Boolean(assign));
+  const students = useStudents();
+  // форма открывается кнопкой — у неё свои подсказки: пока она закрыта, её полей на экране нет (п. 5.4)
+  useScreenTour(creating ? 'teacher-session-new' : 'teacher-sessions', creating ? !!students.data : !!sessions.data);
   return (
     <TeacherShell active="sessions" crumbs="Пульт / Занятия" title="Занятия"
-      actions={!creating && <Button variant="primary" icon="plus" onClick={() => setCreating(true)}>новое занятие</Button>}>
+      actions={!creating && <span data-tour="t-new-session"><Button variant="primary" icon="plus" onClick={() => setCreating(true)}>новое занятие</Button></span>}>
       {creating && <CreateForm assign={assign} onCreated={(id) => navigate(`/teacher/sessions/${id}`)} />}
-      <Card flush>
+      <Card flush tour="t-session-list">
         <table className="cab-table">
           <thead><tr><th>Занятие</th><th>Тип</th><th className="num">Участников</th><th>Начало</th><th>Статус</th><th /></tr></thead>
           <tbody>

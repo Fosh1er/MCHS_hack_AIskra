@@ -61,11 +61,12 @@ class SystemStatus:
         return ServiceState("Кеш ИИ", "ok", [("попаданий", f"{st.hit_rate * 100:.0f} %"), ("записей", str(st.size))])
 
     def _telephony(self) -> ServiceState:
-        tts = type(self._sv.tts).__name__
+        tts = self._sv.tts
+        voice = f"сервер, {tts.model_id}" if tts.enabled else "синтез речи браузера"
         return ServiceState(
             "Телефония",
             "ok",
-            [("режим", "встроенная имитация"), ("озвучка", tts), ("SIP", "не подключён")],
+            [("режим", "встроенная имитация"), ("озвучка", voice), ("SIP", "не подключён")],
             "звонки 112 и ДДС идут через встроенный IP-телефон (п. 2.3); SIP-шлюз — P2",
         )
 

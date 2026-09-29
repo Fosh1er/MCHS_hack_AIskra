@@ -47,6 +47,7 @@ export function AssessmentPanel({ cardId, role, service, auto }: { cardId: strin
                 {c.score == null
                   ? <span className="assess__na" title={c.note}>не проверено</span>
                   : <span className="assess__bar" aria-label={`${Math.round(c.score * 100)} %`}><span style={{ width: `${Math.round(c.score * 100)}%` }} className={c.score >= 0.7 ? 'ok' : c.score >= 0.4 ? 'warn' : 'bad'} /></span>}
+                {c.score != null && c.note && <span className="assess__detail">{c.note}</span>}
                 {c.errors.length > 0 && <ul className="assess__errors">{c.errors.map((e) => <li key={e}>{e}</li>)}</ul>}
               </li>
             ))}

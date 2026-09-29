@@ -7,6 +7,7 @@ import { Banner, Button, Card, Segmented, StatusPill } from '@smena112/ui-kit';
 import { useReadiness, type Readiness } from '../../../shared/api/assessment';
 import { useGroups } from '../../../shared/api/admin';
 import { TeacherShell } from '../../../shared/ui/TeacherShell';
+import { useScreenTour } from '../../../shared/onboarding/OnboardingProvider';
 import { num } from '../../../shared/format';
 import { pct, roleLabel } from './parts';
 
@@ -24,6 +25,7 @@ export function ReadinessPage() {
   const [group, setGroup] = useState('');
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const q = useReadiness({ last: Number(last) });
+  useScreenTour('teacher-readiness', !!q.data);
   const groups = useGroups().data ?? [];
   const members = useMemo(() => new Set(groups.find((g) => g.id === group)?.members.map((m) => m.user_id) ?? []), [groups, group]);
   const rows = (q.data?.rows ?? []).filter((r) => !group || members.has(r.student_id));
@@ -35,16 +37,16 @@ export function ReadinessPage() {
       subtitle="Оценка по последним карточкам: балл и соблюдение нормативов"
       actions={<span className="cab-filters">
         <Segmented options={LAST} value={last} onChange={setLast} ariaLabel="Сколько последних карточек учитывать" />
-        <Button variant="primary" icon="description" disabled={!rows.length} onClick={protocol}>{ids.length ? `протокол (${ids.length})` : 'протокол'}</Button>
+        <span data-tour="t-protocol"><Button variant="primary" icon="description" disabled={!rows.length} onClick={protocol}>{ids.length ? `протокол (${ids.length})` : 'протокол'}</Button></span>
       </span>}>
       {q.isError && <Banner status="critical">{q.error.message}</Banner>}
       {q.data && (
         <>
-          <Card title="Шкала" subtitle={q.data.source}>
+          <Card title="Шкала" subtitle={q.data.source} tour="t-scale">
             <ul className="tch-list">{q.data.scale.map((s) => <li key={s.grade}><b>{s.grade}</b> — {s.rule}</li>)}</ul>
             <p className="tch-source">Учитываются последние {q.data.last} оценённых карточек каждой роли; меньше {q.data.min_cards} — «недостаточно данных». Экспертная правка балла учитывается.</p>
           </Card>
-          <Card title="Обучающиеся" subtitle="Отметьте строки, чтобы включить в протокол только их" flush
+          <Card title="Обучающиеся" subtitle="Отметьте строки, чтобы включить в протокол только их" flush tour="t-readiness-list"
             actions={groups.length > 0 && (
               <select className="cab-select" aria-label="Группа" value={group} onChange={(e) => setGroup(e.target.value)}>
                 <option value="">все группы</option>

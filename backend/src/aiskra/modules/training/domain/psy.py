@@ -1,4 +1,4 @@
-"""Психологический модификатор сценария (п. 3.6, ADR-0011): профиль заявителя и детерминированный движок состояния.
+"""Психологический модификатор сценария (п. 3.7, ADR-0012): профиль заявителя и детерминированный движок состояния.
 
 Состояние заявителя хранит не языковая модель, а этот модуль: уровень по шкале ECCS IAED 1–5 (Clawson & Sinclair
 2001), доверие к оператору и этап (для кризисных профилей). Уровень меняется по действиям оператора
@@ -17,6 +17,8 @@ import random
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass, field
 from typing import Any
+
+from aiskra.modules.training.domain.tone import CallerTone, Emotion, ToneChange
 
 # ------------------------------------------------------------------ словари
 
@@ -557,3 +559,51 @@ def check_settings(settings: Mapping[str, Any], catalog_ids: set[str] | None = N
 def call_rng(seed: int, turn: int) -> random.Random:
     """Генератор хода: seed звонка + номер хода — прогон воспроизводим."""
     return random.Random(seed * 1_000_003 + turn)
+
+
+# ------------------------------------------------------------------ связь с голосом заявителя (CallerTone)
+# Эмоциональный голос (п. 3.7 «голос», ADR-0012) озвучивает заявителя по `CallerTone`. Когда у звонка есть
+# психологический профиль, состояние ведёт движок модификатора, а `CallerTone` выводится из него — голос
+# и оценка видят одно и то же состояние.
+PROFILE_EMOTION: dict[str, Emotion] = {
+    "panic": Emotion.PANIC,
+    "hysteria": Emotion.PANIC,
+    "agitation": Emotion.PANIC,
+    "crying": Emotion.FEAR,
+    "anxiety": Emotion.FEAR,
+    "child": Emotion.FEAR,
+    "elderly": Emotion.FEAR,
+    "psychosis": Emotion.FEAR,
+    "aggression": Emotion.IRRITATION,
+    "false_call": Emotion.IRRITATION,
+    "intoxicated": Emotion.IRRITATION,
+    "stupor": Emotion.SHOCK,
+    "apathy": Emotion.SHOCK,
+    "grief": Emotion.SHOCK,
+    "suicidal": Emotion.SHOCK,
+}
+_TENSION = {1: 2, 2: 4, 3: 6, 4: 8, 5: 10}
+
+
+def tone_from_psy(p: PsyProfile, s: PsyState, *, whisper: bool = False) -> CallerTone:
+    """Голосовое состояние заявителя по состоянию профиля: напряжение — из уровня ECCS, доверие — из доверия."""
+    return CallerTone(
+        base=PROFILE_EMOTION.get(p.id, Emotion.FEAR if p.direction == "up" else Emotion.SHOCK),
+        tension=_TENSION[s.level],
+        trust=max(0, min(10, round(s.trust * 10))),
+        readiness=max(0, min(10, 12 - 2 * s.level)),
+        whisper=whisper or p.id == "psychosis",
+        calmed=1 if s.level < p.start else 0,
+    )
+
+
+def tone_changes(deltas: Sequence[Delta]) -> list[ToneChange]:
+    """Причины изменения уровня в формате голосового модуля (лента состояния у реплики)."""
+    return [
+        ToneChange(
+            reason="calming" if d.change < 0 else "invalidating",
+            fragment=ACT_TITLES.get(d.cause, d.note or d.cause),
+            tension=2 * d.change,
+        )
+        for d in deltas
+    ]

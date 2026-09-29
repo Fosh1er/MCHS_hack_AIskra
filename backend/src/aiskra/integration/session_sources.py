@@ -18,9 +18,16 @@ from aiskra.modules.incidents.domain.incident import AddedBy, CardService, Incid
 from aiskra.modules.incidents.infrastructure.models import CardServiceModel, CardServiceStatusModel, IncidentCardModel
 from aiskra.modules.incidents.infrastructure.repositories import SqlCardRepository
 from aiskra.modules.training.application.ports.sessions import ParticipantProgress
+from aiskra.modules.training.domain.call import ReplicaVia, call_mode
 from aiskra.modules.training.domain.scenario import Scenario
 from aiskra.modules.training.domain.session import TrainingSession
-from aiskra.modules.training.infrastructure.models import ScenarioModel, TrainingSessionModel
+from aiskra.modules.training.domain.tone import EMOTION_TITLES, CallerTone
+from aiskra.modules.training.infrastructure.models import (
+    CallMessageModel,
+    CallModel,
+    ScenarioModel,
+    TrainingSessionModel,
+)
 from aiskra.modules.training.infrastructure.sessions import SqlSessionRepository, SqlStudentDirectory
 from aiskra.platform.types import as_utc
 
@@ -125,6 +132,18 @@ class SessionProgress:
                 latest[r.card_id] = {"score": r.score, "errors": d.get("errors", [])}
         return list(latest.values())
 
+    async def _caller(self, card_id: UUID) -> CallerTone | None:
+        """Состояние ИИ-заявителя в идущем звонке по карточке (п. 3.6)."""
+        raw = (
+            await self._s.execute(
+                select(CallModel.tone)
+                .where(CallModel.card_id == card_id, CallModel.status == "active", CallModel.party == "applicant")
+                .order_by(CallModel.started_at.desc())
+                .limit(1)
+            )
+        ).scalar_one_or_none()
+        return CallerTone.from_json(raw)
+
     async def progress(self, session: TrainingSession) -> list[ParticipantProgress]:
         cards = (
             (
@@ -147,6 +166,7 @@ class SessionProgress:
                 marks = await self._assessments([c.id for c in done], "112", None)
                 current = draft  # нет черновика — оператор ждёт следующий вызов
                 since = _timer_start(draft) if draft else None
+                caller = await self._caller(draft.id) if draft else None
             else:
                 svc = p.dds_service_code or ""
                 service_rows = (
@@ -177,6 +197,7 @@ class SessionProgress:
                 # п. 5.3: пауза на подсказки не входит в таймер ожидания решения
                 arrived = as_utc(current.saved_at) if current else None
                 since = arrived + timedelta(milliseconds=paused[current.id]) if current and arrived else arrived
+                caller = None
             if since is not None and since.tzinfo is None:
                 since = since.replace(tzinfo=UTC)
             scores = [m["score"] for m in marks if m["score"] is not None]
@@ -192,6 +213,8 @@ class SessionProgress:
                     avg_score=round(sum(scores) / len(scores), 1) if scores else None,
                     errors=len(errors),
                     last_errors=errors[-3:],
+                    caller_emotion=EMOTION_TITLES[caller.emotion] if caller else "",
+                    caller_tension=caller.tension if caller else None,
                 )
             )
         return out
@@ -242,6 +265,7 @@ class SessionFactsReader:
         }
         groups = await self._groups({t for t in itypes.values() if t})
         reactions = await self._reactions([c.id for c in cards])
+        modes = await self._call_modes([c.id for c in cards])
         return SessionFacts(
             session_id=ts.id,
             teacher_id=ts.teacher_id,
@@ -275,6 +299,7 @@ class SessionFactsReader:
                     incident_group=groups.get(itypes[c.id] or ""),
                     difficulty=scen.get(c.scenario_id, (None, None))[1],
                     reactions=reactions.get(c.id, {}),
+                    call_mode=modes.get(c.id),
                 )
                 for c in cards
             ],
@@ -305,6 +330,25 @@ class SessionFactsReader:
             select(IncidentTypeModel.code, IncidentTypeModel.group_id).where(IncidentTypeModel.code.in_(codes))
         )
         return {code: gid for code, gid in rows.all()}
+
+    async def _call_modes(self, card_ids: list[UUID]) -> dict[UUID, str]:
+        """Режим разговора по карточке (п. 3.6): самый «голосовой» способ реплик оператора во всех её звонках."""
+        if not card_ids:
+            return {}
+        rows = await self._s.execute(
+            select(CallModel.card_id, CallMessageModel.via)
+            .join(CallMessageModel, CallMessageModel.call_id == CallModel.id)
+            .where(
+                CallModel.card_id.in_(card_ids),
+                CallMessageModel.speaker == "operator",
+                CallMessageModel.via.is_not(None),
+            )
+        )
+        vias: dict[UUID, list[ReplicaVia]] = {}
+        for cid, via in rows.all():
+            if cid is not None and via:
+                vias.setdefault(cid, []).append(ReplicaVia(via))
+        return {cid: mode.value for cid, v in vias.items() if (mode := call_mode(v))}
 
     async def _reactions(self, card_ids: list[UUID]) -> dict[UUID, dict[str, float]]:
         """Время решения ДДС: от поступления карточки в службу до первого статуса после «Поступила» (как в оценке)."""

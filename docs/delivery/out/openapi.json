@@ -3556,7 +3556,7 @@
     "tags": [
      "training"
     ],
-    "summary": "Доступен ли голосовой ввод (модель речи настроена)",
+    "summary": "Что из речи настроено: распознавание и синтез",
     "operationId": "speech_status_api_v1_training_speech_get",
     "responses": {
      "200": {
@@ -3659,7 +3659,7 @@
     "tags": [
      "training"
     ],
-    "summary": "«Пауза»: обучающийся останавливает тяжёлый звонок, блок «Работа с заявителем» не оценивается (п. 3.6)",
+    "summary": "«Пауза»: обучающийся останавливает тяжёлый звонок, блок «Работа с заявителем» не оценивается (п. 3.7)",
     "operationId": "pause_call_api_v1_training_calls__call_id__pause_post",
     "parameters": [
      {
@@ -3702,7 +3702,7 @@
     "tags": [
      "training"
     ],
-    "summary": "Каталог психологических профилей заявителя (п. 3.6)",
+    "summary": "Каталог психологических профилей заявителя (п. 3.7)",
     "operationId": "psy_profiles_api_v1_training_psy_profiles_get",
     "responses": {
      "200": {
@@ -3727,7 +3727,7 @@
     "tags": [
      "training"
     ],
-    "summary": "Закрепить за сценарием психологический профиль заявителя (п. 3.6)",
+    "summary": "Закрепить за сценарием психологический профиль заявителя (п. 3.7)",
     "operationId": "set_scenario_psy_api_v1_training_scenarios__scenario_id__psy_post",
     "parameters": [
      {
@@ -3803,6 +3803,56 @@
          "$ref": "#/components/schemas/CallView"
         }
        }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/training/calls/{call_id}/messages/{message_id}/audio": {
+   "get": {
+    "tags": [
+     "training"
+    ],
+    "summary": "Звук реплики собеседника: серверный синтез с подачей по состоянию заявителя (п. 3.6)",
+    "operationId": "replica_audio_api_v1_training_calls__call_id__messages__message_id__audio_get",
+    "parameters": [
+     {
+      "name": "call_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Call Id"
+      }
+     },
+     {
+      "name": "message_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Message Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Звук реплики",
+      "content": {
+       "audio/mpeg": {},
+       "audio/wav": {}
       }
      },
      "422": {
@@ -4954,6 +5004,147 @@
        "application/json": {
         "schema": {
          "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/assessment/sessions/{session_id}/students/{student_id}/feedback/draft": {
+   "post": {
+    "tags": [
+     "assessment"
+    ],
+    "summary": "Черновик отзыва обучающемуся по занятию: ИИ, без модели — по правилам; ничего не публикует",
+    "operationId": "feedback_draft_api_v1_assessment_sessions__session_id__students__student_id__feedback_draft_post",
+    "parameters": [
+     {
+      "name": "session_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Session Id"
+      }
+     },
+     {
+      "name": "student_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Student Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/FeedbackDraft"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/assessment/sessions/{session_id}/students/{student_id}/feedback": {
+   "put": {
+    "tags": [
+     "assessment"
+    ],
+    "summary": "Сохранить отзыв обучающемуся по занятию (заменяет прежний; в аудит)",
+    "operationId": "feedback_save_api_v1_assessment_sessions__session_id__students__student_id__feedback_put",
+    "parameters": [
+     {
+      "name": "session_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Session Id"
+      }
+     },
+     {
+      "name": "student_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Student Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/FeedbackIn"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/FeedbackOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/assessment/my/feedback": {
+   "get": {
+    "tags": [
+     "assessment"
+    ],
+    "summary": "Отзывы преподавателей по моим занятиям",
+    "operationId": "my_feedback_api_v1_assessment_my_feedback_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/FeedbackItem"
+         },
+         "type": "array",
+         "title": "Response My Feedback Api V1 Assessment My Feedback Get"
         }
        }
       }
@@ -6343,6 +6534,27 @@
       "type": "array",
       "title": "Messages"
      },
+     "tone": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/ToneSnapshot"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "mode": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Mode"
+     },
      "ended_by": {
       "anyOf": [
        {
@@ -6657,6 +6869,24 @@
       },
       "type": "object",
       "title": "Criteria"
+     },
+     "call_mode": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Call Mode"
+     },
+     "critical": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Critical"
      }
     },
     "type": "object",
@@ -8088,6 +8318,225 @@
     ],
     "title": "FeedResult"
    },
+   "FeedbackDraft": {
+    "properties": {
+     "text": {
+      "type": "string",
+      "title": "Text"
+     },
+     "source": {
+      "type": "string",
+      "title": "Source"
+     },
+     "model": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Model"
+     },
+     "focus": {
+      "items": {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      "type": "array",
+      "title": "Focus"
+     },
+     "warnings": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Warnings"
+     },
+     "previous": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Previous"
+     }
+    },
+    "type": "object",
+    "required": [
+     "text",
+     "source",
+     "model",
+     "focus",
+     "warnings",
+     "previous"
+    ],
+    "title": "FeedbackDraft"
+   },
+   "FeedbackIn": {
+    "properties": {
+     "text": {
+      "type": "string",
+      "maxLength": 3000,
+      "minLength": 10,
+      "title": "Text",
+      "description": "Текст отзыва — его увидит обучающийся"
+     },
+     "draft_text": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 6000
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Draft Text",
+      "description": "С какого черновика начали"
+     },
+     "draft_source": {
+      "anyOf": [
+       {
+        "type": "string",
+        "enum": [
+         "ai",
+         "rules"
+        ]
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Draft Source"
+     },
+     "draft_model": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 200
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Draft Model"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "text"
+    ],
+    "title": "FeedbackIn"
+   },
+   "FeedbackItem": {
+    "properties": {
+     "session_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Session Id"
+     },
+     "session_title": {
+      "type": "string",
+      "title": "Session Title"
+     },
+     "text": {
+      "type": "string",
+      "title": "Text"
+     },
+     "updated_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Updated At"
+     }
+    },
+    "type": "object",
+    "required": [
+     "session_id",
+     "session_title",
+     "text",
+     "updated_at"
+    ],
+    "title": "FeedbackItem"
+   },
+   "FeedbackOut": {
+    "properties": {
+     "session_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Session Id"
+     },
+     "student_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Student Id"
+     },
+     "text": {
+      "type": "string",
+      "title": "Text"
+     },
+     "updated_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Updated At"
+     }
+    },
+    "type": "object",
+    "required": [
+     "session_id",
+     "student_id",
+     "text",
+     "updated_at"
+    ],
+    "title": "FeedbackOut"
+   },
+   "FeedbackView": {
+    "properties": {
+     "text": {
+      "type": "string",
+      "title": "Text"
+     },
+     "updated_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Updated At"
+     }
+    },
+    "type": "object",
+    "required": [
+     "text",
+     "updated_at"
+    ],
+    "title": "FeedbackView",
+    "description": "Отзыв преподавателя по занятию (п. 4.7): видят преподаватель и сам обучающийся."
+   },
    "FlagsIn": {
     "properties": {
      "no_contact": {
@@ -9407,6 +9856,28 @@
       "format": "date-time",
       "title": "At"
      },
+     "id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Id"
+     },
+     "tone": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/ToneSnapshot"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
      "remarks": {
       "items": {
        "type": "string"
@@ -9854,6 +10325,15 @@
       ],
       "title": "Tour",
       "description": "Экран обучения, для seen"
+     },
+     "tours": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "maxItems": 5,
+      "title": "Tours",
+      "description": "Несколько экранов одной записью, для seen (обзор и экран)"
      }
     },
     "type": "object",
@@ -9867,7 +10347,23 @@
      "enabled": {
       "type": "boolean",
       "title": "Enabled",
-      "description": "Показывать подсказки автоматически (только обучающимся)"
+      "description": "Показывать подсказки автоматически (обучающемуся или преподавателю)"
+     },
+     "audience": {
+      "anyOf": [
+       {
+        "type": "string",
+        "enum": [
+         "student",
+         "teacher"
+        ]
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Audience",
+      "description": "Чьи подсказки показывать сами: student — экраны обучающегося, teacher — преподавателя"
      },
      "dismissed": {
       "type": "boolean",
@@ -9890,7 +10386,7 @@
      "seen"
     ],
     "title": "OnboardingOut",
-    "description": "Прогресс обучения интерфейсу (п. 5.3)."
+    "description": "Прогресс обучения интерфейсу (п. 5.3, 5.4)."
    },
    "OpenCardIn": {
     "properties": {
@@ -10074,6 +10570,22 @@
       },
       "type": "array",
       "title": "Last Errors"
+     },
+     "caller_emotion": {
+      "type": "string",
+      "title": "Caller Emotion",
+      "default": ""
+     },
+     "caller_tension": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Caller Tension"
      }
     },
     "type": "object",
@@ -10474,7 +10986,7 @@
     "additionalProperties": false,
     "type": "object",
     "title": "PsySettingsIn",
-    "description": "Психологический модификатор занятия (п. 3.6, ADR-0011)."
+    "description": "Психологический модификатор занятия (п. 3.7, ADR-0012)."
    },
    "PurgeResult": {
     "properties": {
@@ -10746,6 +11258,11 @@
       "minLength": 1,
       "title": "Text"
      },
+     "via": {
+      "$ref": "#/components/schemas/ReplicaVia",
+      "description": "Как сказана: text, voice (кнопка), hands_free (п. 3.6)",
+      "default": "text"
+     },
      "latency_ms": {
       "anyOf": [
        {
@@ -10784,13 +11301,36 @@
       "type": "string",
       "title": "Text"
      },
+     "message_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Message Id"
+     },
+     "tone": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/ToneSnapshot"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Состояние заявителя у этой реплики (п. 3.6): эмоция, шкалы 0–10, подача, причины"
+     },
      "remarks": {
       "items": {
        "type": "string"
       },
       "type": "array",
       "title": "Remarks",
-      "description": "Ремарки заявителя: плачет, кричит… (п. 3.6)"
+      "description": "Ремарки заявителя: плачет, кричит… (п. 3.7)"
      },
      "voice": {
       "anyOf": [
@@ -10818,6 +11358,16 @@
      "text"
     ],
     "title": "ReplicaOut"
+   },
+   "ReplicaVia": {
+    "type": "string",
+    "enum": [
+     "text",
+     "voice",
+     "hands_free"
+    ],
+    "title": "ReplicaVia",
+    "description": "Как оператор сказал реплику (п. 3.6): в голосовом режиме в время карточки входит речь собеседника."
    },
    "ResolvedService": {
     "properties": {
@@ -11807,7 +12357,14 @@
     "properties": {
      "enabled": {
       "type": "boolean",
-      "title": "Enabled"
+      "title": "Enabled",
+      "description": "Голосовой ввод: модель распознавания настроена"
+     },
+     "tts": {
+      "type": "boolean",
+      "title": "Tts",
+      "description": "Серверный синтез голоса собеседника; нет — озвучивает браузер",
+      "default": false
      }
     },
     "type": "object",
@@ -12111,6 +12668,16 @@
      "not_assessed": {
       "type": "integer",
       "title": "Not Assessed"
+     },
+     "feedback": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/FeedbackView"
+       },
+       {
+        "type": "null"
+       }
+      ]
      }
     },
     "type": "object",
@@ -12224,6 +12791,101 @@
      "districts"
     ],
     "title": "Territory"
+   },
+   "ToneChange": {
+    "properties": {
+     "reason": {
+      "type": "string",
+      "title": "Reason"
+     },
+     "fragment": {
+      "type": "string",
+      "title": "Fragment"
+     },
+     "tension": {
+      "type": "integer",
+      "title": "Tension",
+      "default": 0
+     },
+     "trust": {
+      "type": "integer",
+      "title": "Trust",
+      "default": 0
+     },
+     "readiness": {
+      "type": "integer",
+      "title": "Readiness",
+      "default": 0
+     }
+    },
+    "type": "object",
+    "required": [
+     "reason",
+     "fragment"
+    ],
+    "title": "ToneChange",
+    "description": "Что изменило состояние: код причины, сработавший фрагмент реплики и сдвиги шкал."
+   },
+   "ToneSnapshot": {
+    "properties": {
+     "emotion": {
+      "type": "string",
+      "title": "Emotion"
+     },
+     "emotion_title": {
+      "type": "string",
+      "title": "Emotion Title"
+     },
+     "tension": {
+      "type": "integer",
+      "title": "Tension"
+     },
+     "trust": {
+      "type": "integer",
+      "title": "Trust"
+     },
+     "readiness": {
+      "type": "integer",
+      "title": "Readiness"
+     },
+     "band": {
+      "type": "string",
+      "title": "Band"
+     },
+     "pace": {
+      "type": "string",
+      "title": "Pace"
+     },
+     "volume": {
+      "type": "string",
+      "title": "Volume"
+     },
+     "breathing": {
+      "type": "string",
+      "title": "Breathing"
+     },
+     "changes": {
+      "items": {
+       "$ref": "#/components/schemas/ToneChange"
+      },
+      "type": "array",
+      "title": "Changes"
+     }
+    },
+    "type": "object",
+    "required": [
+     "emotion",
+     "emotion_title",
+     "tension",
+     "trust",
+     "readiness",
+     "band",
+     "pace",
+     "volume",
+     "breathing"
+    ],
+    "title": "ToneSnapshot",
+    "description": "Состояние у конкретной реплики собеседника — то, что видит интерфейс и по чему озвучивается реплика.\nФактов легенды здесь нет (R3.3-02)."
    },
    "TreeNode": {
     "properties": {

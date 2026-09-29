@@ -1,5 +1,5 @@
-/** Мои результаты по занятию (п. 5.1): карточки, балл, время против норматива, разбор ошибок, комментарии
- *  преподавателя и рекомендации. */
+/** Мои результаты по занятию (п. 5.1): отзыв преподавателя по занятию (п. 4.7), карточки, балл, время против
+ *  норматива, разбор ошибок, комментарии преподавателя и рекомендации. */
 import { useParams } from 'react-router-dom';
 import { Banner, Card, StatTile, StatusPill } from '@smena112/ui-kit';
 import { useMySessionReport } from '../../shared/api/assessment';
@@ -24,6 +24,11 @@ export function MySessionPage() {
             <StatTile label="Среднее время" value={num(me.avg_time_s)} unit={me.avg_time_s ? 'с' : undefined} />
           </section>
           {me.not_assessed > 0 && <Banner>Не оценено карточек: {me.not_assessed}. Оценку запускает преподаватель.</Banner>}
+          {me.feedback && (
+            <Card title="Отзыв преподавателя" subtitle={me.feedback.updated_at ? new Date(me.feedback.updated_at).toLocaleString('ru-RU') : undefined}>
+              <p className="stu-feedback__text">{me.feedback.text}</p>
+            </Card>
+          )}
           {q.data!.recommendations.length > 0 && (
             <Card title="Рекомендации">
               <ul className="stu-recs">{q.data!.recommendations.map((x) => <li key={x.key}><b>{Math.round(x.average * 100)} %</b> {x.text}</li>)}</ul>

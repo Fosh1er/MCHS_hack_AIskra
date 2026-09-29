@@ -63,7 +63,7 @@ class ScenarioView:
     legend: dict[str, Any]
     reference_card: dict[str, Any]
     reference_dds: dict[str, Any]
-    psy_profile: str | None = None  # п. 3.6
+    psy_profile: str | None = None  # п. 3.7
 
 
 class GetScenarioHandler:

@@ -90,7 +90,7 @@ class CreateSessionHandler(_Base):
             participants=participants,
             settings={**(await self._defaults.get() if self._defaults else {}), **cmd.settings},
         )
-        if self._catalog is not None:  # п. 3.6: профили модификатора — только из каталога
+        if self._catalog is not None:  # п. 3.7: профили модификатора — только из каталога
             try:
                 check_settings(session.settings["psy"], set(self._catalog.profiles()))
             except ValueError as e:

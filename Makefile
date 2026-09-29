@@ -1,5 +1,5 @@
 # Частые команды. Бэкенд: uv (Python 3.12), фронтенд: npm workspaces (Node 22).
-.PHONY: up down logs be-install be-test be-lint be-check fe-install fe-dev fe-dev-lan dev-cert fe-build check import-classifier demo-seed demo-seed-docker
+.PHONY: up down logs be-install be-test be-lint be-check fe-install fe-dev fe-dev-lan dev-cert dev-tts dev-tts-say dev-stt fe-build check import-classifier demo-seed demo-seed-docker
 
 up:            ; docker compose up --build -d
 down:          ; docker compose down
@@ -22,5 +22,12 @@ dev-cert:
 	  -addext "subjectAltName=DNS:localhost,IP:127.0.0.1$${IP:+,IP:$$IP}" 2>/dev/null && \
 	echo "Сертификат для localhost и $$IP — .cert/dev.crt (30 дней). Клиент: make fe-dev-lan → https://$$IP:5173"
 fe-dev-lan:    ; npm run dev -w frontend -- --host
+# п. 3.6: голос собеседника без ключей и Docker — нейроголоса Piper (irina, denis, dmitri; скачаются при первом запуске);
+# сервер: TTS_KIND=openai_compatible TTS_URL=http://localhost:8100/v1 TTS_FORMAT=wav + голоса ролей — docs/ai/Голосовой_ввод.md
+dev-tts:       ; cd backend && uv run --with sherpa-onnx --with numpy python tools/dev_tts_piper.py
+# то же на голосе macOS (say, Milena) — ничего не скачивает, один голос на все роли
+dev-tts-say:   ; cd backend && uv run python tools/dev_tts_say.py
+# распознавание речи на процессоре без Docker и ключей — faster-whisper (модель small скачается при первом запуске); сервер: STT_KIND=openai_compatible STT_URL=http://localhost:8200/v1
+dev-stt:       ; cd backend && uv run --with faster-whisper python tools/dev_stt_whisper.py
 fe-build:      ; npm run typecheck && npm run build
 check: be-check fe-build

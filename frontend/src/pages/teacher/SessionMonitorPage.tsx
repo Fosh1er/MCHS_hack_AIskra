@@ -6,6 +6,7 @@ import { Banner, Button, Card, StatTile, StatusPill, StudentTile, normStatus, ty
 import { useIncidentGroups, useServices } from '../../shared/api/dictionaries';
 import { MODE_TITLE, SESSION_STATUS, SOURCE_TITLE, useMonitor, useSessionState, type MonitorView } from '../../shared/api/training';
 import { TeacherShell, initials } from '../../shared/ui/TeacherShell';
+import { useScreenTour } from '../../shared/onboarding/OnboardingProvider';
 
 const pad = (n: number) => String(n).padStart(2, '0');
 const mmss = (sec: number) => `${pad(Math.floor(sec / 60))}:${pad(sec % 60)}`;
@@ -23,14 +24,16 @@ function Tiles({ data, now }: { data: MonitorView; now: number }) {
   // после завершения время замирает на моменте завершения
   const end = data.session.finished_at ? new Date(data.session.finished_at).getTime() : now;
   return (
-    <section className="cab-tiles" aria-label="Обучающиеся">
+    <section className="cab-tiles" aria-label="Обучающиеся" data-tour="t-tiles">
       {data.rows.map(({ participant: p, progress: g }) => {
         const since = g.current_since ? Math.max(0, Math.floor((end - new Date(g.current_since).getTime()) / 1000)) : null;
         const norm = p.role === '112' ? st.norm_112 : st.norm_dds;
         const running = data.session.status === 'running';
         const state: TileState = !running ? 'offline' : since === null ? 'idle' : normStatus(since, norm);
+        // п. 3.6: в идущем звонке видно, как оператор ведёт заявителя — эмоция и напряжение 0–10
+        const caller = g.caller_emotion && g.caller_tension != null ? ` · заявитель: ${g.caller_emotion}, ${g.caller_tension}/10` : '';
         const label = g.current_card
-          ? `№ ${g.current_card}${g.current_label ? ` · ${g.current_label}` : ''}`
+          ? `№ ${g.current_card}${g.current_label ? ` · ${g.current_label}` : ''}${caller}`
           : p.role === '112' ? 'ждёт вызов' : 'очередь пуста';
         return (
           <StudentTile key={p.student_id} name={p.full_name} initials={initials(p.full_name)}
@@ -48,6 +51,7 @@ export function SessionMonitorPage() {
   const { id = '' } = useParams();
   const navigate = useNavigate();
   const q = useMonitor(id);
+  useScreenTour('teacher-monitor', !!q.data);
   const state = useSessionState(id);
   const groups = useIncidentGroups();
   const now = useNow();
@@ -65,15 +69,15 @@ export function SessionMonitorPage() {
   return (
     <TeacherShell active="sessions" crumbs="Пульт / Занятия" title={s.title} subtitle={`${MODE_TITLE[s.mode]} · ${SESSION_STATUS[s.status]}`}
       actions={
-        <>
+        <span className="tch-tour-group" data-tour="t-session-state">
           {s.status === 'planned' && <Button variant="primary" icon="play" disabled={state.isPending} onClick={() => state.mutate(true)}>начать занятие</Button>}
           {s.status === 'running' && <Button variant="danger" icon="stop" disabled={state.isPending} onClick={() => state.mutate(false)}>завершить</Button>}
           {s.status !== 'planned' && <Button icon="bar_chart" onClick={() => navigate(`/teacher/sessions/${id}/report`)}>отчёт</Button>}
-        </>
+        </span>
       }>
       {state.isError && <Banner status="critical">{state.error.message}</Banner>}
       {s.status === 'planned' && <Banner>Занятие ещё не начато. После старта обучающиеся увидят его в журнале 112 и в АРМ ДДС.</Banner>}
-      <section className="cab-kpis" aria-label="Сводка по занятию">
+      <section className="cab-kpis" aria-label="Сводка по занятию" data-tour="t-kpis">
         <StatTile label="Идёт" value={s.started_at ? mmss(elapsed) : '—'} note={s.started_at ? `с ${new Date(s.started_at).toLocaleTimeString('ru-RU')}` : 'не начато'} />
         <StatTile label="Средний балл" value={avg ?? '—'} note={`порог ${s.settings.threshold}`} />
         <StatTile label="Карточек обработано" value={done} />

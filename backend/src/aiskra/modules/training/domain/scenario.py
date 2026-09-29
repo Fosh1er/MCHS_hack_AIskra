@@ -111,10 +111,27 @@ def synthetic_phone(rng: random.Random) -> str:
     return f"+7 (9{rng.randint(10, 99)}) {rng.randint(100, 999)}-{rng.randint(10, 99)}-{rng.randint(10, 99)}"
 
 
-def synthetic_name(rng: random.Random) -> str:
+def synthetic_voice(first_name: str) -> str:
+    """Голос синтетического заявителя по имени из списка генератора `_FIRST`: женские имена там — на «а»/«я».
+    Правило генератора, а не догадка о реальном человеке: имена в сценариях — только из этого списка."""
+    return "female" if first_name.endswith(("а", "я")) else "male"
+
+
+def legend_voice(applicant: dict[str, Any]) -> str | None:
+    """Голос заявителя легенды (п. 3.6): записан генератором; в сценариях до п. 3.6 — по его же правилу из имени
+    («Фамилия Имя»), чтобы «Кузнецов Алексей» из старого банка не говорил женским голосом."""
+    voice = applicant.get("voice")
+    if voice in ("female", "male"):
+        return str(voice)
+    name = str(applicant.get("name") or "").split()
+    return synthetic_voice(name[-1]) if len(name) >= 2 else None
+
+
+def synthetic_person(rng: random.Random) -> tuple[str, str]:
+    """Синтетический заявитель: ФИО и голос для озвучки («female» / «male», п. 3.6)."""
     first = rng.choice(_FIRST)
-    female = first.endswith(("а", "я"))
-    return f"{rng.choice(_LAST_F if female else _LAST_M)} {first}"
+    voice = synthetic_voice(first)
+    return f"{rng.choice(_LAST_F if voice == 'female' else _LAST_M)} {first}", voice
 
 
 def _plain(text: str | None) -> str:
@@ -167,7 +184,7 @@ class Scenario:
     status: ScenarioStatus = ScenarioStatus.DRAFT
     author_id: UUID | None = None
     approved_by: UUID | None = None
-    psy_profile: str | None = None  # п. 3.6: закреплённый психологический профиль заявителя
+    psy_profile: str | None = None  # п. 3.7: закреплённый психологический профиль заявителя
     id: UUID = field(default_factory=uuid4)
 
     def approve(self, by: UUID) -> None:
@@ -197,14 +214,14 @@ def build_scenario(
         raise DomainError("Сложность — от 1 до 5", code="bad_difficulty")
     victims = "victims" in flags
     victims_count = rng.randint(1, 3) if victims else 0
-    name = synthetic_name(rng)
+    name, voice = synthetic_person(rng)
     status = rng.choice(APPLICANT_STATUSES[: 3 if difficulty < 3 else 5])
     phone = synthetic_phone(rng)
     floor = str(rng.randint(1, 16)) if "дом" in _plain(incident.sign1) or "квартир" in _plain(incident.sign2) else ""
     flat = str(rng.randint(1, 300)) if floor else ""
     path = [s for s in (incident.sign1, incident.sign2, incident.sign3) if s]
     legend = {
-        "applicant": {"name": name, "status": status, "phone": phone},
+        "applicant": {"name": name, "status": status, "phone": phone, "voice": voice},
         "address": {
             **asdict(address),
             "label": address.label,

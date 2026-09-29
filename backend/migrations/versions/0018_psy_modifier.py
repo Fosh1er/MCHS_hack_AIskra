@@ -1,9 +1,9 @@
-"""П. 3.6: психологический модификатор — профиль сценария, снимок профиля и состояние звонка, разметка реплик.
+"""П. 3.7: психологический модификатор — профиль сценария, снимок профиля и состояние звонка, разметка реплик.
 
-Только необязательные столбцы: занятия без модификатора и прошлые данные не меняются (ADR-0011).
+Только необязательные столбцы: занятия без модификатора и прошлые данные не меняются (ADR-0012).
 
-Revision ID: 0015
-Revises: 0014
+Revision ID: 0018
+Revises: 0017
 Create Date: 2026-09-28 22:00:00
 """
 
@@ -13,8 +13,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision: str = "0015"
-down_revision: str | None = "0014"
+revision: str = "0018"
+down_revision: str | None = "0017"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

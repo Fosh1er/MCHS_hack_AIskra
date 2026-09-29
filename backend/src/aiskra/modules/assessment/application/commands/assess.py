@@ -59,7 +59,7 @@ def _judge_criteria(out: JudgeOut | None, keys: list[str]) -> list[Criterion]:
 
 
 def psy_details(result: Result, attempt: PsyAttempt) -> dict[str, object]:
-    """Блок «Работа с заявителем» в details оценки (п. 3.6)."""
+    """Блок «Работа с заявителем» в details оценки (п. 3.7)."""
     return {
         "score": result.score,
         "passed": result.passed,
@@ -139,6 +139,7 @@ class AssessCardHandler:
                 names=a.service_names,
                 flag_names=a.flag_names,
                 spoken=a.legend_text or None,
+                caller=a.caller,
             )
             judged = (
                 await self._judge.check(

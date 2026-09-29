@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Annotated, Any, Protocol
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Form, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Response, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -120,7 +120,13 @@ from aiskra.modules.training.application.queries.sessions import (
     SessionPage,
     SessionView,
 )
-from aiskra.modules.training.application.speech import Transcribe, TranscribeHandler
+from aiskra.modules.training.application.speech import (
+    GetReplicaAudio,
+    ReplicaAudioHandler,
+    SpeechStatus,
+    Transcribe,
+    TranscribeHandler,
+)
 from aiskra.modules.training.domain.material import MAX_BYTES, MaterialKind
 from aiskra.shared.errors import NotFoundError
 from aiskra.shared.security import Permission, Principal
@@ -214,7 +220,15 @@ async def answer(
 
 
 def _replica_out(r: Replica) -> ReplicaOut:
-    return ReplicaOut(speaker=r.speaker, text=r.text, remarks=r.remarks, voice=r.voice, hung_up=r.hung_up)
+    return ReplicaOut(
+        speaker=r.speaker,
+        text=r.text,
+        message_id=r.message_id,
+        tone=r.tone,
+        remarks=r.remarks,
+        voice=r.voice,
+        hung_up=r.hung_up,
+    )
 
 
 @router.post(
@@ -243,7 +257,7 @@ async def replica(
     handler: Annotated[SendReplicaHandler, Depends(deps.provide_replica)],
 ) -> ReplicaOut:
     signals = TurnSignals(latency_ms=body.latency_ms, interrupted=body.interrupted)
-    r = await handler(SendReplica(actor=actor, call_id=call_id, text=body.text, signals=signals))
+    r = await handler(SendReplica(actor=actor, call_id=call_id, text=body.text, via=body.via, signals=signals))
     return _replica_out(r)
 
 
@@ -252,14 +266,15 @@ class SpeechOut(BaseModel):
 
 
 class SpeechStatusOut(BaseModel):
-    enabled: bool
+    enabled: bool = Field(description="Голосовой ввод: модель распознавания настроена")
+    tts: bool = Field(default=False, description="Серверный синтез голоса собеседника; нет — озвучивает браузер")
 
 
-@router.get("/speech", response_model=SpeechStatusOut, summary="Доступен ли голосовой ввод (модель речи настроена)")
+@router.get("/speech", response_model=SpeechStatusOut, summary="Что из речи настроено: распознавание и синтез")
 async def speech_status(
-    _: Trainee, handler: Annotated[TranscribeHandler, Depends(deps.provide_transcribe)]
+    _: Trainee, status: Annotated[SpeechStatus, Depends(deps.provide_speech_status)]
 ) -> SpeechStatusOut:
-    return SpeechStatusOut(enabled=handler.enabled)
+    return SpeechStatusOut(enabled=status.stt, tts=status.tts)
 
 
 @router.post("/speech", response_model=SpeechOut, summary="Распознать реплику в трубку (голосовой ввод, Whisper)")
@@ -283,7 +298,7 @@ async def end_call(
 @router.post(
     "/calls/{call_id}/pause",
     response_model=StatusOut,
-    summary="«Пауза»: обучающийся останавливает тяжёлый звонок, блок «Работа с заявителем» не оценивается (п. 3.6)",
+    summary="«Пауза»: обучающийся останавливает тяжёлый звонок, блок «Работа с заявителем» не оценивается (п. 3.7)",
 )
 async def pause_call(
     call_id: UUID, actor: Trainee, meta: Meta, handler: Annotated[PauseCallHandler, Depends(deps.provide_pause_call)]
@@ -294,7 +309,7 @@ async def pause_call(
 @router.get(
     "/psy/profiles",
     response_model=list[PsyProfileOut],
-    summary="Каталог психологических профилей заявителя (п. 3.6)",
+    summary="Каталог психологических профилей заявителя (п. 3.7)",
 )
 async def psy_profiles(
     _: Annotated[Principal, Depends(require(Permission.LESSONS_CONDUCT, Permission.SCENARIOS_MANAGE))],
@@ -323,7 +338,7 @@ async def psy_profiles(
 @router.post(
     "/scenarios/{scenario_id}/psy",
     response_model=StatusOut,
-    summary="Закрепить за сценарием психологический профиль заявителя (п. 3.6)",
+    summary="Закрепить за сценарием психологический профиль заявителя (п. 3.7)",
 )
 async def set_scenario_psy(
     scenario_id: UUID,
@@ -341,6 +356,22 @@ async def get_call(
     call_id: UUID, actor: CurrentPrincipal, handler: Annotated[GetCallHandler, Depends(deps.provide_get_call)]
 ) -> CallView:
     return await handler(GetCall(actor=actor, call_id=call_id))
+
+
+@router.get(
+    "/calls/{call_id}/messages/{message_id}/audio",
+    response_class=Response,
+    responses={200: {"content": {"audio/mpeg": {}, "audio/wav": {}}, "description": "Звук реплики"}},
+    summary="Звук реплики собеседника: серверный синтез с подачей по состоянию заявителя (п. 3.6)",
+)
+async def replica_audio(
+    call_id: UUID,
+    message_id: UUID,
+    actor: CurrentPrincipal,
+    handler: Annotated[ReplicaAudioHandler, Depends(deps.provide_replica_audio)],
+) -> Response:
+    audio = await handler(GetReplicaAudio(actor=actor, call_id=call_id, message_id=message_id))
+    return Response(content=audio.content, media_type=audio.mime)
 
 
 @router.get("/cards/{card_id}/calls", response_model=list[CallView], summary="Звонки по карточке")

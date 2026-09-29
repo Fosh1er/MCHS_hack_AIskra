@@ -91,3 +91,14 @@
 ## Инструменты и образы (в поставку кода не входят)
 
 pytest, pytest-asyncio, ruff, mypy, import-linter (Python); TypeScript, Vite (фронтенд). Контейнеры: `python:3.12-slim`, `node:22-alpine`, `nginx:1.27-alpine`, `postgres:16-alpine`, `ollama/ollama` — официальные образы с открытыми лицензиями.
+
+**Локальная речь для проверки (п. 3.6).** Отдельные процессы, запускаются через `uv run --with`, не входят ни в зависимости проекта, ни в поставку:
+
+| Инструмент или модель | Лицензия | Где |
+|---|---|---|
+| faster-whisper | MIT | `make dev-stt` — `backend/tools/dev_stt_whisper.py` |
+| модель Systran/faster-whisper-small | MIT | скачивается при первом запуске |
+| sherpa-onnx | Apache-2.0 | `make dev-tts` — `backend/tools/dev_tts_piper.py`. Пакет piper-tts не используем: он под GPL-3.0 |
+| голоса Piper denis, dmitri | CC0 | скачиваются при первом запуске |
+| голос Piper irina | «Unknown» (датасет RHVoice) | только для проверки; в контур заказчика — после уточнения лицензии |
+| голос macOS Milena | лицензия Apple на ОС | `make dev-tts-say` — только на macOS разработчика |

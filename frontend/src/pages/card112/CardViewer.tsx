@@ -13,6 +13,7 @@ import {
 import { shortName } from '../../shared/ui/ArmTopBar';
 import { AddressMap } from './AddressMap';
 import { AssessmentPanel } from '../../shared/ui/AssessmentPanel';
+import { CallReview } from '../../shared/ui/CallReview';
 import { Hint } from './Hint';
 import { focusId, useHotkeys, type HotkeyMap } from './useHotkeys';
 import { TourHelpButton } from '../../shared/onboarding/OnboardingProvider';
@@ -193,6 +194,19 @@ function DdsStatusEditor({ next, busy, lastOrderNo, onSave, onCancel }: {
       <button type="button" className="arm-iconsq" aria-label="Сохранить статус" disabled={busy} onClick={save}><Icon name="check" size="sm" /></button>
       <button type="button" className="arm-iconsq" aria-label="Отмена" onClick={onCancel}><Icon name="close" size="sm" /></button>
       {error && <div className="dds-editor__err" role="alert">{error}</div>}
+    </div>
+  );
+}
+
+/** Разбор разговора с ИИ-заявителем (п. 3.6): и вне занятия — автору карточки и преподавателю. */
+function ConversationToggle({ cardId }: { cardId: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="arm112v-talk">
+      <button type="button" className="arm112-btn" aria-expanded={open} onClick={() => setOpen(!open)}>
+        {open ? 'скрыть разговор' : 'разговор с заявителем'}
+      </button>
+      {open && <CallReview cardId={cardId} />}
     </div>
   );
 }
@@ -384,7 +398,10 @@ export function CardViewer({ view, me, dds }: { view: CardView; me: Me; dds?: Dd
           )}
           {!dds && <div className="arm-panel arm112v-class arm112v-muted" data-testid="card-status">{statusLine}</div>}
           {!dds && view.status !== 'draft' && (view.author_id === me.user_id || me.permissions.includes(CARDS_CHECK)) && (
-            <AssessmentPanel cardId={view.id} role="112" auto={view.author_id === me.user_id} />
+            <>
+              <AssessmentPanel cardId={view.id} role="112" auto={view.author_id === me.user_id} />
+              <ConversationToggle cardId={view.id} />
+            </>
           )}
           {dds && ownService && ownService.status !== 'added' && ownService.status !== 'received' && (
             <AssessmentPanel cardId={view.id} role="dds" service={dds.service} auto={false} />

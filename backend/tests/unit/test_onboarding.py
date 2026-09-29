@@ -42,6 +42,20 @@ def test_size_is_limited() -> None:
         state.apply(OnboardingAction.SEEN, "one-more")
 
 
+def test_several_tours_all_or_nothing() -> None:
+    """П. 5.4: несколько экранов — одной записью; повтор не задваивается, ошибка в одном — не записан ни один."""
+    state = Onboarding(seen=["teacher-home"])
+    state.mark_seen(["teacher-welcome", "teacher-home", "teacher-welcome"])
+    assert state.seen == ["teacher-home", "teacher-welcome"]
+    with pytest.raises(DomainError):
+        state.mark_seen(["teacher-report", "Плохой id"])
+    assert "teacher-report" not in state.seen
+    full = Onboarding(seen=[f"t{i}" for i in range(MAX_TOURS - 1)])
+    with pytest.raises(DomainError):
+        full.mark_seen(["a", "b"])  # не влезают оба — не записан ни один
+    assert len(full.seen) == MAX_TOURS - 1
+
+
 def test_corrupted_value_is_ignored() -> None:
     state = Onboarding.from_json({"dismissed": 1, "seen": ["ok-1", 5, "Bad Id", None]})
     assert state.dismissed is True and state.seen == ["ok-1"]

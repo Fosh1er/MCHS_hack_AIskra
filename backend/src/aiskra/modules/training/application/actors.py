@@ -18,6 +18,7 @@ from aiskra.ai.tasks import AITask
 from aiskra.modules.training.application.ports.scenarios import DdsCallContext
 from aiskra.modules.training.domain.actors import applicant_reply, brigade_reply, service_reply
 from aiskra.modules.training.domain.call import CallMessage, Speaker
+from aiskra.modules.training.domain.tone import EMOTION_TITLES, CallerTone, color_reply
 from aiskra.shared.errors import ExternalServiceError
 
 log = logging.getLogger(__name__)
@@ -106,33 +107,51 @@ class Actors:
             return None
 
     async def applicant(
-        self, legend: dict[str, Any], history: list[CallMessage], question: str, revealed: list[str], scope: str
+        self,
+        legend: dict[str, Any],
+        history: list[CallMessage],
+        question: str,
+        revealed: list[str],
+        scope: str,
+        tone: CallerTone | None = None,
     ) -> tuple[str, list[str]]:
+        """Ответ заявителя. `tone` (п. 3.6) — его состояние после реплики оператора: модель получает его в промпте,
+        офлайн-ответ им окрашивается. Факты в обоих случаях — только из легенды."""
         offline = applicant_reply(legend, question, revealed)
         if self._online(AITask.APPLICANT_ACTOR):
             public = {
                 k: legend[k] for k in ("applicant", "address", "what", "details", "facts", "victims") if k in legend
             }
-            system = load_prompt(AITask.APPLICANT_ACTOR).format(
-                legend=json.dumps(public, ensure_ascii=False, indent=1), emotion=legend.get("emotion", "спокойно")
+            version = self._router.for_task(AITask.APPLICANT_ACTOR).profile.prompt_version
+            system = load_prompt(AITask.APPLICANT_ACTOR, version).format(
+                legend=json.dumps(public, ensure_ascii=False, indent=1),
+                emotion=EMOTION_TITLES[tone.emotion] if tone else legend.get("emotion", "спокойно"),
+                tension=tone.tension if tone else "—",
+                trust=tone.trust if tone else "—",
+                readiness=tone.readiness if tone else "—",
             )
+            # спокойный и паникующий заявитель на один вопрос отвечают по-разному — у них разный кеш
+            band = f":{tone.band.value}" if tone else ""
             text = await self._ask(
-                AITask.APPLICANT_ACTOR, system, history, question, f"{scope}:{','.join(offline.revealed)}"
+                AITask.APPLICANT_ACTOR, system, history, question, f"{scope}:{','.join(offline.revealed)}{band}"
             )
             if text:
                 return text, offline.revealed
+        if tone is not None:  # номер реплики заявителя — чтобы окраска чередовалась от реплики к реплике
+            n = sum(1 for m in history if m.speaker is Speaker.PARTY)
+            return color_reply(offline.text, tone, n), offline.revealed
         return offline.text, offline.revealed
 
     async def applicant_psy(
         self, legend: dict[str, Any], history: list[CallMessage], question: str, psy: PsyPrompt, scope: str
     ) -> str | None:
-        """Реплика заявителя с психологическим профилем (промпт applicant_actor/v2). None — модели нет или ошибка:
+        """Реплика заявителя с психологическим профилем (промпт applicant_actor/v3). None — модели нет или ошибка:
         вызывающий берёт офлайн-реплику профиля."""
         if not self._online(AITask.APPLICANT_ACTOR):
             return None
         public = {k: legend[k] for k in ("applicant", "address", "what", "details", "facts", "victims") if k in legend}
         system = (
-            load_prompt(AITask.APPLICANT_ACTOR, "v2")
+            load_prompt(AITask.APPLICANT_ACTOR, "v3")
             .replace("{legend}", json.dumps(public, ensure_ascii=False, indent=1))
             .replace("{profile_title}", psy.profile_title)
             .replace("{level}", str(psy.level))

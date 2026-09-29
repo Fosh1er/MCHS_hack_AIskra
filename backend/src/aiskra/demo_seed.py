@@ -57,7 +57,7 @@ DEMO_USERS = [
     DemoUser("dds2", "Лебедев Артём Николаевич", Role.STUDENT, "202", "dds", "S103"),  # Служба 103 (скорая)
 ]
 GROUP = "Смена 1 (демо)"
-DEMO_PSY = ("panic", "crying", "hysteria", "aggression", "apathy", "stupor")  # п. 3.6, реакции на стресс (ЦЭПП МЧС)
+DEMO_PSY = ("panic", "crying", "hysteria", "aggression", "apathy", "stupor")  # п. 3.7, реакции на стресс (ЦЭПП МЧС)
 KIND_BY_EXT = {".docx": MaterialKind.INSTRUCTION, ".pdf": MaterialKind.REGULATION, ".xlsx": MaterialKind.CLASSIFIER}
 
 
@@ -102,7 +102,7 @@ async def seed(
             else:
                 print(f"Сценарии: утверждено {have}")
 
-        async with factory() as s:  # п. 3.6: сценарии с психологическим профилем заявителя для показа модификатора
+        async with factory() as s:  # п. 3.7: сценарии с психологическим профилем заявителя для показа модификатора
             pinned = (
                 await s.execute(
                     select(func.count()).select_from(ScenarioModel).where(ScenarioModel.psy_profile.is_not(None))

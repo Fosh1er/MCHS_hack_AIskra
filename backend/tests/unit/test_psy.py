@@ -1,4 +1,4 @@
-"""Психологический модификатор (п. 3.6): каталог, движок состояния, классификатор действий, реплики, валидатор,
+"""Психологический модификатор (п. 3.7): каталог, движок состояния, классификатор действий, реплики, валидатор,
 блок оценки «Работа с заявителем» и бенчмарк мутаций (по образцу п. 3.5)."""
 
 from __future__ import annotations
@@ -405,3 +405,15 @@ def test_offline_answer_matches_legend_when_topic_open() -> None:
     assert "address" in gates(p, s)
     base = applicant_reply(LEGEND, "Назовите адрес", [])
     assert "Тверская" in base.text
+
+
+def test_profile_drives_caller_tone_for_voice() -> None:
+    """С профилем голосовое состояние (п. 3.6) выводится из движка модификатора: голос и оценка видят одно."""
+    director = offline_director()
+    p = CATALOG.get("panic")
+    assert p is not None
+    psy = start_psy(p, seed=3, catalog_version=1, settings={}, session_id=None)
+    turn = asyncio.run(director.turn(psy, LEGEND, [], "Успокойтесь!", ["opening"], 5, TurnSignals(), "s"))
+    assert turn is not None and turn.snapshot is not None and turn.tone is not None
+    assert turn.snapshot.emotion == "panic" and turn.snapshot.tension == 10  # уровень 5 → напряжение 10
+    assert any(c.reason == "invalidating" for c in turn.snapshot.changes)

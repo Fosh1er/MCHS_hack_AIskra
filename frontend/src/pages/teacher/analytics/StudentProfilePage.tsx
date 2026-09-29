@@ -5,6 +5,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Banner, Button, Card, LineChart, StatTile, StatusPill } from '@smena112/ui-kit';
 import { useStudentProfile } from '../../../shared/api/assessment';
 import { TeacherShell } from '../../../shared/ui/TeacherShell';
+import { useScreenTour } from '../../../shared/onboarding/OnboardingProvider';
 import { num } from '../../../shared/format';
 import { ErrorsCard, NormTiles, pct, roleLabel, when } from './parts';
 import { GradePill } from './ReadinessPage';
@@ -15,12 +16,13 @@ export function StudentProfilePage() {
   const { id = '' } = useParams();
   const navigate = useNavigate();
   const q = useStudentProfile(id);
+  useScreenTour('teacher-student', !!q.data);
   const p = q.data;
   return (
     <TeacherShell active="analytics" crumbs="Пульт / Аналитика / Обучающийся" title={p?.full_name ?? 'Профиль обучающегося'}
       subtitle={p ? `${p.roles.map((r) => (r === '112' ? 'оператор 112' : 'диспетчер ДДС')).join(', ')} · занятий: ${p.sessions}` : undefined}
       actions={<span className="tch-noprint cab-filters">
-        <Button variant="primary" icon="plus" onClick={() => navigate(`/teacher/sessions?assign=${id}`)}>индивидуальное задание</Button>
+        <span data-tour="t-assign"><Button variant="primary" icon="plus" onClick={() => navigate(`/teacher/sessions?assign=${id}`)}>индивидуальное задание</Button></span>
         <Button icon="description" onClick={() => window.print()}>PDF</Button>
       </span>}>
       {q.isError && <Banner status="critical">{q.error.message}</Banner>}
@@ -33,7 +35,7 @@ export function StudentProfilePage() {
             <StatTile label="Занятий" value={p.sessions} />
           </section>
           {p.readiness.length > 0 && (
-            <Card title="Готовность к допуску" subtitle="По последним 10 карточкам: шкала Программы подготовки ЕДДС, нормативы ПП № 1931"
+            <Card tour="t-profile-readiness" title="Готовность к допуску" subtitle="По последним 10 карточкам: шкала Программы подготовки ЕДДС, нормативы ПП № 1931"
               actions={<Link className="cab-btn tch-noprint" to="/teacher/readiness">все обучающиеся</Link>}>
               <ul className="tch-list">
                 {p.readiness.map((r) => (
@@ -91,7 +93,7 @@ export function StudentProfilePage() {
                 </div>
               )}
             </Card>
-            <Card title="Рекомендации" subtitle="По самым слабым критериям — для инструктажа">
+            <Card title="Рекомендации" subtitle="По самым слабым критериям — для инструктажа" tour="t-profile-recs">
               {p.recommendations.length
                 ? <ul className="tch-list">{p.recommendations.map((r) => <li key={r.key}>{r.text} <small>средний балл критерия {pct(r.average)}</small></li>)}</ul>
                 : <p className="c-slate">Все критерии выше 85 %.</p>}

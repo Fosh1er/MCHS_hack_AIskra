@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from dataclasses import replace
 from datetime import timedelta
+from typing import Any
 from uuid import UUID
 
 from sqlalchemy import select
@@ -12,11 +13,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from aiskra.modules.assessment.application.ports.attempts import Card112Attempt, DdsAttempt
 from aiskra.modules.assessment.domain.psy_scoring import PsyAttempt, PsyTurn
-from aiskra.modules.assessment.domain.scoring import StatusStep
+from aiskra.modules.assessment.domain.scoring import CallerFacts, StatusStep
 from aiskra.modules.dictionaries.infrastructure.models import EnumValueModel, ServiceModel
 from aiskra.modules.incidents.infrastructure.models import CardServiceModel, CardServiceStatusModel, IncidentCardModel
 from aiskra.modules.incidents.infrastructure.reader import SqlCardReader
 from aiskra.modules.training.domain.actors import topic_of
+from aiskra.modules.training.domain.tone import ToneSnapshot
 from aiskra.modules.training.infrastructure.models import CallMessageModel, CallModel, ScenarioModel
 from aiskra.platform.types import as_utc
 
@@ -26,7 +28,7 @@ class IncidentAttempts:
         self._s = session
 
     async def _psy(self, card_id: UUID, role: str, service_code: str | None, services: list[str]) -> PsyAttempt | None:
-        """Последний разговор с заявителем, у которого был психологический профиль (п. 3.6)."""
+        """Последний разговор с заявителем, у которого был психологический профиль (п. 3.7)."""
         stmt = select(CallModel).where(
             CallModel.card_id == card_id, CallModel.role == role, CallModel.party == "applicant"
         )
@@ -85,6 +87,33 @@ class IncidentAttempts:
             await self._s.execute(select(IncidentCardModel.scenario_id).where(IncidentCardModel.id == card_id))
         ).scalar_one_or_none()
         return await self._s.get(ScenarioModel, sid) if sid else None
+
+    async def _caller(self, calls: list[UUID]) -> CallerFacts | None:
+        """Состояние ИИ-заявителя по снимкам у его реплик (п. 3.6): первая и последняя реплика, причины изменений."""
+        rows: list[Any] = list(
+            (
+                await self._s.execute(
+                    select(CallMessageModel.tone)
+                    .where(CallMessageModel.call_id.in_(calls), CallMessageModel.speaker == "party")
+                    .order_by(CallMessageModel.at)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        snaps = [s for s in (ToneSnapshot.from_json(r) for r in rows) if s is not None]
+        if not snaps:
+            return None
+        changes = [c for s in snaps for c in s.changes]
+        return CallerFacts(
+            start=snaps[0].tension,
+            end=snaps[-1].tension,
+            calming=sum(1 for c in changes if c.reason == "calming"),
+            invalidating=[c.fragment for c in changes if c.reason == "invalidating"],
+            pressure=[c.fragment for c in changes if c.reason == "pressure"],
+            start_emotion=snaps[0].emotion_title,
+            end_emotion=snaps[-1].emotion_title,
+        )
 
     async def card_112(self, card_id: UUID) -> Card112Attempt | None:
         card = await SqlCardReader(self._s).get(card_id)
@@ -146,6 +175,7 @@ class IncidentAttempts:
             asked_topics=topics,
             service_names=names,
             flag_names={k: v.lower() for k, v in flags.items()},
+            caller=await self._caller(list(calls)) if calls else None,
             psy=psy,
         )
 

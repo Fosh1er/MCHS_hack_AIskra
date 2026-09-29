@@ -1,9 +1,10 @@
 /** Кабинет обучающегося (п. 5.1): идущее занятие и вход в эмулятор своей роли, запланированные, история с
- *  результатами, рекомендации по слабым местам. */
+ *  результатами и отзывами преподавателя (п. 4.7), рекомендации по слабым местам. */
+import { Fragment } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Banner, Button, Card, StatTile, StatusPill } from '@smena112/ui-kit';
+import { Banner, Button, Card, Icon, StatTile, StatusPill } from '@smena112/ui-kit';
 import { useServices } from '../../shared/api/dictionaries';
-import { useMyProgress } from '../../shared/api/assessment';
+import { useMyFeedback, useMyProgress } from '../../shared/api/assessment';
 import { MODE_TITLE, SESSION_STATUS, armFor, useMySessions, type MySessionRow } from '../../shared/api/training';
 import { CabinetShell } from '../../shared/ui/CabinetShell';
 import { useScreenTour, useTourControls } from '../../shared/onboarding/OnboardingProvider';
@@ -19,6 +20,7 @@ export function StudentHomePage() {
   const navigate = useNavigate();
   const sessions = useMySessions();
   const progress = useMyProgress();
+  const myFeedback = useMyFeedback();
   const role = useRole();
   const tour = useTourControls();
   useScreenTour('student-home', !!sessions.data && !!progress.data);
@@ -27,6 +29,7 @@ export function StudentHomePage() {
   const planned = all.filter((s) => s.status === 'planned');
   const finished = all.filter((s) => s.status === 'finished');
   const p = progress.data;
+  const feedback = new Map((myFeedback.data ?? []).map((f) => [f.session_id, f]));
   return (
     <CabinetShell kind="student" active="home" title="Кабинет обучающегося"
       actions={(
@@ -75,12 +78,28 @@ export function StudentHomePage() {
         <table className="cab-table">
           <thead><tr><th>Занятие</th><th>Роль</th><th>Завершено</th><th /></tr></thead>
           <tbody>
-            {finished.map((s) => (
-              <tr key={s.session_id}>
-                <td>{s.title}</td><td>{role(s)}</td><td>{s.finished_at ? new Date(s.finished_at).toLocaleString('ru-RU') : '—'}</td>
-                <td><Button size="sm" variant="ghost" icon="bar_chart" onClick={() => navigate(`/student/sessions/${s.session_id}`)}>мои результаты</Button></td>
-              </tr>
-            ))}
+            {finished.map((s) => {
+              const f = feedback.get(s.session_id);
+              return (
+                <Fragment key={s.session_id}>
+                  <tr className={f ? 'stu-has-feedback' : undefined}>
+                    <td>{s.title}</td><td>{role(s)}</td><td>{s.finished_at ? new Date(s.finished_at).toLocaleString('ru-RU') : '—'}</td>
+                    <td><Button size="sm" variant="ghost" icon="bar_chart" onClick={() => navigate(`/student/sessions/${s.session_id}`)}>мои результаты</Button></td>
+                  </tr>
+                  {f && (
+                    <tr className="stu-feedback-row">
+                      <td colSpan={4}>
+                        <div className="stu-feedback">
+                          <div className="stu-feedback__head"><Icon name="chat" size="sm" /> <b>Отзыв преподавателя</b>
+                            {f.updated_at && <small>{new Date(f.updated_at).toLocaleDateString('ru-RU')}</small>}</div>
+                          <p className="stu-feedback__text">{f.text}</p>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              );
+            })}
             {sessions.data && !finished.length && <tr><td colSpan={4} className="c-slate">Пройденных занятий пока нет.</td></tr>}
           </tbody>
         </table>

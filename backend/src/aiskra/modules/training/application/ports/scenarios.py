@@ -33,7 +33,7 @@ class ScenarioRow:
     incident_type_code: str | None
     source: str
     created_at: Any
-    psy_profile: str | None = None  # п. 3.6
+    psy_profile: str | None = None  # п. 3.7
 
 
 class ScenarioRepository(Protocol):

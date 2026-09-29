@@ -7,8 +7,9 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from aiskra.modules.training.domain.call import CallParty
+from aiskra.modules.training.domain.call import CallParty, ReplicaVia
 from aiskra.modules.training.domain.session import CardSource, SessionMode
+from aiskra.modules.training.domain.tone import ToneSnapshot
 
 
 class _Strict(BaseModel):
@@ -48,6 +49,9 @@ class DdsCallIn(_Strict):
 
 class ReplicaIn(_Strict):
     text: str = Field(min_length=1, max_length=500)
+    via: ReplicaVia = Field(
+        default=ReplicaVia.TEXT, description="Как сказана: text, voice (кнопка), hands_free (п. 3.6)"
+    )
     # п. 3.6: сигналы голосового канала — передаёт голосовой или дуплекс-адаптер; в текстовом режиме не нужны
     latency_ms: int | None = Field(default=None, ge=0, le=600_000, description="Пауза перед ответом оператора, мс")
     interrupted: bool = Field(default=False, description="Оператор перебил реплику заявителя")
@@ -56,7 +60,11 @@ class ReplicaIn(_Strict):
 class ReplicaOut(BaseModel):
     speaker: str
     text: str
-    remarks: list[str] = Field(default_factory=list, description="Ремарки заявителя: плачет, кричит… (п. 3.6)")
+    message_id: UUID | None = None
+    tone: ToneSnapshot | None = Field(
+        default=None, description="Состояние заявителя у этой реплики (п. 3.6): эмоция, шкалы 0–10, подача, причины"
+    )
+    remarks: list[str] = Field(default_factory=list, description="Ремарки заявителя: плачет, кричит… (п. 3.7)")
     voice: dict[str, object] | None = Field(
         default=None, description="Параметры голоса реплики для синтеза речи (п. 3.6, руководство §7)"
     )
@@ -94,7 +102,7 @@ class SessionSettingsIn(_Strict):
 
 
 class PsySettingsIn(_Strict):
-    """Психологический модификатор занятия (п. 3.6, ADR-0011)."""
+    """Психологический модификатор занятия (п. 3.7, ADR-0012)."""
 
     enabled: bool = False
     share: float = Field(default=0.3, ge=0, le=1, description="Доля звонков с психологическим профилем заявителя")

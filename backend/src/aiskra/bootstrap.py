@@ -27,6 +27,7 @@ from aiskra.integration.validation_sources import ScenarioBankCases
 from aiskra.modules.assessment.api import deps as assessment_deps
 from aiskra.modules.assessment.application.commands.assess import AssessCardHandler
 from aiskra.modules.assessment.application.commands.evaluate_session import EvaluateSessionHandler
+from aiskra.modules.assessment.application.commands.feedback import SaveFeedbackHandler
 from aiskra.modules.assessment.application.commands.override import OverrideAssessmentHandler
 from aiskra.modules.assessment.application.judge import Judge
 from aiskra.modules.assessment.application.psy_judge import PsyJudge
@@ -38,13 +39,14 @@ from aiskra.modules.assessment.application.queries.analytics import (
     SuggestAssignmentHandler,
 )
 from aiskra.modules.assessment.application.queries.assessments import GetAssessmentHandler, GroupInsightsHandler
+from aiskra.modules.assessment.application.queries.feedback import DraftFeedbackHandler, MyFeedbackHandler
 from aiskra.modules.assessment.application.queries.reports import (
     GetMySessionReportHandler,
     GetSessionReportHandler,
     MyProgressHandler,
 )
 from aiskra.modules.assessment.application.queries.validation import ValidationHandler
-from aiskra.modules.assessment.infrastructure.repositories import SqlAssessmentRepository
+from aiskra.modules.assessment.infrastructure.repositories import SqlAssessmentRepository, SqlFeedbackStore
 from aiskra.modules.audit.api import deps as audit_deps
 from aiskra.modules.audit.application.commands.purge import PurgeAuditHandler
 from aiskra.modules.audit.application.queries.search_audit import ListEventTypesHandler, SearchAuditHandler
@@ -172,7 +174,7 @@ from aiskra.modules.training.application.queries.sessions import (
     MySessionsHandler,
     SessionMonitorHandler,
 )
-from aiskra.modules.training.application.speech import TranscribeHandler
+from aiskra.modules.training.application.speech import ReplicaAudioHandler, SpeechStatus, TranscribeHandler
 from aiskra.modules.training.infrastructure.materials import (
     DocumentTextExtractor,
     LocalFileStorage,
@@ -211,7 +213,7 @@ def build_services(settings: Settings) -> Services:
         session_factory=create_session_factory(engine),
         cache=cache,
         model_router=build_router(ai_config, cache),
-        tts=build_tts(ai_config, cache),
+        tts=build_tts(ai_config),
         stt=build_stt(ai_config),
     )
 
@@ -483,7 +485,7 @@ def _wire_training(app: FastAPI, services: Services) -> None:
     clock = SystemClock()
     router = services.model_router
 
-    catalog = YamlPsyCatalog(services.settings.dictionaries_dir / "psy_profiles.yaml")  # п. 3.6, проверка при старте
+    catalog = YamlPsyCatalog(services.settings.dictionaries_dir / "psy_profiles.yaml")  # п. 3.7, проверка при старте
 
     def call_parts(session: AsyncSession) -> tuple[object, ...]:
         return (
@@ -496,7 +498,7 @@ def _wire_training(app: FastAPI, services: Services) -> None:
         )
 
     def psy_parts(session: AsyncSession) -> dict[str, object]:
-        """Психологический модификатор (п. 3.6): ведущий и занятия — чтобы выбрать профиль по настройкам."""
+        """Психологический модификатор (п. 3.7): ведущий и занятия — чтобы выбрать профиль по настройкам."""
         return {"psy": PsyDirector(catalog, Actors(router)), "sessions": SqlTrainingSessionRepository(session)}
 
     def generate(session: Session) -> GenerateScenariosHandler:
@@ -543,6 +545,9 @@ def _wire_training(app: FastAPI, services: Services) -> None:
     def get_call(session: Session) -> GetCallHandler:
         return GetCallHandler(SqlCallRepository(session))
 
+    def replica_audio(session: Session) -> ReplicaAudioHandler:
+        return ReplicaAudioHandler(services.tts, SqlCallRepository(session), SqlScenarioRepository(session))
+
     def card_calls(session: Session) -> CardCallsHandler:
         return CardCallsHandler(SqlCallRepository(session))
 
@@ -555,11 +560,14 @@ def _wire_training(app: FastAPI, services: Services) -> None:
     ov[training_deps.provide_dds_call] = dds_call
     ov[training_deps.provide_replica] = replica
     ov[training_deps.provide_transcribe] = lambda: TranscribeHandler(services.stt)  # голосовой ввод (п. 1.4)
+    # голос собеседника (п. 3.6): сервисы читаются при каждом запросе — адаптер можно подменить в тестах
+    ov[training_deps.provide_speech_status] = lambda: SpeechStatus(stt=services.stt.enabled, tts=services.tts.enabled)
     ov[training_deps.provide_end_call] = end_call
     ov[training_deps.provide_pause_call] = pause_call
     ov[training_deps.provide_set_scenario_psy] = set_scenario_psy
     ov[training_deps.provide_psy_catalog] = lambda: catalog
     ov[training_deps.provide_get_call] = get_call
+    ov[training_deps.provide_replica_audio] = replica_audio
     ov[training_deps.provide_card_calls] = card_calls
     _wire_sessions(app, services)
 
@@ -705,10 +713,14 @@ def _wire_assessment(app: FastAPI, services: Services) -> None:
         )
 
     def report(session: Session) -> GetSessionReportHandler:
-        return GetSessionReportHandler(SessionFactsReader(session), SqlAssessmentRepository(session))
+        return GetSessionReportHandler(
+            SessionFactsReader(session), SqlAssessmentRepository(session), SqlFeedbackStore(session)
+        )
 
     def my_report(session: Session) -> GetMySessionReportHandler:
-        return GetMySessionReportHandler(SessionFactsReader(session), SqlAssessmentRepository(session))
+        return GetMySessionReportHandler(
+            SessionFactsReader(session), SqlAssessmentRepository(session), SqlFeedbackStore(session)
+        )
 
     def evaluate_session(session: Session) -> EvaluateSessionHandler:
         return EvaluateSessionHandler(SessionFactsReader(session), assess(session))
@@ -764,6 +776,31 @@ def _wire_assessment(app: FastAPI, services: Services) -> None:
         return ValidationHandler(ScenarioBankCases(session), SqlAssessmentRepository(session))
 
     ov[assessment_deps.provide_validation] = validation
+
+    # отзыв преподавателя по занятию (specs/4.7)
+    def feedback_draft(session: Session) -> DraftFeedbackHandler:
+        return DraftFeedbackHandler(
+            SessionFactsReader(session),
+            SqlAssessmentRepository(session),
+            SqlFeedbackStore(session),
+            services.model_router,
+        )
+
+    def feedback_save(session: Session) -> SaveFeedbackHandler:
+        return SaveFeedbackHandler(
+            SessionFactsReader(session),
+            SqlAssessmentRepository(session),
+            SqlFeedbackStore(session),
+            SqlAuditRecorder(session),
+            SqlAlchemyUnitOfWork(session),
+        )
+
+    def my_feedback(session: Session) -> MyFeedbackHandler:
+        return MyFeedbackHandler(SqlFeedbackStore(session))
+
+    ov[assessment_deps.provide_feedback_draft] = feedback_draft
+    ov[assessment_deps.provide_feedback_save] = feedback_save
+    ov[assessment_deps.provide_my_feedback] = my_feedback
 
 
 def _wire_admin(app: FastAPI, services: Services) -> None:
