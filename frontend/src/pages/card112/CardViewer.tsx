@@ -207,7 +207,7 @@ function DdsStatusEditor({ service, cardId, current, next, busy, lastOrderNo, on
             const taken = b.busy_card_number !== null;
             return (
               <label key={b.code} className={picked.includes(b.code) ? 'is-on' : ''} title={taken ? `Работает по карточке № ${b.busy_card_number}` : `${b.kind}, расчёт ${b.crew} чел.`}>
-                <input type="checkbox" checked={picked.includes(b.code)} disabled={taken} onChange={() => toggle(b.code)} />
+                <input type="checkbox" aria-label={`${b.call_sign} ${b.name}`} checked={picked.includes(b.code)} disabled={taken} onChange={() => toggle(b.code)} />
                 {' '}<b>{b.call_sign}</b> {b.name}{taken && <span className="dds-editor__busy"> · занята, № {b.busy_card_number}</span>}
               </label>
             );

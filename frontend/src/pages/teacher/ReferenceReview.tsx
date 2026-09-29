@@ -21,7 +21,8 @@ export function ReferenceReview({ s }: { s: ScenarioView }) {
   const save = useReviewSections();
   const [draft, setDraft] = useState<Draft>(() => fromView(rows));
   const [info, setInfo] = useState('');
-  useEffect(() => { setDraft(fromView(s.review ?? [])); setInfo(''); }, [s.id, s.review]);
+  useEffect(() => setInfo(''), [s.id]); // итог сохранения — до перехода к другому сценарию
+  useEffect(() => setDraft(fromView(s.review ?? [])), [s.id, s.review]);
   if (!rows.length) return null;
 
   const set = (key: string, patch: Partial<SectionDecision>) =>
@@ -44,31 +45,24 @@ export function ReferenceReview({ s }: { s: ScenarioView }) {
         Проверка эталона по разделам: принято {accepted} из {rows.length}
         {s.status === 'approved' ? ' · сценарий утверждён' : ''}
       </div>
-      <table className="cab-table">
-        <tbody>
-          {rows.map((r) => {
-            const d = draft[r.key];
-            return (
-              <tr key={r.key}>
-                <td>
-                  {r.title}
-                  {d?.decision === 'rework' && (
-                    <textarea rows={2} style={{ width: '100%', marginTop: 6 }} aria-label={`Что доработать: ${r.title}`} maxLength={500}
-                      placeholder="Что доработать" value={d.comment ?? ''} onChange={(e) => set(r.key, { comment: e.target.value })} />
-                  )}
-                  {r.decision === 'rework' && d?.decision !== 'rework' && r.comment && <div className="c-slate">было: {r.comment}</div>}
-                </td>
-                <td><Pill r={r} /></td>
-                <td>
-                  <Segmented ariaLabel={`Решение: ${r.title}`} value={d?.decision ?? ''}
-                    onChange={(v) => v && set(r.key, { decision: v as SectionDecision['decision'] })}
-                    options={[{ value: 'accepted', label: 'принять' }, { value: 'rework', label: 'на доработку' }]} />
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+      <ol className="tch-review">
+        {rows.map((r) => {
+          const d = draft[r.key];
+          return (
+            <li key={r.key}>
+              <div className="tch-review__head"><span>{r.title}</span><Pill r={r} /></div>
+              <Segmented ariaLabel={`Решение: ${r.title}`} value={d?.decision ?? ''}
+                onChange={(v) => v && set(r.key, { decision: v as SectionDecision['decision'] })}
+                options={[{ value: 'accepted', label: 'принять' }, { value: 'rework', label: 'на доработку' }]} />
+              {d?.decision === 'rework' && (
+                <textarea rows={2} aria-label={`Что доработать: ${r.title}`} maxLength={500}
+                  placeholder="Что доработать" value={d.comment ?? ''} onChange={(e) => set(r.key, { comment: e.target.value })} />
+              )}
+              {r.decision === 'rework' && d?.decision !== 'rework' && r.comment && <small className="c-slate">было: {r.comment}</small>}
+            </li>
+          );
+        })}
+      </ol>
       <div className="cab-filters">
         <Button icon="check" disabled={s.status === 'archived' || save.isPending || !Object.keys(changed).length || missing} onClick={submit}>
           сохранить решение по разделам

@@ -467,6 +467,11 @@
 .tch-subrow td { background: var(--c-white); }
 .tch-cardline { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; }
 .tch-errors { margin: 6px 0 0; padding-left: 18px; color: var(--text-muted); font-size: var(--fs-sm); }
+/* п. 3.3: проверка эталона по разделам — в узкой колонке карточки сценария, поэтому раздел — блоком, а не строкой таблицы */
+.tch-review { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.tch-review > li { display: flex; flex-direction: column; gap: 6px; padding: 8px 0; border-top: 1px solid var(--border-subtle); }
+.tch-review__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.tch-review textarea { width: 100%; }
 .tch-override { margin-top: 8px; padding: 10px; background: var(--bg-panel); max-width: 520px; }
 .c-red { color: var(--s-critical); }
 

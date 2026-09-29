@@ -13,6 +13,7 @@ import logging
 import re
 from dataclasses import dataclass
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 from aiskra.ai.ports import STTPort, TTSPort, VoiceProfile
 from aiskra.modules.training.application.ports.scenarios import CallRepository, ScenarioRepository
@@ -159,6 +160,7 @@ class ReplicaAudioHandler(_Voices):
         return ReplicaAudio(content=blob.content, mime=blob.mime)
 
 
+MSK = ZoneInfo("Europe/Moscow")
 MAX_RECORDING_REPLICAS = 80  # учебный звонок — 10–30 реплик; предел защищает синтез от очень длинных разговоров
 
 
@@ -198,7 +200,7 @@ class CallRecordingHandler(_Voices):
             log.warning("Запись звонка: синтез речи (%s) недоступен: %s", self._tts.model_id, e)
             raise
         content, ext = join_call_audio(segments)
-        stamp = call.started_at.strftime("%Y%m%d-%H%M")
+        stamp = call.started_at.astimezone(MSK).strftime("%Y%m%d-%H%M")  # имя файла — по московскому времени
         return CallRecording(
             content=content, mime="audio/wav" if ext == "wav" else "audio/mpeg", file_name=f"call-{stamp}.{ext}"
         )
