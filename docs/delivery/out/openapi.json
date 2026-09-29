@@ -10004,6 +10004,22 @@
       },
       "type": "array",
       "title": "Last Errors"
+     },
+     "caller_emotion": {
+      "type": "string",
+      "title": "Caller Emotion",
+      "default": ""
+     },
+     "caller_tension": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Caller Tension"
      }
     },
     "type": "object",

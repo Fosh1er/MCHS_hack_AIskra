@@ -111,7 +111,7 @@ cd backend && uv run python -m aiskra.cli create-user --login admin --full-name 
 - **API:** `/api/v1/training/scenarios…`, `/training/calls/incoming`, `/calls/dds`, `/calls/{id}/answer|replicas|end`, `/training/cards/{id}/calls`. CLI `generate-scenarios --count N`.
 - **Фронт:** входящий вызов — `pages/journal/JournalPage.tsx`; панель разговора — `shared/ui/CallPanel.tsx`; софтфон ДДС — `pages/dds/DdsSoftphone.tsx`.
 
-## Эмоции и голос ИИ-собеседника (п. 3.6, этапы V1–V3) — что уже есть
+## Эмоции и голос ИИ-собеседника (п. 3.6, этапы V1–V4) — что уже есть
 - **Состояние** — `training/domain/tone.py:CallerTone`: эмоция, напряжение, доверие, готовность отвечать (0–10). Начальное — `tone_for_legend` (сложность легенды, группа — первые цифры кода классификатора). Хранится в `training_calls.tone`, снимок у каждой реплики заявителя — `training_call_messages.tone` (миграция 0015).
 - **Правила** — `CallerTone.react`: словари `CALMING` / `INVALIDATING` / `PRESSURE` + вопрос по новой теме (`topic_of`). Категория — раз на реплику, успокаивающая фраза — раз за звонок, успокоение — не больше 6. Меняете словари — поправьте таблицу 7.2 в `specs/3.6-emotional-voice.md` и `unit/test_caller_tone.py`.
 - **Модель** получает состояние в промпте `applicant_actor/v2.md` (версия — `prompt_version` задачи в `config/ai*.yaml`), кеш делится по полосе напряжения; **без модели** ответ окрашивает `color_reply` — только слова вокруг фактов, факты легенды не меняются. Состояние меняют только правила, не модель.
@@ -121,7 +121,8 @@ cd backend && uv run python -m aiskra.cli create-user --login admin --full-name 
 - **Проверка без ключей на macOS:** `make dev-tts` + `TTS_KIND=openai_compatible TTS_URL=http://localhost:8100/v1 TTS_FORMAT=wav`. Подробно — `docs/ai/Голосовой_ввод.md`.
 - **Без рук (V3)** — детектор фраз `frontend/src/shared/voice/vad.ts:VadDetector` (чистый модуль: `step(rms, now, partySpeaking)`; значения — из прототипа, гистерезис исправлен), микрофон — `useHandsFree.ts`, фраза → `POST /training/speech`. В `CallPanel`: очередь голосовых реплик (`enqueue`, ответ модели не обрывается), перебивание (`onSpeechStart` → `stopVoice`), отсев эха `isLikelyEcho`; микрофон закрыт вне звонка и на время подсказок (`useActiveTour`). Сервер выбрасывает «титры» Whisper (`drop_phantoms`).
 - **Режим звонка** — `ReplicaIn.via` (`text` / `voice` / `hands_free`) → `training_call_messages.via` (миграция 0016), `CallView.mode`, `ReportCard.call_mode` → отчёт и CSV.
-- Дальше — графики эмоций для преподавателя (V4): [спецификация](specs/3.6-emotional-voice.md), [ADR-0011](docs/adr/0011-voice-emotional-caller.md).
+- **Преподавателю (V4):** разбор разговора — `shared/ui/CallReview.tsx` (кнопка «разговор» в отчёте занятия); критерий `caller_care` «Работа с заявителем (информативно)» — `assessment/domain/scoring.py`, **вес 0** в `WEIGHTS_112` (не удаляйте ноль: критерий без веса получает 1,0 в `total`), факты — `IncidentAttempts._caller`; на плитке мониторинга — `ParticipantProgress.caller_emotion`, `caller_tension`.
+- Дальше — потоковые ответы и шаг модели (V5): [спецификация](specs/3.6-emotional-voice.md), [ADR-0011](docs/adr/0011-voice-emotional-caller.md).
 
 ## Автооценка (п. 3.4) — что уже есть
 - **Правила** — `modules/assessment/domain/scoring.py` (формулы и веса описаны в `specs/3.4-assessment.md`); ИИ-судья — `application/judge.py` (без модели критерии «не проверено»).
