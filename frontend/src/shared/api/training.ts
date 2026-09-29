@@ -3,12 +3,19 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import { ApiError, http } from './http';
 
 export interface CallStarted { call_id: string; scenario_id: string | null; aon: string; channel: string }
-export interface Replica { speaker: 'party' | 'operator' | 'system'; text: string }
-export interface CallMessage { speaker: 'party' | 'operator' | 'system'; text: string; at: string }
+/** Что изменило состояние заявителя: код правила и сработавший фрагмент реплики оператора (п. 3.6). */
+export interface ToneChange { reason: 'calming' | 'invalidating' | 'pressure' | 'on_topic'; fragment: string; tension: number; trust: number; readiness: number }
+/** Состояние ИИ-заявителя у его реплики (п. 3.6): шкалы 0–10 и подача голоса. Фактов легенды здесь нет. */
+export interface Tone {
+  emotion: string; emotion_title: string; tension: number; trust: number; readiness: number; band: 'calm' | 'tense' | 'panic';
+  pace: 'slow' | 'normal' | 'fast' | 'very_fast'; volume: 'whisper' | 'low' | 'normal' | 'loud'; breathing: string; changes: ToneChange[];
+}
+export interface Replica { speaker: 'party' | 'operator' | 'system'; text: string; message_id?: string | null; tone?: Tone | null }
+export interface CallMessage { speaker: 'party' | 'operator' | 'system'; text: string; at: string; id?: string | null; tone?: Tone | null }
 export interface CallView {
   id: string; role: string; party: 'applicant' | 'brigade' | 'service'; direction: 'in' | 'out'; status: string; aon: string;
   card_id: string | null; service_code: string | null; target_service: string | null;
-  started_at: string; answered_at: string | null; ended_at: string | null; messages: CallMessage[];
+  started_at: string; answered_at: string | null; ended_at: string | null; messages: CallMessage[]; tone?: Tone | null;
 }
 
 const T = '/api/v1/training';

@@ -1,10 +1,12 @@
 /** Панель разговора (п. 1.4, 2.3): реплики оператора и ИИ-собеседника, таймер, «завершить».
  *  Голос (P1): реплики собеседника озвучиваются синтезом речи браузера (Web Speech API работает офлайн на ОС
  *  с русским голосом); оператор говорит в микрофон — запись распознаёт Whisper на сервере (`POST /training/speech`),
- *  либо печатает. Вид — тёмный док АРМ (ui-kit: Transcript, Composer). */
+ *  либо печатает. Вид — тёмный док АРМ (ui-kit: Transcript, Composer).
+ *  Эмоции (п. 3.6): у реплики заявителя — его состояние; голос следует ему темпом, высотой и громкостью,
+ *  а в тексте состояние видно подписью у реплики — в текстовом режиме это единственный канал интонации. */
 import { useEffect, useRef, useState } from 'react';
 import { Composer, Icon, Transcript, type TranscriptMessage } from '@smena112/ui-kit';
-import { endCall, getCall, sendReplica, transcribe, useSpeechStatus, type CallMessage } from '../api/training';
+import { endCall, getCall, sendReplica, transcribe, useSpeechStatus, type CallMessage, type Tone } from '../api/training';
 
 const pad = (n: number) => String(n).padStart(2, '0');
 const MAX_TALK_MS = 30_000; // реплика в трубку — не дольше 30 с, дальше запись останавливается сама
@@ -50,12 +52,25 @@ function useTalk(onText: (text: string) => void, onError: (msg: string) => void)
 }
 const VOICE_KEY = 'aiskra.call.voice';
 
-function speak(text: string) {
+/** Подача голоса по состоянию заявителя (п. 3.6, спецификация — таблица 7.3). Нет состояния — ровный голос. */
+const RATE: Record<Tone['pace'], number> = { slow: 0.9, normal: 1, fast: 1.15, very_fast: 1.3 };
+const VOLUME: Record<Tone['volume'], number> = { whisper: 0.5, low: 0.8, normal: 0.9, loud: 1 };
+function prosody(tone?: Tone | null) {
+  if (!tone) return { rate: 1, pitch: 1, volume: 1 };
+  const pitch = tone.tension <= 3 ? 0.95 : tone.tension <= 5 ? 1 : tone.tension <= 7 ? 1.08 : 1.15;
+  return { rate: RATE[tone.pace] ?? 1, pitch, volume: VOLUME[tone.volume] ?? 1 };
+}
+
+function speak(text: string, tone?: Tone | null) {
   try {
     const synth = window.speechSynthesis;
     if (!synth) return;
     const u = new SpeechSynthesisUtterance(text);
     u.lang = 'ru-RU';
+    const p = prosody(tone);
+    u.rate = p.rate;
+    u.pitch = p.pitch;
+    u.volume = p.volume;
     const voice = synth.getVoices().find((v) => v.lang.startsWith('ru'));
     if (voice) u.voice = voice;
     synth.cancel();
@@ -87,7 +102,7 @@ export function CallPanel({ callId, title, subtitle, partyName, initial, onEnded
   useEffect(() => { if (ended) return; const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, [ended]);
   useEffect(() => {
     const party = messages.filter((m) => m.speaker === 'party');
-    if (voice && party.length > spoken.current) speak(party[party.length - 1].text);
+    if (voice && party.length > spoken.current) speak(party[party.length - 1].text, party[party.length - 1].tone);
     spoken.current = party.length;
   }, [messages, voice]);
 
@@ -101,7 +116,7 @@ export function CallPanel({ callId, title, subtitle, partyName, initial, onEnded
     setMessages((m) => [...m, { speaker: 'operator', text: t, at }]);
     try {
       const r = await sendReplica(callId, t);
-      setMessages((m) => [...m, { speaker: r.speaker, text: r.text, at: new Date().toISOString() }]);
+      setMessages((m) => [...m, { speaker: r.speaker, text: r.text, at: new Date().toISOString(), id: r.message_id, tone: r.tone }]);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -127,7 +142,7 @@ export function CallPanel({ callId, title, subtitle, partyName, initial, onEnded
   const secs = Math.max(0, Math.floor(((ended ? now : now) - startedAt) / 1000));
   const transcript: TranscriptMessage[] = messages.map((m) => ({
     from: m.speaker === 'operator' ? 'me' : m.speaker === 'party' ? 'them' : 'sys',
-    who: m.speaker === 'operator' ? 'Вы' : partyName,
+    who: m.speaker === 'operator' ? 'Вы' : m.tone ? `${partyName} · ${m.tone.emotion_title}` : partyName,
     text: m.text,
   }));
   if (busy) transcript.push({ from: 'sys', text: `${partyName} отвечает…` });
