@@ -11,3 +11,4 @@ class AITask(StrEnum):
     SERVICE_ACTOR = "service_actor"  # п. 3.3 — диспетчер смежной службы (роль ДДС)
     JUDGE = "judge"  # п. 3.4 — оценка свободного текста
     INSIGHTS = "insights"  # п. 4.3 — инсайты по группе
+    FEEDBACK_DRAFT = "feedback_draft"  # п. 4.7 — черновик отзыва преподавателя по занятию

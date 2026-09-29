@@ -6,7 +6,19 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import BigInteger, DateTime, Float, ForeignKey, Index, Integer, String, Text, Uuid, func
+from sqlalchemy import (
+    BigInteger,
+    DateTime,
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    Uuid,
+    func,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from aiskra.platform.db import Base
@@ -56,6 +68,23 @@ class ExpertOverrideModel(Base):
     changes: Mapped[dict[str, Any]] = mapped_column(JsonType, default=dict)
     reason: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class TeacherFeedbackModel(Base):
+    """Отзыв преподавателя по занятию (п. 4.7): один на пару «занятие + обучающийся»; изменения — в аудите."""
+
+    __tablename__ = "teacher_feedback"
+    __table_args__ = (UniqueConstraint("session_id", "student_id", name="uq_teacher_feedback_session_student"),)
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    session_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("training_sessions.id", ondelete="CASCADE"), index=True)
+    student_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    teacher_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
+    session_title: Mapped[str] = mapped_column(String(255))
+    session_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    text: Mapped[str] = mapped_column(Text)
+    details: Mapped[dict[str, Any]] = mapped_column(JsonType, default=dict)  # focus, criteria, avg_score, draft
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class ReportModel(Base):
