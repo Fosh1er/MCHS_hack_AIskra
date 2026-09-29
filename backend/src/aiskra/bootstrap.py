@@ -189,6 +189,7 @@ from aiskra.modules.training.application.speech import (
     SpeechStatus,
     TranscribeHandler,
 )
+from aiskra.modules.training.application.voice_lab import VoiceLab
 from aiskra.modules.training.infrastructure.materials import (
     DocumentTextExtractor,
     LocalFileStorage,
@@ -588,6 +589,8 @@ def _wire_training(app: FastAPI, services: Services) -> None:
     ov[training_deps.provide_dds_call] = dds_call
     ov[training_deps.provide_replica] = replica
     ov[training_deps.provide_transcribe] = lambda: TranscribeHandler(services.stt)  # голосовой ввод (п. 1.4)
+    voice_lab = VoiceLab(services.stt, services.tts, services.model_router)  # голосовой полигон (п. 3.6)
+    ov[training_deps.provide_voice_lab] = lambda: voice_lab
     # голос собеседника (п. 3.6): сервисы читаются при каждом запросе — адаптер можно подменить в тестах
     ov[training_deps.provide_speech_status] = lambda: SpeechStatus(stt=services.stt.enabled, tts=services.tts.enabled)
     ov[training_deps.provide_end_call] = end_call

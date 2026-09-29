@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
+import base64
+import binascii
+import json
+import re
+from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Annotated, Any, Protocol
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Form, Response, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from aiskra.modules.training.api import deps
@@ -135,9 +140,10 @@ from aiskra.modules.training.application.speech import (
     Transcribe,
     TranscribeHandler,
 )
+from aiskra.modules.training.application.voice_lab import LabMessage, VoiceLab
 from aiskra.modules.training.domain.material import MAX_BYTES, MaterialKind
 from aiskra.modules.training.domain.review import Decision
-from aiskra.shared.errors import NotFoundError
+from aiskra.shared.errors import DomainError, NotFoundError
 from aiskra.shared.security import Permission, Principal
 from aiskra.shared.web import CurrentPrincipal, Meta, require
 
@@ -311,6 +317,61 @@ async def transcribe(
     data = await audio.read()
     r = await handler(Transcribe(actor=actor, audio=data, mime=audio.content_type or "audio/webm"))
     return SpeechOut(text=r.text)
+
+
+class VoiceLabSttIn(BaseModel):
+    audio: str = Field(max_length=6_000_000, description="Запись из браузера в base64")
+    format: str = Field(default="webm", max_length=10)
+    language: str = Field(default="auto", max_length=10)
+
+
+class VoiceLabMessage(BaseModel):
+    role: str = Field(max_length=20)
+    content: str = Field(max_length=12000)
+
+
+class VoiceLabChatIn(BaseModel):
+    messages: list[VoiceLabMessage] = Field(min_length=1, max_length=60)
+
+
+class VoiceLabTtsIn(BaseModel):
+    input: str = Field(min_length=1, max_length=4600)
+    voice: str | None = Field(default=None, max_length=40)
+
+
+@router.post("/voice-lab/stt", summary="Голосовой полигон: распознать фразу (п. 3.6)")
+async def voice_lab_stt(
+    _: Trainee, lab: Annotated[VoiceLab, Depends(deps.provide_voice_lab)], body: VoiceLabSttIn
+) -> dict[str, str]:
+    try:
+        audio = base64.b64decode(body.audio, validate=True)
+    except (ValueError, binascii.Error) as e:
+        raise DomainError("Запись повреждена", code="bad_audio") from e
+    fmt = re.sub(r"[^a-z0-9]", "", body.format.lower()) or "webm"
+    return {"text": await lab.transcribe(audio, mime=f"audio/{fmt}")}
+
+
+@router.post("/voice-lab/chat", summary="Голосовой полигон: ответ заявителя потоком SSE (п. 3.6)")
+async def voice_lab_chat(
+    _: Trainee, lab: Annotated[VoiceLab, Depends(deps.provide_voice_lab)], body: VoiceLabChatIn
+) -> StreamingResponse:
+    text = await lab.reply([LabMessage(role=m.role, content=m.content) for m in body.messages])
+
+    async def events() -> AsyncIterator[bytes]:
+        # формат потока OpenRouter/OpenAI, который читает страница: фразами, затем [DONE]
+        for part in re.findall(r"[^.!?…\n]+[.!?…\n]*\s*", text) or [text]:
+            yield f"data: {json.dumps({'choices': [{'delta': {'content': part}}]}, ensure_ascii=False)}\n\n".encode()
+        yield b"data: [DONE]\n\n"
+
+    return StreamingResponse(events(), media_type="text/event-stream", headers={"Cache-Control": "no-store"})
+
+
+@router.post("/voice-lab/tts", summary="Голосовой полигон: озвучить реплику с эмоцией (п. 3.6)")
+async def voice_lab_tts(
+    _: Trainee, lab: Annotated[VoiceLab, Depends(deps.provide_voice_lab)], body: VoiceLabTtsIn
+) -> Response:
+    audio = await lab.speak(body.input)
+    return Response(content=audio.content, media_type=audio.mime, headers={"Cache-Control": "no-store"})
 
 
 @router.post("/calls/{call_id}/end", response_model=StatusOut, summary="Завершить звонок")

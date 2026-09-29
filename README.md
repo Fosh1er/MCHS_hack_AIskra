@@ -12,7 +12,7 @@
 | Спецификации «требование → код → тест» по каждому пункту плана | [specs/](specs/README.md) |
 | Архитектурные решения | [docs/adr/](docs/adr/README.md) |
 | Скринкаст и презентация | [скринкаст](docs/demo/АИскра_скринкаст.mp4), [презентация](docs/presentation/АИскра_презентация_ЛЦТ2026.pdf) |
-| Прототип полнодуплексного эмоционального голоса | [prototypes/emotional-voice-duplex](prototypes/emotional-voice-duplex/README.md) |
+| Голосовой полигон: свободный голосовой разговор с эмоциональным заявителем, с перебиванием | кабинет обучающегося и преподавателя → «Голосовой полигон» (`/voice-lab/`); работает через ИИ-порты тренажёра. Исходный прототип — [prototypes/emotional-voice-duplex](prototypes/emotional-voice-duplex/README.md) |
 
 ## Возможности
 
