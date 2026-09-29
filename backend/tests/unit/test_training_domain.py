@@ -9,6 +9,7 @@ from aiskra.modules.training.domain.scenario import (
     ServiceFacts,
     build_scenario,
     humanize,
+    legend_voice,
     offline_story,
 )
 
@@ -114,3 +115,11 @@ def test_legend_has_voice() -> None:
         assert applicant["voice"] == ("female" if first.endswith(("а", "я")) else "male")
         voices.add(applicant["voice"])
     assert voices == {"female", "male"}
+
+
+def test_legend_voice_for_old_scenarios() -> None:
+    """Сценарии до п. 3.6 без поля voice: голос — по правилу генератора из имени «Фамилия Имя»."""
+    assert legend_voice({"name": "Кузнецов Алексей"}) == "male"
+    assert legend_voice({"name": "Смирнова Ольга"}) == "female"
+    assert legend_voice({"name": "Кузнецов Алексей", "voice": "female"}) == "female"  # записанное — главнее
+    assert legend_voice({"name": "Аноним"}) is None and legend_voice({}) is None

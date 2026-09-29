@@ -18,6 +18,7 @@ from aiskra.ai.ports import STTPort, TTSPort, VoiceProfile
 from aiskra.modules.training.application.ports.scenarios import CallRepository, ScenarioRepository
 from aiskra.modules.training.application.queries.calls import call_visible
 from aiskra.modules.training.domain.call import CallParty, Speaker
+from aiskra.modules.training.domain.scenario import legend_voice
 from aiskra.modules.training.domain.tone import STAFF_STYLE, speech_speed, speech_style
 from aiskra.shared.application import Command, Query
 from aiskra.shared.errors import DomainError, ExternalServiceError, NotFoundError
@@ -118,8 +119,8 @@ class ReplicaAudioHandler:
             return party.value  # brigade | service
         scenario = await self._scenarios.get(scenario_id) if scenario_id else None
         applicant = scenario.legend.get("applicant", {}) if scenario else {}
-        sex = applicant.get("voice") if isinstance(applicant, dict) else None
-        return f"applicant_{sex}" if sex in ("female", "male") else "applicant"
+        sex = legend_voice(applicant) if isinstance(applicant, dict) else None
+        return f"applicant_{sex}" if sex else "applicant"
 
     async def __call__(self, q: GetReplicaAudio) -> ReplicaAudio:
         call = await self._calls.get(q.call_id)

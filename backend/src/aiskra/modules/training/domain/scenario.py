@@ -111,12 +111,27 @@ def synthetic_phone(rng: random.Random) -> str:
     return f"+7 (9{rng.randint(10, 99)}) {rng.randint(100, 999)}-{rng.randint(10, 99)}-{rng.randint(10, 99)}"
 
 
+def synthetic_voice(first_name: str) -> str:
+    """Голос синтетического заявителя по имени из списка генератора `_FIRST`: женские имена там — на «а»/«я».
+    Правило генератора, а не догадка о реальном человеке: имена в сценариях — только из этого списка."""
+    return "female" if first_name.endswith(("а", "я")) else "male"
+
+
+def legend_voice(applicant: dict[str, Any]) -> str | None:
+    """Голос заявителя легенды (п. 3.6): записан генератором; в сценариях до п. 3.6 — по его же правилу из имени
+    («Фамилия Имя»), чтобы «Кузнецов Алексей» из старого банка не говорил женским голосом."""
+    voice = applicant.get("voice")
+    if voice in ("female", "male"):
+        return str(voice)
+    name = str(applicant.get("name") or "").split()
+    return synthetic_voice(name[-1]) if len(name) >= 2 else None
+
+
 def synthetic_person(rng: random.Random) -> tuple[str, str]:
-    """Синтетический заявитель: ФИО и голос для озвучки («female» / «male», п. 3.6). Голос задаёт генератор,
-    выбирая имя из своего списка, — ничего не угадывается по имени постфактум."""
+    """Синтетический заявитель: ФИО и голос для озвучки («female» / «male», п. 3.6)."""
     first = rng.choice(_FIRST)
-    female = first.endswith(("а", "я"))
-    return f"{rng.choice(_LAST_F if female else _LAST_M)} {first}", "female" if female else "male"
+    voice = synthetic_voice(first)
+    return f"{rng.choice(_LAST_F if voice == 'female' else _LAST_M)} {first}", voice
 
 
 def _plain(text: str | None) -> str:
