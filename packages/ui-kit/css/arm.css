@@ -326,6 +326,7 @@
   gap: 12px;
   padding: 4px 6px 6px 8px;
   background: var(--c-white);
+  color: var(--text-strong); /* внутри тёмной панели служб текст наследовал белый — на белом фоне ввод был не виден */
   box-shadow: var(--shadow-popover);
 }
 .arm-uline {
