@@ -157,9 +157,14 @@ async def resolve_services(
     flag: Annotated[list[str] | None, Query(description="Признаки карточки (enums.card_flag)")] = None,
     okrug: str | None = None,
     district: str | None = None,
+    object_name: Annotated[
+        str | None, Query(alias="object", description="Поле «Объект» адреса (подчинённость)")
+    ] = None,
 ) -> ResolvedServices:
     return await handler(
-        ResolveServices(incident_types=incident_type, flags=flag or [], okrug=okrug, district=district)
+        ResolveServices(
+            incident_types=incident_type, flags=flag or [], okrug=okrug, district=district, object_name=object_name
+        )
     )
 
 

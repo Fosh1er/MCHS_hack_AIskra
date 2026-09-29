@@ -1716,6 +1716,24 @@
        ],
        "title": "District"
       }
+     },
+     {
+      "name": "object",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Поле «Объект» адреса (подчинённость)",
+       "title": "Object"
+      },
+      "description": "Поле «Объект» адреса (подчинённость)"
      }
     ],
     "responses": {

@@ -5,17 +5,20 @@
 2. Территориальные мета-службы разворачиваются по адресу: «Территориальные ОИВ» → ДДС префектуры округа
    и ДДС района; «… ТиНАО» — то же для ТиНАО; «Автомобильные дороги АО» → ГБУ АД округа.
    Если адрес ещё не указан, возвращается признак `needs_address`.
+   Службы по подчинённости объекта (поле «Объект», пп. 4.4, 8.4) — по справочнику `subordination.yaml`.
 3. «Главная служба» типа (колонка 14 классификатора) отмечается как основная и добавляется, даже если
    матрица её не дала. На панели основная служба подчёркнута двойной линией.
 """
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 
 from aiskra.modules.dictionaries.application.ports.reader import DictionaryReader, ServiceRow
 from aiskra.modules.dictionaries.domain.model import DeliveryKind
 from aiskra.modules.dictionaries.domain.routing import Cell, applicable, territorial_applies
+from aiskra.modules.dictionaries.domain.subordination import SubordinationRule, subordinate_services
 from aiskra.shared.application import Query
 from aiskra.shared.errors import NotFoundError
 
@@ -29,6 +32,7 @@ class ResolveServices(Query):
     flags: list[str] = field(default_factory=list)
     okrug: str | None = None
     district: str | None = None
+    object_name: str | None = None  # поле «Объект» адреса карточки — для подчинённости объекта
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -52,8 +56,9 @@ class ResolvedServices:
 
 
 class ResolveServicesHandler:
-    def __init__(self, reader: DictionaryReader) -> None:
+    def __init__(self, reader: DictionaryReader, subordination: Sequence[SubordinationRule] = ()) -> None:
         self._reader = reader
+        self._subordination = subordination
 
     async def __call__(self, query: ResolveServices) -> ResolvedServices:
         codes = list(dict.fromkeys(query.incident_types))[:MAX_TYPES]
@@ -107,6 +112,9 @@ class ResolveServicesHandler:
                 add(hit.service, reason)
                 if hit.service_type:
                     service_types.setdefault(hit.service, hit.service_type)
+
+        for rule in subordinate_services(self._subordination, query.object_name):
+            add(rule.service, f"подчинённость объекта: {rule.note}")
 
         main_services = [s for s in await self._reader.list_main_services() if set(s.main_codes) & main_codes]
         for s in main_services:

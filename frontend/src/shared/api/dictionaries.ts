@@ -56,10 +56,10 @@ export const useQuestionnaire = (cardType: string) =>
 export const useIncidentType = (code: string | null) =>
   useQuery({ queryKey: ['dict', 'incident-type', code], queryFn: () => http<IncidentTypeDetails>(`${D}/incident-types/${code}`), enabled: !!code, ...forever });
 
-export const useResolvedServices = (types: string[], flags: string[], okrug: string | null, district: string | null) =>
+export const useResolvedServices = (types: string[], flags: string[], okrug: string | null, district: string | null, object?: string | null) =>
   useQuery({
-    queryKey: ['dict', 'resolve', types, flags, okrug, district],
-    queryFn: () => http<ResolvedServices>(`${D}/services/resolve?${qs({ incident_type: types, flag: flags, okrug, district })}`),
+    queryKey: ['dict', 'resolve', types, flags, okrug, district, object],
+    queryFn: () => http<ResolvedServices>(`${D}/services/resolve?${qs({ incident_type: types, flag: flags, okrug, district, object })}`),
     enabled: types.length > 0,
     placeholderData: keepPreviousData,
     staleTime: 60_000,
