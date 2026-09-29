@@ -39,7 +39,7 @@ async def test_alerts_from_services_and_recent_errors() -> None:
         ]
     )
     alerts = await GetAlertsHandler(status, logs)(GetAlerts())
-    assert [a.source for a in alerts][0] == "ИИ-модели"  # критичные — первыми
+    assert alerts[0].source == "ИИ-модели"  # критичные — первыми
     assert {a.source for a in alerts} == {"ИИ-модели", "Резервные копии", "Лог приложения"}
     log_alert = next(a for a in alerts if a.source == "Лог приложения")
     assert "ошибок за 60 мин: 1" in log_alert.text and "429" in log_alert.text

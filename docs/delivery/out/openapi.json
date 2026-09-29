@@ -1043,6 +1043,31 @@
     }
    }
   },
+  "/api/v1/system/alerts": {
+   "get": {
+    "tags": [
+     "system"
+    ],
+    "summary": "Оповещения о сбоях: сервисы не в норме, ошибки в логе",
+    "operationId": "alerts_api_v1_system_alerts_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/Alert"
+         },
+         "type": "array",
+         "title": "Response Alerts Api V1 System Alerts Get"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/system/logs": {
    "get": {
     "tags": [
@@ -3221,7 +3246,7 @@
     "tags": [
      "training"
     ],
-    "summary": "Правка сценария (возвращает в черновики)",
+    "summary": "Правка сценария (возвращает в черновики) с проверкой грамотности",
     "operationId": "edit_scenario_api_v1_training_scenarios__scenario_id__patch",
     "parameters": [
      {
@@ -3251,7 +3276,7 @@
       "content": {
        "application/json": {
         "schema": {
-         "$ref": "#/components/schemas/StatusOut"
+         "$ref": "#/components/schemas/EditScenarioOut"
         }
        }
       }
@@ -4906,6 +4931,47 @@
     }
    }
   },
+  "/api/v1/assessment/sessions/{session_id}/report.xlsx": {
+   "get": {
+    "tags": [
+     "assessment"
+    ],
+    "summary": "Отчёт по занятию в Excel (XLSX)",
+    "operationId": "session_report_xlsx_api_v1_assessment_sessions__session_id__report_xlsx_get",
+    "parameters": [
+     {
+      "name": "session_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Session Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/assessment/sessions/{session_id}/report.csv": {
    "get": {
     "tags": [
@@ -5770,6 +5836,41 @@
     ],
     "title": "AddressSuggestion",
     "description": "Вариант подсказки: подпись, разобранные поля, район и координаты (выбор заполняет блок «Адрес»)."
+   },
+   "Alert": {
+    "properties": {
+     "level": {
+      "type": "string",
+      "title": "Level"
+     },
+     "source": {
+      "type": "string",
+      "title": "Source"
+     },
+     "text": {
+      "type": "string",
+      "title": "Text"
+     },
+     "at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "At"
+     }
+    },
+    "type": "object",
+    "required": [
+     "level",
+     "source",
+     "text"
+    ],
+    "title": "Alert"
    },
    "AnswerIn": {
     "properties": {
@@ -8089,6 +8190,33 @@
     "type": "object",
     "title": "EditScenarioIn"
    },
+   "EditScenarioOut": {
+    "properties": {
+     "status": {
+      "type": "string",
+      "title": "Status"
+     },
+     "grammar": {
+      "items": {
+       "$ref": "#/components/schemas/GrammarRemark"
+      },
+      "type": "array",
+      "title": "Grammar",
+      "description": "Замечания проверки грамотности (п. 3.6)"
+     },
+     "checked_by": {
+      "type": "string",
+      "title": "Checked By",
+      "description": "rules — правила; rules+model — правила и модель"
+     }
+    },
+    "type": "object",
+    "required": [
+     "status",
+     "checked_by"
+    ],
+    "title": "EditScenarioOut"
+   },
    "EnumValueRow": {
     "properties": {
      "domain": {
@@ -8727,6 +8855,34 @@
      "distance_m"
     ],
     "title": "GeocodeResult"
+   },
+   "GrammarRemark": {
+    "properties": {
+     "field": {
+      "type": "string",
+      "title": "Field"
+     },
+     "quote": {
+      "type": "string",
+      "title": "Quote"
+     },
+     "fix": {
+      "type": "string",
+      "title": "Fix"
+     },
+     "rule": {
+      "type": "string",
+      "title": "Rule"
+     }
+    },
+    "type": "object",
+    "required": [
+     "field",
+     "quote",
+     "fix",
+     "rule"
+    ],
+    "title": "GrammarRemark"
    },
    "GroupIdOut": {
     "properties": {
