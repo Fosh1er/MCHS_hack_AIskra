@@ -1,0 +1,19 @@
+{
+  "name": "voice-agent-full-duplex",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Full-duplex voice interface for an AI agent using OpenRouter STT, streaming LLM, and TTS APIs.",
+  "scripts": {
+    "dev": "node server.js",
+    "start": "node server.js",
+    "check": "node --check server.js"
+  },
+  "engines": {
+    "node": ">=18.18"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "express": "^5.1.0"
+  }
+}

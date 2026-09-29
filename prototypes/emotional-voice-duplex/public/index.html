@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#09111f" />
+    <title>Voice Agent — Full Duplex</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></div>
+          <div>
+            <div class="eyebrow">OPENROUTER VOICE INTERFACE</div>
+            <h1>Голосовой агент</h1>
+          </div>
+        </div>
+        <div id="connection-pill" class="status-pill offline">
+          <span class="status-dot"></span>
+          <span id="connection-label">Не подключён</span>
+        </div>
+      </header>
+
+      <section class="hero">
+        <div class="hero-copy">
+          <div class="kicker">STT · LLM · TTS · OPENROUTER</div>
+          <h2>Говори естественно.<br /><em>Агент слушает.</em></h2>
+          <p>
+            Двусторонний голосовой диалог: микрофон и ответ агента работают одновременно.
+            Можно перебить агента в любой момент.
+          </p>
+        </div>
+        <div class="orb-wrap" aria-label="Состояние голосового агента">
+          <div id="orb" class="orb idle">
+            <div class="orb-core"></div>
+            <div class="orb-ring ring-one"></div>
+            <div class="orb-ring ring-two"></div>
+          </div>
+          <div id="orb-caption" class="orb-caption">Готов к разговору</div>
+        </div>
+      </section>
+
+      <section class="controls-card">
+        <div class="controls-row">
+          <button id="start-button" class="primary-button" type="button">
+            <span class="button-icon">●</span>
+            Начать разговор
+          </button>
+          <button id="stop-button" class="secondary-button" type="button" disabled>
+            Завершить
+          </button>
+          <button id="tts-test-button" class="secondary-button" type="button">
+            Тест голоса
+          </button>
+          <div class="settings">
+            <label>
+              Язык
+              <select id="language-select">
+                <option value="ru" selected>Русский</option>
+                <option value="en">English</option>
+                <option value="auto">Авто</option>
+              </select>
+            </label>
+            <label>
+              Чувствительность VAD
+              <select id="vad-sensitivity-select">
+                <option value="high" selected>Высокая — тихая речь</option>
+                <option value="balanced">Сбалансированная</option>
+                <option value="strict">Строгая — меньше шума</option>
+              </select>
+            </label>
+            <label>
+              Ситуация 911
+              <select id="scenario-select">
+                <option value="medical" selected>Медицинский кризис</option>
+                <option value="domestic">Домашний конфликт</option>
+                <option value="crash">ДТП с пострадавшим</option>
+                <option value="fire">Пожар в помещении</option>
+                <option value="missingChild">Пропавший ребёнок</option>
+              </select>
+            </label>
+            <label>
+              TTS-режим
+              <select id="emotion-select">
+                <option value="adaptive" selected>Адаптивный по диалогу</option>
+                <option value="warm">Тёплая</option>
+                <option value="cheerful">Живая</option>
+                <option value="excited">Воодушевлённая</option>
+                <option value="calm">Спокойная</option>
+                <option value="empathetic">Эмпатичная</option>
+              </select>
+            </label>
+            <label>
+              Голос TTS
+              <select id="voice-select">
+                <option value="Zephyr" selected>Zephyr</option>
+                <option value="Kore">Kore</option>
+                <option value="Aoede">Aoede</option>
+                <option value="Puck">Puck</option>
+                <option value="Charon">Charon</option>
+              </select>
+            </label>
+          </div>
+        </div>
+        <div class="hint"><span class="hint-dot"></span> Browser VAD включён — пауза завершает реплику автоматически, эхо TTS фильтруется · <span id="tone-status">Тон адаптируется по диалогу</span></div>
+        <details class="tone-panel">
+          <summary>Расширенная нотация тональности</summary>
+          <code id="tone-notation"></code>
+        </details>
+      </section>
+
+      <section class="conversation-card">
+        <div class="section-heading">
+          <div>
+            <div class="eyebrow">LIVE TRANSCRIPT</div>
+            <h3>Разговор</h3>
+          </div>
+          <button id="clear-button" class="text-button" type="button">Очистить</button>
+        </div>
+        <div id="transcript" class="transcript" aria-live="polite">
+          <div id="empty-state" class="empty-state">
+            <div class="empty-icon">⌁</div>
+            <p>Нажми «Начать разговор» и скажи что-нибудь</p>
+          </div>
+        </div>
+      </section>
+
+      <footer>
+        <span>Browser VAD</span>
+        <span class="footer-separator">·</span>
+        <span>OpenRouter API</span>
+        <span class="footer-separator">·</span>
+        <span id="latency-label">Ожидание подключения</span>
+      </footer>
+    </main>
+
+    <audio id="remote-audio" autoplay></audio>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>
