@@ -4,7 +4,7 @@
 import { Fragment, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Banner, Button, Card, Icon, LineChart, StatTile, StatusPill } from '@smena112/ui-kit';
-import { reportCsvUrl, useEvaluateSession, useOverride, useSessionReport, type CardResult, type SessionReport } from '../../shared/api/assessment';
+import { reportCsvUrl, reportXlsxUrl, useEvaluateSession, useOverride, useSessionReport, type CardResult, type SessionReport } from '../../shared/api/assessment';
 import { CallReview } from '../../shared/ui/CallReview';
 import { TeacherShell } from '../../shared/ui/TeacherShell';
 import { StudentFeedback } from './StudentFeedback';
@@ -182,7 +182,8 @@ export function SessionReportPage() {
           <span data-tour="t-evaluate"><Button icon="refresh" disabled={evaluate.isPending} onClick={() => evaluate.mutate()}>{evaluate.isPending ? 'оценка…' : 'оценить все карточки'}</Button></span>
           <span className="tch-tour-group" data-tour="t-report-more">
             <Link className="cab-btn" to={`/teacher/sessions/${id}/debrief`}>разбор</Link>
-            <a className="cab-btn" href={reportCsvUrl(id)} download>Excel (CSV)</a>
+            <a className="cab-btn" href={reportXlsxUrl(id)} download>Excel (XLSX)</a>
+          <a className="cab-btn" href={reportCsvUrl(id)} download>CSV</a>
             <Button icon="description" onClick={() => window.print()}>PDF</Button>
           </span>
         </span>

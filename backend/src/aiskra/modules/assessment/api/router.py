@@ -64,6 +64,7 @@ from aiskra.modules.assessment.application.queries.reports import (
     ProgressView,
     SessionReport,
     report_csv,
+    report_xlsx,
 )
 from aiskra.modules.assessment.application.queries.validation import ValidationHandler, ValidationQuery, ValidationView
 from aiskra.modules.assessment.domain.scoring import PASS_THRESHOLD
@@ -167,6 +168,18 @@ async def session_report(
     session_id: UUID, actor: Teacher, handler: Annotated[GetSessionReportHandler, Depends(deps.provide_report)]
 ) -> SessionReport:
     return await handler(GetSessionReport(actor=actor, session_id=session_id))
+
+
+@router.get("/sessions/{session_id}/report.xlsx", summary="Отчёт по занятию в Excel (XLSX)")
+async def session_report_xlsx(
+    session_id: UUID, actor: Teacher, handler: Annotated[GetSessionReportHandler, Depends(deps.provide_report)]
+) -> Response:
+    report = await handler(GetSessionReport(actor=actor, session_id=session_id))
+    return Response(
+        content=report_xlsx(report),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="session-{session_id}.xlsx"'},
+    )
 
 
 @router.get("/sessions/{session_id}/report.csv", summary="Отчёт по занятию в CSV (Excel)")

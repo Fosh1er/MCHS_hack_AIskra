@@ -235,35 +235,33 @@ def _feedback(feedback: dict[UUID, FeedbackRecord] | None, student_id: UUID) -> 
     return FeedbackView(text=rec.text, updated_at=rec.updated_at) if rec else None
 
 
-def report_csv(r: SessionReport) -> str:
-    """CSV для Excel: разделитель «;», BOM — чтобы кириллица открылась без мастера импорта."""
-    buf = io.StringIO()
-    w = csv.writer(buf, delimiter=";")
+REPORT_HEADER = [
+    "ФИО",
+    "Роль",
+    "Служба",
+    "Карточка",
+    "Тип",
+    "Время, с",
+    "Норматив, с",
+    "Отклонение, с",
+    "Разговор",
+    "Балл",
+    "Зачтено",
+    "Экспертная правка",
+    "Комментарий эксперта",
+    "Замечания",
+    "Отзыв преподавателя",
+]
+
+
+def report_rows(r: SessionReport) -> tuple[list[Any], list[list[Any]]]:
+    """Сводка занятия и строки по карточкам — общие для CSV и XLSX (п. 4.3, 10.9)."""
     share = f"{round(r.passed_share * 100)} %" if r.passed_share is not None else ""
-    w.writerow(["Занятие", r.title, "Средний балл", r.avg_score, "Зачтено", share])
-    w.writerow([])
-    w.writerow(
-        [
-            "ФИО",
-            "Роль",
-            "Служба",
-            "Карточка",
-            "Тип",
-            "Время, с",
-            "Норматив, с",
-            "Отклонение, с",
-            "Разговор",
-            "Балл",
-            "Зачтено",
-            "Экспертная правка",
-            "Комментарий эксперта",
-            "Замечания",
-            "Отзыв преподавателя",
-        ]
-    )
+    summary: list[Any] = ["Занятие", r.title, "Средний балл", r.avg_score, "Зачтено", share]
+    rows: list[list[Any]] = []
     for s in r.students:
         for i, c in enumerate(s.cards):
-            w.writerow(
+            rows.append(
                 [
                     s.full_name,
                     "оператор 112" if s.role == "112" else "ДДС",
@@ -282,7 +280,54 @@ def report_csv(r: SessionReport) -> str:
                     s.feedback.text if s.feedback and i == 0 else "",  # отзыв — по занятию, один раз у обучающегося
                 ]
             )
-    return "﻿" + buf.getvalue()
+    return summary, rows
+
+
+def report_csv(r: SessionReport) -> str:
+    """CSV для Excel: разделитель «;», BOM — чтобы кириллица открылась без мастера импорта."""
+    summary, rows = report_rows(r)
+    buf = io.StringIO()
+    w = csv.writer(buf, delimiter=";")
+    w.writerow(summary)
+    w.writerow([])
+    w.writerow(REPORT_HEADER)
+    w.writerows(rows)
+    return "\ufeff" + buf.getvalue()
+
+
+def report_xlsx(r: SessionReport) -> bytes:
+    """Нативный XLSX (п. 10.9): числа — числами, шапка закреплена, автофильтр, ширина колонок по содержимому."""
+    from openpyxl import Workbook
+    from openpyxl.styles import Alignment, Font, PatternFill
+    from openpyxl.utils import get_column_letter
+    from openpyxl.worksheet.worksheet import Worksheet
+
+    summary, rows = report_rows(r)
+    wb = Workbook()
+    ws = wb.create_sheet("Отчёт", 0)
+    wb.remove(wb.worksheets[1])
+    assert isinstance(ws, Worksheet)
+    ws.append(summary)
+    ws.append([])
+    ws.append(REPORT_HEADER)
+    head = ws.max_row
+    for cell in ws[head]:
+        cell.font = Font(bold=True, color="FFFFFF")
+        cell.fill = PatternFill("solid", fgColor="10689E")
+        cell.alignment = Alignment(vertical="center", wrap_text=True)
+    for data_row in rows:
+        ws.append(data_row)
+    last = get_column_letter(len(REPORT_HEADER))
+    ws.freeze_panes = f"A{head + 1}"
+    ws.auto_filter.ref = f"A{head}:{last}{ws.max_row}"
+    for idx in range(1, len(REPORT_HEADER) + 1):
+        values = [str(v) for v in (ws.cell(row=n, column=idx).value for n in range(head, ws.max_row + 1)) if v]
+        ws.column_dimensions[get_column_letter(idx)].width = min(60, max(10, max(map(len, values), default=8) + 2))
+        for n in range(head + 1, ws.max_row + 1):
+            ws.cell(row=n, column=idx).alignment = Alignment(vertical="top", wrap_text=True)
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
 
 
 @dataclass(frozen=True, kw_only=True)

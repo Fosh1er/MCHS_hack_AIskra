@@ -206,3 +206,25 @@ def test_speech_input_endpoint(app_client: Callable[[], TestClient]) -> None:
         )
     finally:
         services.stt = real
+
+
+def test_report_xlsx_is_native_excel(app_client: Callable[[], TestClient], lesson: dict[str, Any]) -> None:
+    """П. 10.9: отчёт по занятию — настоящий XLSX, числа числами, шапка на месте."""
+    import io
+
+    from openpyxl import load_workbook
+
+    teacher = as_user(app_client, "teacher")
+    r = teacher.get(f"/api/v1/assessment/sessions/{lesson['session_id']}/report.xlsx")
+    assert r.status_code == 200 and r.headers["content-type"].startswith("application/vnd.openxmlformats")
+    ws = load_workbook(io.BytesIO(r.content)).active
+    rows = list(ws.iter_rows(values_only=True))
+    assert rows[0][0] == "Занятие" and rows[2][:2] == ("ФИО", "Роль")
+    card_row = next(row for row in rows[3:] if row[3] == lesson["card_number"])
+    assert isinstance(card_row[3], int) and isinstance(card_row[6], (int, float))
+    assert (
+        as_user(app_client, "student")
+        .get(f"/api/v1/assessment/sessions/{lesson['session_id']}/report.xlsx")
+        .status_code
+        == 403
+    )
