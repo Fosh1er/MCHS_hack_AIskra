@@ -65,6 +65,13 @@ def test_category_once_per_replica() -> None:
     assert t.tension == 7
 
 
+def test_calming_survives_recognition_errors() -> None:
+    """Реплика из распознавания речи: живой Whisper слышал «доставайтесь на линии» и «доставайтесь на линия»."""
+    for heard in ("Доставайтесь на линии", "Доставайтесь на линия"):
+        t = panic()
+        assert [c.fragment for c in t.react(heard, topic=None, revealed=[])] == ["на лини"]
+
+
 def test_same_phrase_counts_once() -> None:
     t = panic()
     t.react("Я вас слышу", topic=None, revealed=[])
