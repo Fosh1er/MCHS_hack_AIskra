@@ -45,7 +45,26 @@ ai:
     service_actor:       {provider: demo_small, temperature: 0.6, cache: task,  cache_ttl: 1d, max_tokens: 160}
     judge:               {provider: demo,       temperature: 0,   cache: exact, cache_ttl: 7d, max_tokens: 600}
     insights:            {provider: demo,       temperature: 0.3, cache: off}
-  tts: {kind: fake, cache_ttl: 30d}
+  # Голос собеседника (п. 3.6): Gemini TTS через OpenRouter — эмоция передаётся стилем (speech_metadata.style), голос — по роли.
+  # Синтез на OpenRouter ПЛАТНЫЙ (по символам; 29.09.2026 — доли цента за реплику): нужен пополненный счёт.
+  # Выключен, пока TTS_KIND не задан, — тогда реплики озвучивает браузер.
+  tts:
+    kind: ${TTS_KIND:-fake}          # openai_compatible — включить
+    base_url: ${TTS_URL:-https://openrouter.ai/api/v1}
+    api_key_env: DEMO_LLM_API_KEY    # тот же ключ OpenRouter
+    model: ${TTS_MODEL:-google/gemini-3.8-flash-lite-tts}
+    style: ${TTS_STYLE:-google}      # google | openai | none
+    response_format: ${TTS_FORMAT:-pcm}   # Gemini отдаёт сырой звук 24 кГц — сервер оборачивает его в WAV
+    voice: ${TTS_VOICE:-Zephyr}
+    voices:
+      applicant_female: ${TTS_VOICE_FEMALE:-Kore}
+      applicant_male: ${TTS_VOICE_MALE:-Charon}
+      brigade: ${TTS_VOICE_BRIGADE:-Orus}
+      service: ${TTS_VOICE_SERVICE:-Aoede}
+    cache_ttl: 30d
+    cache_mb: 64
+    max_concurrency: 2
+    timeout_s: 30
   # Голосовой ввод оператора (Whisper за OpenAI-совместимым /audio/transcriptions). Выключен, пока STT_KIND не задан.
   # Локально (GPU/CPU): Speaches — docs/ai/Голосовой_ввод.md; STT_URL=http://<машина с GPU>:8000/v1
   stt:

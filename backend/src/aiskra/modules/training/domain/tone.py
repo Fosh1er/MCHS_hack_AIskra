@@ -342,3 +342,31 @@ def color_reply(text: str, tone: CallerTone, n: int) -> str:
     if tone.emotion is Emotion.RELIEF and n % 2 == 0:
         return f"Да, хорошо. {text}"
     return text
+
+
+# Подача для серверного синтеза (п. 3.6, V2; спецификация — таблицы 7.3 и 7.4). Стиль — по-английски: так его
+# понимают модели с инструкциями (Gemini, OpenAI TTS); модели без инструкций (Piper) получают только темп.
+SPEED = {"slow": 0.9, "normal": 1.0, "fast": 1.15, "very_fast": 1.3}
+_STYLE_EMOTION = {
+    "calm": "a calm",
+    "relief": "a relieved, grateful",
+    "fear": "a frightened",
+    "panic": "a panicking",
+    "shock": "a shocked, stunned",
+    "irritation": "an irritated",
+}
+_STYLE_PACE = {"slow": "slow", "normal": "steady", "fast": "fast", "very_fast": "very fast, rushed"}
+_STYLE_VOLUME = {"whisper": "whispering", "low": "quiet", "normal": "", "loud": "loud"}
+_STYLE_BREATH = {"calm": "", "tense": "tense", "rapid": "breathless", "irregular": "gasping, voice breaking"}
+STAFF_STYLE = "a calm, professional emergency service officer, steady and clear"  # старший группы, служба
+
+
+def speech_style(tone: ToneSnapshot) -> str:
+    """«a panicking caller to the 112 emergency line: very fast, rushed, loud, gasping, voice breaking»."""
+    parts = [_STYLE_PACE.get(tone.pace, ""), _STYLE_VOLUME.get(tone.volume, ""), _STYLE_BREATH.get(tone.breathing, "")]
+    who = _STYLE_EMOTION.get(tone.emotion, "a worried")
+    return f"{who} caller to the 112 emergency line: " + ", ".join(p for p in parts if p)
+
+
+def speech_speed(tone: ToneSnapshot) -> float:
+    return SPEED.get(tone.pace, 1.0)

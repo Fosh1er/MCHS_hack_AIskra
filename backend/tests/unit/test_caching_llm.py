@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from aiskra.ai.adapters.caching import CachingLLM, CachingTTS
 from aiskra.ai.adapters.fake import FakeLLM
 from aiskra.ai.adapters.speech import FakeTTS
-from aiskra.ai.ports import CacheDirective, ChatMessage, LLMParams, LLMResult, VoiceProfile
+from aiskra.ai.ports import AudioBlob, CacheDirective, ChatMessage, LLMParams, LLMResult, VoiceProfile
 from aiskra.shared.cache import InMemoryTTLCache
 from aiskra.shared.errors import ExternalServiceError
 
@@ -100,7 +100,46 @@ async def test_schema_is_reparsed_on_cache_hit() -> None:
 
 async def test_tts_cache() -> None:
     inner = FakeTTS()
-    tts = CachingTTS(inner, InMemoryTTLCache(), ttl_s=60)
+    tts = CachingTTS(inner, max_bytes=1_000_000, ttl_s=60)
     a = await tts.synthesize("Бригада выехала", voice=VoiceProfile())
     b = await tts.synthesize("Бригада  выехала", voice=VoiceProfile())
     assert inner.calls == 1 and b.cached and a.content == b.content
+    await tts.synthesize("Бригада выехала", voice=VoiceProfile(style="panicked"))  # другая подача — другой звук
+    assert inner.calls == 2
+
+
+class SlowTTS:
+    """Синтез по 100 байт, с паузой — чтобы одновременные запросы встретились."""
+
+    enabled = True
+    model_id = "slow"
+
+    def __init__(self) -> None:
+        self.calls = 0
+
+    async def synthesize(self, text: str, *, voice: VoiceProfile) -> AudioBlob:
+        self.calls += 1
+        await asyncio.sleep(0.01)
+        return AudioBlob(content=b"x" * 100, mime="audio/wav")
+
+
+async def test_tts_cache_bounded_by_bytes() -> None:
+    """П. 3.6: аудио тяжёлое — лимит кеша в байтах, давно не звучавшее вытесняется."""
+    inner = SlowTTS()
+    tts = CachingTTS(inner, max_bytes=250, ttl_s=60)
+    for phrase in ("один", "два", "три"):
+        await tts.synthesize(phrase, voice=VoiceProfile())
+    assert tts.size_bytes == 200 and inner.calls == 3  # «один» вытеснен
+    assert (await tts.synthesize("три", voice=VoiceProfile())).cached
+    assert not (await tts.synthesize("один", voice=VoiceProfile())).cached and inner.calls == 4
+
+
+async def test_tts_cache_single_flight_and_ttl() -> None:
+    inner = SlowTTS()
+    now = [0.0]
+    tts = CachingTTS(inner, max_bytes=10_000, ttl_s=60, clock=lambda: now[0])
+    await asyncio.gather(*(tts.synthesize("Алло", voice=VoiceProfile()) for _ in range(3)))
+    assert inner.calls == 1  # одновременные запросы одной реплики — один синтез
+    now[0] = 61
+    await tts.synthesize("Алло", voice=VoiceProfile())
+    assert inner.calls == 2 and tts.size_bytes == 100  # просроченная запись заменена, не задвоена

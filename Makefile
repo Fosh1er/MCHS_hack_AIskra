@@ -1,5 +1,5 @@
 # Частые команды. Бэкенд: uv (Python 3.12), фронтенд: npm workspaces (Node 22).
-.PHONY: up down logs be-install be-test be-lint be-check fe-install fe-dev fe-dev-lan dev-cert fe-build check import-classifier demo-seed demo-seed-docker
+.PHONY: up down logs be-install be-test be-lint be-check fe-install fe-dev fe-dev-lan dev-cert dev-tts fe-build check import-classifier demo-seed demo-seed-docker
 
 up:            ; docker compose up --build -d
 down:          ; docker compose down
@@ -22,5 +22,7 @@ dev-cert:
 	  -addext "subjectAltName=DNS:localhost,IP:127.0.0.1$${IP:+,IP:$$IP}" 2>/dev/null && \
 	echo "Сертификат для localhost и $$IP — .cert/dev.crt (30 дней). Клиент: make fe-dev-lan → https://$$IP:5173"
 fe-dev-lan:    ; npm run dev -w frontend -- --host
+# п. 3.6: серверная озвучка на macOS без ключей и Docker — голос системы (say); сервер: TTS_KIND=openai_compatible TTS_URL=http://localhost:8100/v1 TTS_FORMAT=wav
+dev-tts:       ; cd backend && uv run python tools/dev_tts_say.py
 fe-build:      ; npm run typecheck && npm run build
 check: be-check fe-build

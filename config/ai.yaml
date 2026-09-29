@@ -17,7 +17,28 @@ ai:
     service_actor:       {provider: fake, temperature: 0.6, cache: task,  cache_ttl: 1d}
     judge:               {provider: fake, temperature: 0,   cache: exact, cache_ttl: 7d}
     insights:            {provider: fake, temperature: 0.3, cache: off}
-  tts: {kind: fake, cache_ttl: 30d}
+  # Голос собеседника (п. 3.6): серверный синтез за OpenAI-совместимым /audio/speech. Выключен, пока TTS_KIND не задан, —
+  # тогда реплики озвучивает браузер (темп, высота, громкость по состоянию заявителя).
+  # Изолированный контур: Speaches с Piper на CPU (speaches-ai/piper-ru_RU-irina|denis|dmitri|ruslan-medium), TTS_STYLE=none —
+  # эмоция передаётся только темпом. Демо с эмоциональным голосом — config/ai.openrouter.yaml.
+  # Проверка на macOS без ключей и Docker: make dev-tts (голос системы), TTS_KIND=openai_compatible TTS_URL=http://localhost:8100/v1
+  tts:
+    kind: ${TTS_KIND:-fake}          # openai_compatible — включить
+    base_url: ${TTS_URL:-http://speaches:8000/v1}
+    api_key_env: TTS_API_KEY         # для локального сервера не нужен
+    model: ${TTS_MODEL:-speaches-ai/piper-ru_RU-irina-medium}
+    style: ${TTS_STYLE:-none}        # google | openai | none
+    response_format: ${TTS_FORMAT:-mp3}
+    voice: ${TTS_VOICE:-}            # голос по умолчанию; роли ниже без имени получают его
+    voices:
+      applicant_female: ${TTS_VOICE_FEMALE:-}
+      applicant_male: ${TTS_VOICE_MALE:-}
+      brigade: ${TTS_VOICE_BRIGADE:-}
+      service: ${TTS_VOICE_SERVICE:-}
+    cache_ttl: 30d
+    cache_mb: 64                     # лимит кеша аудио в памяти процесса
+    max_concurrency: 2
+    timeout_s: 20
   # Голосовой ввод оператора (Whisper за OpenAI-совместимым /audio/transcriptions). Выключен, пока STT_KIND не задан.
   # Локально (GPU/CPU): Speaches — docs/ai/Голосовой_ввод.md; STT_URL=http://<машина с GPU>:8000/v1
   stt:

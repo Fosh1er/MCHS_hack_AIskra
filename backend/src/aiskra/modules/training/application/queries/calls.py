@@ -41,7 +41,7 @@ class CallView:
     tone: ToneSnapshot | None = None  # текущее состояние заявителя (п. 3.6); у старшего группы и службы — нет
 
 
-def _visible(call: Call | None, actor: Principal) -> bool:
+def call_visible(call: Call | None, actor: Principal) -> bool:
     return call is not None and (call.student_id == actor.user_id or actor.can(Permission.RESULTS_READ_ALL))
 
 
@@ -77,7 +77,7 @@ class GetCallHandler:
 
     async def __call__(self, q: GetCall) -> CallView:
         call = await self._repo.get(q.call_id)
-        if call is None or not _visible(call, q.actor):
+        if call is None or not call_visible(call, q.actor):
             raise NotFoundError("Звонок не найден", code="call_not_found")
         return await _view(self._repo, call)
 

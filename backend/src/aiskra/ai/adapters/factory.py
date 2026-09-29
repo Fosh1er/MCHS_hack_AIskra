@@ -5,7 +5,7 @@ from __future__ import annotations
 from aiskra.ai.adapters.caching import CachingLLM, CachingTTS
 from aiskra.ai.adapters.fake import FakeLLM
 from aiskra.ai.adapters.openai_compatible import OpenAICompatibleLLM
-from aiskra.ai.adapters.speech import FakeSTT, FakeTTS, OpenAICompatibleSTT
+from aiskra.ai.adapters.speech import FakeSTT, FakeTTS, OpenAICompatibleSTT, OpenAICompatibleTTS
 from aiskra.ai.config import AIConfig, ProviderConfig
 from aiskra.ai.ports import LLMPort, STTPort, TTSPort
 from aiskra.ai.router import ModelRouter, TaskProfile
@@ -46,8 +46,25 @@ def build_router(cfg: AIConfig, cache: CachePort) -> ModelRouter:
     return ModelRouter(profiles=profiles, clients=clients, default_provider=cfg.default_provider)
 
 
-def build_tts(cfg: AIConfig, cache: CachePort) -> TTSPort:
-    return CachingTTS(FakeTTS(), cache, ttl_s=cfg.tts.cache_ttl)
+def build_tts(cfg: AIConfig) -> TTSPort:
+    """Синтез речи собеседника (п. 3.6). `fake` — выключен: озвучивает браузер."""
+    t = cfg.tts
+    if t.kind == "openai_compatible" and t.base_url:
+        inner: TTSPort = OpenAICompatibleTTS(
+            base_url=t.base_url,
+            model=t.model,
+            api_key_env=t.api_key_env,
+            voice=t.voice,
+            voices=t.voices,
+            style=t.style,
+            response_format=t.response_format,
+            pcm_rate=t.pcm_rate,
+            timeout_s=t.timeout_s,
+            max_concurrency=t.max_concurrency,
+        )
+    else:
+        inner = FakeTTS()
+    return CachingTTS(inner, max_bytes=t.cache_mb * 1024 * 1024, ttl_s=t.cache_ttl)
 
 
 def build_stt(cfg: AIConfig) -> STTPort:

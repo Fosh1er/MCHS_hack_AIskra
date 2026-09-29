@@ -92,3 +92,25 @@ def test_brigade_reports_by_status() -> None:
     assert "Выезжаем" in brigade_reply({"service_status": "accepted", "order_no": "23"}, "Алло")
     assert "наряд 23" in brigade_reply({"service_status": "accepted", "order_no": "23"}, "Алло")
     assert "Прибыли" in brigade_reply({"service_status": "arrived"}, "Как обстановка?")
+
+
+def test_legend_has_voice() -> None:
+    """П. 3.6: генератор сам задаёт голос синтетического заявителя вместе с именем — для озвучки."""
+    voices = set()
+    for seed in range(20):
+        s = build_scenario(
+            incident=FIRE,
+            address=ADDR,
+            services=SERVICES,
+            story={},
+            flags=[],
+            difficulty=2,
+            rng=random.Random(seed),
+            source="template",
+            author_id=None,
+        )
+        applicant = s.legend["applicant"]
+        first = applicant["name"].split()[-1]
+        assert applicant["voice"] == ("female" if first.endswith(("а", "я")) else "male")
+        voices.add(applicant["voice"])
+    assert voices == {"female", "male"}

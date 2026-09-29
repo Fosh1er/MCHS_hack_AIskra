@@ -179,11 +179,9 @@ def test_analytics_is_teacher_only(app_client: Callable[[], TestClient], lesson:
 def test_speech_input_endpoint(app_client: Callable[[], TestClient]) -> None:
     """Голосовой ввод (п. 1.4): без модели речи — выключен и честно отказывает; с моделью — текст реплики."""
     from aiskra.ai.ports import Transcript
-    from aiskra.modules.training.api import deps as training_deps
-    from aiskra.modules.training.application.speech import TranscribeHandler
 
     student = as_user(app_client, "student")
-    assert student.get("/api/v1/training/speech").json() == {"enabled": False}
+    assert student.get("/api/v1/training/speech").json() == {"enabled": False, "tts": False}
     r = student.post("/api/v1/training/speech", files={"audio": ("a.webm", b"x", "audio/webm")})
     assert r.status_code == 422 and r.json()["error"] == "stt_disabled"
 
@@ -195,9 +193,10 @@ def test_speech_input_endpoint(app_client: Callable[[], TestClient]) -> None:
             return Transcript(text="Что у вас случилось?")
 
     app = student.app
-    app.dependency_overrides[training_deps.provide_transcribe] = lambda: TranscribeHandler(Whisper())  # type: ignore[attr-defined]
+    services = app.state.services  # type: ignore[attr-defined]
+    real, services.stt = services.stt, Whisper()
     try:
-        assert student.get("/api/v1/training/speech").json() == {"enabled": True}
+        assert student.get("/api/v1/training/speech").json() == {"enabled": True, "tts": False}
         r = student.post("/api/v1/training/speech", files={"audio": ("a.webm", b"\x1aE", "audio/webm;codecs=opus")})
         assert r.status_code == 200 and r.json() == {"text": "Что у вас случилось?"}
         teacherless = TestClient(app)  # без входа — 401
@@ -206,4 +205,4 @@ def test_speech_input_endpoint(app_client: Callable[[], TestClient]) -> None:
             == 401
         )
     finally:
-        del app.dependency_overrides[training_deps.provide_transcribe]  # type: ignore[attr-defined]
+        services.stt = real

@@ -10,8 +10,9 @@ CachingLLM реализует тот же LLMPort и оборачивает лю
 
 from __future__ import annotations
 
-import base64
 import time
+from collections import OrderedDict
+from collections.abc import Callable
 
 from pydantic import BaseModel
 
@@ -134,18 +135,50 @@ class CachingLLM:
 
 
 class CachingTTS:
-    """Синтез речи — самая дорогая операция на CPU: одинаковая фраза тем же голосом синтезируется один раз."""
+    """Синтез речи — самая дорогая операция на CPU и платная во внешнем API: одинаковая фраза тем же голосом
+    и с той же подачей синтезируется один раз.
 
-    def __init__(self, inner: TTSPort, cache: CachePort, *, ttl_s: int) -> None:
+    Кеш свой, не общий `CachePort`: аудио — 50–150 КБ на фразу, а общий кеш ограничен числом записей (20 000)
+    — это гигабайты на сервере с 8 ГБ. Здесь лимит — в байтах, вытесняется давно не звучавшее (п. 3.6)."""
+
+    def __init__(
+        self, inner: TTSPort, *, max_bytes: int, ttl_s: int, clock: Callable[[], float] = time.monotonic
+    ) -> None:
         self._inner = inner
-        self._cache = cache
-        self._ttl = ttl_s
+        self._max, self._ttl, self._clock = max_bytes, ttl_s, clock
+        self._items: OrderedDict[str, tuple[float, AudioBlob]] = OrderedDict()
+        self._bytes = 0
+        self._flight = SingleFlight()
+
+    @property
+    def enabled(self) -> bool:
+        return self._inner.enabled
+
+    @property
+    def model_id(self) -> str:
+        return self._inner.model_id
+
+    @property
+    def size_bytes(self) -> int:
+        return self._bytes
+
+    def _drop(self, key: str) -> None:
+        _, blob = self._items.pop(key)
+        self._bytes -= len(blob.content)
 
     async def synthesize(self, text: str, *, voice: VoiceProfile) -> AudioBlob:
-        key = make_key("tts", normalize_strict(text), voice.voice, voice.speed, voice.emotion)
-        hit = await self._cache.get(key)
+        key = make_key("tts", normalize_strict(text), voice.voice, voice.speed, voice.emotion, voice.style)
+        hit = self._items.get(key)
         if hit is not None:
-            return AudioBlob(content=base64.b64decode(str(hit["b64"])), mime=str(hit["mime"]), cached=True)
-        blob = await self._inner.synthesize(text, voice=voice)
-        await self._cache.set(key, {"b64": base64.b64encode(blob.content).decode(), "mime": blob.mime}, ttl_s=self._ttl)
+            if hit[0] > self._clock():
+                self._items.move_to_end(key)
+                return AudioBlob(content=hit[1].content, mime=hit[1].mime, cached=True)
+            self._drop(key)
+        blob, _ = await self._flight.run(key, lambda: self._inner.synthesize(text, voice=voice))
+        size = len(blob.content)
+        if size <= self._max and key not in self._items:
+            self._items[key] = (self._clock() + self._ttl, blob)
+            self._bytes += size
+            while self._bytes > self._max:
+                self._drop(next(iter(self._items)))
         return blob
