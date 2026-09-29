@@ -3556,7 +3556,7 @@
     "tags": [
      "training"
     ],
-    "summary": "Доступен ли голосовой ввод (модель речи настроена)",
+    "summary": "Что из речи настроено: распознавание и синтез",
     "operationId": "speech_status_api_v1_training_speech_get",
     "responses": {
      "200": {
@@ -3682,6 +3682,56 @@
          "$ref": "#/components/schemas/CallView"
         }
        }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/training/calls/{call_id}/messages/{message_id}/audio": {
+   "get": {
+    "tags": [
+     "training"
+    ],
+    "summary": "Звук реплики собеседника: серверный синтез с подачей по состоянию заявителя (п. 3.6)",
+    "operationId": "replica_audio_api_v1_training_calls__call_id__messages__message_id__audio_get",
+    "parameters": [
+     {
+      "name": "call_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Call Id"
+      }
+     },
+     {
+      "name": "message_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Message Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Звук реплики",
+      "content": {
+       "audio/mpeg": {},
+       "audio/wav": {}
       }
      },
      "422": {
@@ -11434,7 +11484,14 @@
     "properties": {
      "enabled": {
       "type": "boolean",
-      "title": "Enabled"
+      "title": "Enabled",
+      "description": "Голосовой ввод: модель распознавания настроена"
+     },
+     "tts": {
+      "type": "boolean",
+      "title": "Tts",
+      "description": "Серверный синтез голоса собеседника; нет — озвучивает браузер",
+      "default": false
      }
     },
     "type": "object",
