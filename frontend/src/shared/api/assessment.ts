@@ -91,6 +91,7 @@ export interface ProgressView {
 export const useSessionReport = (id: string) =>
   useQuery({ queryKey: ['report', id], queryFn: () => http<SessionReport>(`${A}/sessions/${id}/report`) });
 export const reportCsvUrl = (id: string) => `${A}/sessions/${id}/report.csv`;
+export const reportXlsxUrl = (id: string) => `${A}/sessions/${id}/report.xlsx`;
 
 export function useEvaluateSession(id: string) {
   const qc = useQueryClient();

@@ -10,7 +10,8 @@ import json
 import logging
 import random
 from collections.abc import Mapping
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
+from datetime import UTC, datetime
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -24,6 +25,7 @@ from aiskra.modules.training.application.ports.psy import PsyCatalog
 from aiskra.modules.training.application.ports.scenarios import ScenarioFactsSource, ScenarioRepository
 from aiskra.modules.training.domain.review import accept_all
 from aiskra.modules.training.domain.scenario import FLAG_FACTS, Scenario, ScenarioStatus, build_scenario, offline_story
+from aiskra.modules.training.domain.spelling import Remark, check_legend
 from aiskra.shared.application import Command, UnitOfWork
 from aiskra.shared.audit import AuditEntry, AuditEvent, AuditRecorder, RequestMeta
 from aiskra.shared.errors import DomainError, ExternalServiceError, NotFoundError
@@ -221,6 +223,29 @@ class EditScenario(Command):
     meta: RequestMeta = field(default_factory=RequestMeta)
 
 
+class GrammarRemarkOut(BaseModel):
+    quote: str = Field(max_length=200)
+    fix: str = Field(max_length=200)
+
+
+class GrammarOut(BaseModel):
+    errors: list[GrammarRemarkOut] = Field(default_factory=list, max_length=8)
+
+
+GRAMMAR_PROMPT = (
+    "Ты корректор русского языка. Найди орфографические, пунктуационные и грамматические ошибки в тексте легенды "
+    'учебного вызова 112 (разговорная речь заявителя допустима). Верни JSON {"errors": [{"quote": фрагмент с '
+    'ошибкой, "fix": исправление}]}; ошибок нет — пустой список.'
+)
+
+
+@dataclass(frozen=True)
+class EditResult:
+    status: str
+    grammar: list[Remark]
+    checked_by: str  # rules | rules+model
+
+
 class EditScenarioHandler:
     def __init__(self, repo: ScenarioRepository, router: ModelRouter, audit: AuditRecorder, uow: UnitOfWork) -> None:
         self._repo = repo
@@ -256,7 +281,7 @@ class EditScenarioHandler:
         story = result.parsed if isinstance(result.parsed, StoryOut) else StoryOut.model_validate_json(result.text)
         s.legend.update(what=story.description, opening=story.opening, details=story.details)
 
-    async def __call__(self, cmd: EditScenario) -> str:
+    async def __call__(self, cmd: EditScenario) -> EditResult:
         s = await self._repo.get(cmd.scenario_id)
         if s is None:
             raise NotFoundError("Сценарий не найден", code="scenario_not_found")
@@ -275,6 +300,12 @@ class EditScenarioHandler:
                 s.legend[key] = " ".join(value.split())[:600]
         if cmd.comment and cmd.comment.strip():
             await self._regenerate(s, cmd.comment.strip())
+        remarks, by = await self._check_grammar(s)
+        s.legend["grammar_check"] = {
+            "at": datetime.now(UTC).isoformat(),
+            "by": by,
+            "remarks": [asdict(r) for r in remarks],
+        }
         s.status = ScenarioStatus.DRAFT
         s.approved_by = None
         try:
@@ -293,7 +324,30 @@ class EditScenarioHandler:
         except Exception:
             await self._uow.rollback()
             raise
-        return s.status.value
+        return EditResult(status=s.status.value, grammar=remarks, checked_by=by)
+
+    async def _check_grammar(self, s: Scenario) -> tuple[list[Remark], str]:
+        """П. 3.6: после каждой ручной правки — правила всегда, модель — если подключена (сбой модели не мешает)."""
+        fields = {"title": s.title, **{k: str(s.legend.get(k) or "") for k in ("opening", "what", "details")}}
+        remarks = check_legend(fields)
+        model = self._router.for_task(AITask.JUDGE)
+        if model.provider_name == "fake":
+            return remarks, "rules"
+        text = "\n".join(f"{k}: {v}" for k, v in fields.items() if v)
+        try:
+            result = await model.complete(
+                [ChatMessage(role="system", content=GRAMMAR_PROMPT), ChatMessage(role="user", content=text)],
+                schema=GrammarOut,
+            )
+            out = (
+                result.parsed if isinstance(result.parsed, GrammarOut) else GrammarOut.model_validate_json(result.text)
+            )
+        except Exception:
+            logging.getLogger(__name__).warning("проверка грамотности моделью не выполнена", exc_info=True)
+            return remarks, "rules"
+        seen = {r.quote for r in remarks}
+        remarks += [Remark("текст", e.quote, e.fix, "ИИ-проверка") for e in out.errors if e.quote not in seen]
+        return remarks, "rules+model"
 
 
 @dataclass(frozen=True, kw_only=True)

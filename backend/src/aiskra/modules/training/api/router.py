@@ -425,16 +425,36 @@ async def card_calls(
     return await handler(CardCalls(actor=actor, card_id=card_id))
 
 
-@router.patch("/scenarios/{scenario_id}", response_model=StatusOut, summary="Правка сценария (возвращает в черновики)")
+class GrammarRemark(BaseModel):
+    field: str
+    quote: str
+    fix: str
+    rule: str
+
+
+class EditScenarioOut(BaseModel):
+    status: str
+    grammar: list[GrammarRemark] = Field(default_factory=list, description="Замечания проверки грамотности (п. 3.6)")
+    checked_by: str = Field(description="rules — правила; rules+model — правила и модель")
+
+
+@router.patch(
+    "/scenarios/{scenario_id}",
+    response_model=EditScenarioOut,
+    summary="Правка сценария (возвращает в черновики) с проверкой грамотности",
+)
 async def edit_scenario(
     scenario_id: UUID,
     body: EditScenarioIn,
     actor: Manager,
     meta: Meta,
     handler: Annotated[EditScenarioHandler, Depends(deps.provide_edit_scenario)],
-) -> StatusOut:
-    return StatusOut(
-        status=await handler(EditScenario(actor=actor, scenario_id=scenario_id, meta=meta, **body.model_dump()))
+) -> EditScenarioOut:
+    r = await handler(EditScenario(actor=actor, scenario_id=scenario_id, meta=meta, **body.model_dump()))
+    return EditScenarioOut(
+        status=r.status,
+        grammar=[GrammarRemark(field=g.field, quote=g.quote, fix=g.fix, rule=g.rule) for g in r.grammar],
+        checked_by=r.checked_by,
     )
 
 

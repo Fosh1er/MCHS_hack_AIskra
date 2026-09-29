@@ -8,9 +8,11 @@
 
 from __future__ import annotations
 
+import asyncio
+import logging
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any
 
 from fastapi import Depends, FastAPI, Request
@@ -126,6 +128,7 @@ from aiskra.modules.incidents.infrastructure.repositories import SqlCardReposito
 from aiskra.modules.system.api import deps as system_deps
 from aiskra.modules.system.application.commands.backups import (
     CreateBackupHandler,
+    DailyBackupJob,
     ListBackupsHandler,
     RestoreBackupHandler,
 )
@@ -868,6 +871,24 @@ def _wire_admin(app: FastAPI, services: Services) -> None:
     ov[system_deps.provide_backup_file] = lambda: backups
     ov[system_deps.provide_status] = lambda: GetStatusHandler(status)
     ov[system_deps.provide_logs] = lambda: RecentLogsHandler(logs)
+
+
+async def daily_backup_loop(services: Services, period_s: float = 60.0) -> None:
+    """Встроенный ежедневный запуск резервного копирования (п. 10.5): раз в минуту — «не пора ли?»."""
+    log = logging.getLogger("aiskra.backup")
+    backups = FileBackupStore(services.engine, services.settings.backup_dir)
+    while True:
+        await asyncio.sleep(period_s)
+        try:
+            async with services.session_factory() as session:
+                job = DailyBackupJob(
+                    backups, SqlSettingsStore(session), IsolatedAuditRecorder(services.session_factory)
+                )
+                info = await job.tick(datetime.now(UTC))
+            if info:
+                log.info("ежедневная резервная копия %s: таблиц %s, строк %s", info.name, info.tables, info.rows)
+        except Exception:  # сбой копии не должен останавливать приложение — он виден в логе и состоянии сервисов
+            log.exception("ежедневная резервная копия не создана")
 
 
 def wire(app: FastAPI, services: Services) -> None:

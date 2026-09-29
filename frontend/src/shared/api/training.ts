@@ -130,8 +130,10 @@ export const usePsyProfiles = () =>
 export const useSetScenarioPsy = () =>
   useInvalidating(({ id, profile }: { id: string; profile: string | null }) => post<{ status: string }>(`/scenarios/${id}/psy`, { profile }),
     [['scenarios'], ['scenario']]);
+export interface GrammarRemark { field: string; quote: string; fix: string; rule: string }
+export interface EditScenarioResult { status: string; grammar: GrammarRemark[]; checked_by: 'rules' | 'rules+model' }
 export const useEditScenario = () =>
-  useInvalidating(({ id, ...b }: ScenarioEdit & { id: string }) => http<{ status: string }>(`${T}/scenarios/${id}`, { method: 'PATCH', body: JSON.stringify(b) }),
+  useInvalidating(({ id, ...b }: ScenarioEdit & { id: string }) => http<EditScenarioResult>(`${T}/scenarios/${id}`, { method: 'PATCH', body: JSON.stringify(b) }),
     [['scenarios'], ['scenario'], ['scenario-preview']]);
 
 // ------------------------------------------------------------------ п. 4.2: занятия

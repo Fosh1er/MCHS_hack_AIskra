@@ -5,6 +5,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from aiskra.modules.system.application.ports.admin import BackupInfo, BackupStore, SettingsStore
 from aiskra.shared.application import Command, Query
@@ -17,7 +19,7 @@ RESTORE_CONFIRM = "ВОССТАНОВИТЬ"
 
 @dataclass(frozen=True, kw_only=True)
 class CreateBackup(Command):
-    actor: Principal
+    actor: Principal | None  # None — встроенный планировщик (п. 10.5)
     meta: RequestMeta = field(default_factory=RequestMeta)
 
 
@@ -93,3 +95,31 @@ class ListBackupsHandler:
 
     async def __call__(self, q: ListBackups) -> list[BackupInfo]:
         return self._store.list()
+
+
+MSK = ZoneInfo("Europe/Moscow")
+
+
+def backup_due(now: datetime, daily_hour: int, last: datetime | None) -> bool:
+    """Пора ли ежедневной копии (п. 10.5): наступил час по МСК, а сегодня (МСК) копии ещё не было."""
+    local = now.astimezone(MSK)
+    if local.hour < daily_hour:
+        return False
+    return last is None or last.astimezone(MSK).date() < local.date()
+
+
+class DailyBackupJob:
+    """Встроенный ежедневный запуск резервного копирования вместо cron (п. 10.5): вызывается раз в минуту."""
+
+    def __init__(self, store: BackupStore, settings: SettingsStore, audit: AuditRecorder) -> None:
+        self._store, self._settings = store, settings
+        self._create = CreateBackupHandler(store, settings, audit)
+
+    async def tick(self, now: datetime) -> BackupInfo | None:
+        cfg = await self._settings.get("backup") or {}
+        if not int(cfg.get("auto", 1)):
+            return None
+        last = max((b.created_at for b in self._store.list()), default=None)
+        if not backup_due(now, int(cfg.get("daily_hour", 3)), last):
+            return None
+        return await self._create(CreateBackup(actor=None))
