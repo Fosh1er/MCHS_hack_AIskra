@@ -160,7 +160,7 @@ function CardEditor({ view, editable, me }: { view: CardView; editable: boolean;
 
   // --- службы: автоподбор по классификатору, признакам и адресу + ручные правки
   const flags = cardFlags(state);
-  const resolved = useResolvedServices(incidentTypes, flags, state.address.okrug, state.address.district);
+  const resolved = useResolvedServices(incidentTypes, flags, state.address.okrug, state.address.district, state.address.object);
   const auto = editable && incidentTypes.length ? resolved.data?.services ?? [] : [];
   const panel = panelServices(auto, state, serviceCatalog);
   // порядок служб — как на панели в момент сохранения (data.services), основная — первой

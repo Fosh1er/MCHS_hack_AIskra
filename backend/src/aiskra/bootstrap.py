@@ -80,6 +80,7 @@ from aiskra.modules.dictionaries.application.queries.resolve_services import Res
 from aiskra.modules.dictionaries.infrastructure.addresses import FileAddressSource, SqlAddressReader, SqlAddressWriter
 from aiskra.modules.dictionaries.infrastructure.reader import SqlDictionaryReader
 from aiskra.modules.dictionaries.infrastructure.sources import XlsxClassifierSource, YamlCuratedSource
+from aiskra.modules.dictionaries.infrastructure.subordination import load_subordination
 from aiskra.modules.dictionaries.infrastructure.writer import SqlDictionaryWriter
 from aiskra.modules.identity.api import deps as identity_deps
 from aiskra.modules.identity.api.cookies import SessionCookie
@@ -916,7 +917,12 @@ def wire(app: FastAPI, services: Services) -> None:
     ov[dict_deps.provide_list_groups] = _dict_query(ListGroupsHandler)
     ov[dict_deps.provide_list_territory] = _dict_query(ListTerritoryHandler)
     ov[dict_deps.provide_list_enum] = _dict_query(ListEnumHandler)
-    ov[dict_deps.provide_resolve_services] = _dict_query(ResolveServicesHandler)
+    subordination = load_subordination(str(services.settings.dictionaries_dir / "subordination.yaml"))
+
+    def resolve_factory(session: Session) -> ResolveServicesHandler:
+        return ResolveServicesHandler(SqlDictionaryReader(session), subordination)
+
+    ov[dict_deps.provide_resolve_services] = resolve_factory
 
     # --- адресный справочник и карта (п. 1.2)
     def import_addresses_factory(session: Session) -> ImportAddressesHandler:
