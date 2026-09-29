@@ -28,7 +28,10 @@ def test_matrix_covers_every_requirement(build) -> None:
     assert all(status in build.STATUS_WORDS for _, status, _ in build.MATRIX.values())
     md = build.matrix_md()
     assert md.startswith("Итог: реализовано")
-    assert md.count("\n| ") == 84  # заголовок + 83 строки
+    # в матрице — обязательные требования и реализованные желательные и возможные
+    shown = [r for r, _, p in build.requirements() if not (p[:1] in ("S", "C") and build.MATRIX[r][1] in ("🟡", "⏳"))]
+    assert md.count("\n| ") == len(shown) + 1  # заголовок + строки
+    assert all(f"\n| {r} |" in md for r, _, p in build.requirements() if p.startswith("M"))
 
 
 def test_api_table_lists_every_operation(build) -> None:
