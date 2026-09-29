@@ -29,8 +29,10 @@ function Tiles({ data, now }: { data: MonitorView; now: number }) {
         const norm = p.role === '112' ? st.norm_112 : st.norm_dds;
         const running = data.session.status === 'running';
         const state: TileState = !running ? 'offline' : since === null ? 'idle' : normStatus(since, norm);
+        // п. 3.6: в идущем звонке видно, как оператор ведёт заявителя — эмоция и напряжение 0–10
+        const caller = g.caller_emotion && g.caller_tension != null ? ` · заявитель: ${g.caller_emotion}, ${g.caller_tension}/10` : '';
         const label = g.current_card
-          ? `№ ${g.current_card}${g.current_label ? ` · ${g.current_label}` : ''}`
+          ? `№ ${g.current_card}${g.current_label ? ` · ${g.current_label}` : ''}${caller}`
           : p.role === '112' ? 'ждёт вызов' : 'очередь пуста';
         return (
           <StudentTile key={p.student_id} name={p.full_name} initials={initials(p.full_name)}

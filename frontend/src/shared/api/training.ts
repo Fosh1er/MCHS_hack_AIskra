@@ -104,6 +104,7 @@ export interface StudentRow { id: string; login: string; full_name: string; oper
 export interface ParticipantProgress {
   student_id: string; cards_done: number; current_card: number | null; current_label: string; current_since: string | null;
   waiting: number; avg_score: number | null; errors: number; last_errors: string[];
+  caller_emotion?: string; caller_tension?: number | null; // заявитель в идущем звонке (п. 3.6)
 }
 export interface MonitorView { session: SessionView; rows: { participant: Participant; progress: ParticipantProgress }[] }
 export interface MySession {

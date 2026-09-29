@@ -4,6 +4,7 @@ import { Fragment, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Banner, Button, Card, Icon, LineChart, StatTile, StatusPill } from '@smena112/ui-kit';
 import { reportCsvUrl, useEvaluateSession, useOverride, useSessionReport, type CardResult, type SessionReport } from '../../shared/api/assessment';
+import { CallReview } from '../../shared/ui/CallReview';
 import { TeacherShell } from '../../shared/ui/TeacherShell';
 import { num } from '../../shared/format';
 
@@ -32,6 +33,7 @@ function OverrideForm({ card, sessionId, threshold, onClose }: { card: CardResul
 function StudentsTable({ r }: { r: SessionReport }) {
   const [open, setOpen] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
+  const [talk, setTalk] = useState<string | null>(null); // разбор разговора с заявителем (п. 3.6)
   const [all, setAll] = useState(false);
   useEffect(() => { // в PDF — все карточки раскрыты
     const on = () => setAll(true);
@@ -76,10 +78,12 @@ function StudentsTable({ r }: { r: SessionReport }) {
                         ? <StatusPill status={c.passed ? 'ok' : 'critical'}>{num(c.score)} {c.expert ? '· эксперт' : ''}</StatusPill>
                         : <StatusPill status="neutral">не оценена</StatusPill>}
                       {c.assessment_id && <Button size="sm" variant="ghost" icon="edit" onClick={() => setEditing(editing === c.card_id ? null : c.card_id)}>правка</Button>}
+                      {s.role === '112' && <Button size="sm" variant="ghost" icon="phone" aria-expanded={talk === c.card_id} onClick={() => setTalk(talk === c.card_id ? null : c.card_id)}>разговор</Button>}
                     </div>
                     {c.expert_comment && <div className="tch-expert">Эксперт: {c.expert_comment}</div>}
                     {c.errors.length > 0 && <ul className="tch-errors">{c.errors.map((e) => <li key={e}>{e}</li>)}</ul>}
                     {editing === c.card_id && <OverrideForm card={c} sessionId={r.session_id} threshold={threshold} onClose={() => setEditing(null)} />}
+                    {talk === c.card_id && <CallReview cardId={c.card_id} />}
                   </td>
                 </tr>
               ))}

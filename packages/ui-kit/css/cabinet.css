@@ -499,6 +499,16 @@
 .tch-details { margin-top: 10px; }
 .tch-details summary { cursor: pointer; font-size: var(--fs-sm); color: var(--accent); }
 .tch-heat-parts { display: flex; flex-wrap: wrap; gap: 24px; }
+/* Разбор разговора с ИИ-заявителем (п. 3.6): напряжение по репликам и что его изменило */
+.call-review { margin-top: 8px; padding: 8px 10px; border: 1px solid var(--border); background: var(--c-white); font-size: var(--fs-sm); }
+.call-review__sum { margin-bottom: 6px; }
+.call-review__lines { display: grid; gap: 4px; margin: 8px 0 0; padding: 0; list-style: none; }
+.call-review__lines li { padding: 4px 8px; border-left: 3px solid var(--border); }
+.call-review__lines li.is-operator { border-left-color: var(--accent); }
+.call-review__who { display: block; font-size: var(--fs-xs); color: var(--text-muted); }
+.call-review__effect { display: inline-block; margin: 2px 0 0 8px; padding: 0 6px; font-size: var(--fs-xs); border: 1px solid var(--border); }
+.call-review__effect.is-calming { color: var(--s-ok); border-color: var(--s-ok); }
+.call-review__effect.is-invalidating, .call-review__effect.is-pressure { color: var(--s-critical); border-color: var(--s-critical); }
 .tch-expert { margin-top: 6px; padding: 4px 8px; font-size: var(--fs-sm); background: var(--c-blue-100); border-left: 3px solid var(--accent); }
 .tch-heat thead th { height: 160px; }
 .tch-heat thead th span { max-height: 160px; }
