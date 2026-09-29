@@ -1090,6 +1090,17 @@ body:has(.dds-editor) .ipphone > .arm-dock__section:not(.ipphone__screen) { disp
 .call-panel__talk.is-on { background: var(--s-critical); border-color: var(--s-critical); animation: call-talk-pulse 1.2s ease-in-out infinite; }
 @keyframes call-talk-pulse { 50% { opacity: .75; } }
 @media (prefers-reduced-motion: reduce) { .call-panel__talk.is-on { animation: none; } }
+/* Разговор без рук (п. 3.6): индикатор микрофона и чувствительность */
+.call-panel__switches { display: inline-flex; gap: 14px; align-items: center; }
+.call-panel__hf { display: flex; gap: 8px; align-items: center; min-height: 34px; margin-top: 6px; padding: 0 8px; border: 1px solid var(--border-strong, #5b6b7d); color: var(--text-inverse); font-size: var(--fs-xs); }
+.call-panel__hf-dot { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--text-inverse-muted); }
+.call-panel__hf.is-listening .call-panel__hf-dot { background: var(--s-ok); }
+.call-panel__hf.is-hearing .call-panel__hf-dot { background: var(--s-critical); animation: call-talk-pulse 1.2s ease-in-out infinite; }
+.call-panel__hf.is-party .call-panel__hf-dot, .call-panel__hf.is-calibrating .call-panel__hf-dot { background: var(--s-warn); }
+.call-panel__hf-text { flex: 1; min-width: 0; }
+.call-panel__hf-level { max-width: 118px; height: 24px; border: 1px solid var(--border-strong, #5b6b7d); background: transparent; color: var(--text-inverse); font-size: var(--fs-xs); }
+.call-panel__hf-level option { color: initial; }
+@media (prefers-reduced-motion: reduce) { .call-panel__hf.is-hearing .call-panel__hf-dot { animation: none; } }
 .call-panel__close { height: 32px; padding: 0 14px; border: 1px solid var(--c-mist-100); background: transparent; color: var(--text-inverse); cursor: pointer; }
 .arm-newcard--call { display: inline-flex; gap: 4px; align-items: center; background: var(--accent); }
 .arm-newcard:disabled { opacity: .6; cursor: default; }

@@ -2,7 +2,7 @@
  *  диаграммы; экспертная правка оценки с комментарием; выгрузка в Excel (CSV) и PDF (печать страницы). */
 import { Fragment, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { Banner, Button, Card, LineChart, StatTile, StatusPill } from '@smena112/ui-kit';
+import { Banner, Button, Card, Icon, LineChart, StatTile, StatusPill } from '@smena112/ui-kit';
 import { reportCsvUrl, useEvaluateSession, useOverride, useSessionReport, type CardResult, type SessionReport } from '../../shared/api/assessment';
 import { TeacherShell } from '../../shared/ui/TeacherShell';
 import { num } from '../../shared/format';
@@ -65,6 +65,11 @@ function StudentsTable({ r }: { r: SessionReport }) {
                       {c.processing_s !== null && (
                         <span className={c.deviation_s !== null && c.deviation_s > 0 ? 'c-red' : ''}>
                           {Math.round(c.processing_s)} с (норматив {c.norm_s}, {c.deviation_s !== null && c.deviation_s > 0 ? '+' : ''}{c.deviation_s})
+                        </span>
+                      )}
+                      {c.call_mode && c.call_mode !== 'text' && (
+                        <span title="В голосовом режиме во время заполнения входит речь заявителя">
+                          <Icon name="mic" size="sm" /> {c.call_mode === 'hands_free' ? 'голосом без рук' : 'голосом'}
                         </span>
                       )}
                       {c.score !== null

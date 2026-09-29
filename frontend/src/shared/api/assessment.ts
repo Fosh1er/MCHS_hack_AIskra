@@ -49,6 +49,7 @@ export const useInsights = (enabled: boolean) =>
 // ------------------------------------------------------------------ п. 4.3: отчёт по занятию
 export interface CardResult {
   card_id: string; card_number: number; card_types: string[]; processing_s: number | null; norm_s: number; deviation_s: number | null;
+  call_mode?: 'text' | 'voice' | 'hands_free' | null; // как вёл разговор оператор 112 (п. 3.6)
   assessment_id: string | null; score: number | null; passed: boolean | null; expert: boolean; expert_comment: string; errors: string[];
   criteria: Record<string, number | null>;
 }

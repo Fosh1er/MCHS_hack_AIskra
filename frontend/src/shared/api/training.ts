@@ -16,6 +16,7 @@ export interface CallView {
   id: string; role: string; party: 'applicant' | 'brigade' | 'service'; direction: 'in' | 'out'; status: string; aon: string;
   card_id: string | null; service_code: string | null; target_service: string | null;
   started_at: string; answered_at: string | null; ended_at: string | null; messages: CallMessage[]; tone?: Tone | null;
+  mode?: ReplicaVia; // как оператор вёл разговор: самый «голосовой» из способов его реплик
 }
 
 const T = '/api/v1/training';
@@ -23,7 +24,9 @@ const post = <R,>(path: string, body: unknown = {}) => http<R>(`${T}${path}`, { 
 
 export const startIncomingCall = (b: { groups?: number[]; difficulty?: number } = {}) => post<CallStarted>('/calls/incoming', b);
 export const answerCall = (id: string, cardId: string | null) => post<Replica | null>(`/calls/${id}/answer`, { card_id: cardId });
-export const sendReplica = (id: string, text: string) => post<Replica>(`/calls/${id}/replicas`, { text });
+/** Как оператор сказал реплику (п. 3.6): напечатал, кнопкой «говорить» или без рук — режим звонка видит отчёт. */
+export type ReplicaVia = 'text' | 'voice' | 'hands_free';
+export const sendReplica = (id: string, text: string, via: ReplicaVia = 'text') => post<Replica>(`/calls/${id}/replicas`, { text, via });
 export const endCall = (id: string) => post<{ status: string }>(`/calls/${id}/end`);
 export const startDdsCall = (b: { card_id: string; service_code: string; party: CallView['party']; target_service?: string | null; incoming?: boolean }) =>
   post<CallStarted>('/calls/dds', b);

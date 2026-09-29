@@ -5,10 +5,15 @@
  *  Эмоции (п. 3.6): у реплики заявителя — его состояние; голос следует ему темпом, высотой и громкостью,
  *  а в тексте состояние видно подписью у реплики — в текстовом режиме это единственный канал интонации.
  *  Если на сервере настроен синтез (`GET /training/speech` → `tts`), реплика звучит голосом модели с эмоцией;
- *  сбой синтеза — та же реплика голосом браузера. */
+ *  сбой синтеза — та же реплика голосом браузера.
+ *  Без рук (п. 3.6, V3): микрофон открыт на время звонка, фразы оператора выделяются по голосу (`VadDetector`),
+ *  распознаются и уходят собеседнику по очереди; оператор заговорил — собеседник замолкает (перебивание). */
 import { useEffect, useRef, useState } from 'react';
 import { Composer, Icon, Transcript, type TranscriptMessage } from '@smena112/ui-kit';
-import { endCall, getCall, replicaAudioUrl, sendReplica, transcribe, useSpeechStatus, type CallMessage, type Tone } from '../api/training';
+import { endCall, getCall, replicaAudioUrl, sendReplica, transcribe, useSpeechStatus, type CallMessage, type ReplicaVia, type Tone } from '../api/training';
+import { useActiveTour } from '../onboarding/OnboardingProvider';
+import { useHandsFree, type HandsFreeState } from '../voice/useHandsFree';
+import { VAD_PROFILES, isLikelyEcho, type VadProfileName } from '../voice/vad';
 
 const pad = (n: number) => String(n).padStart(2, '0');
 const MAX_TALK_MS = 30_000; // реплика в трубку — не дольше 30 с, дальше запись останавливается сама
@@ -53,6 +58,14 @@ function useTalk(onText: (text: string) => void, onError: (msg: string) => void)
   return { state, since, start, stop };
 }
 const VOICE_KEY = 'aiskra.call.voice';
+const HANDS_FREE_KEY = 'aiskra.call.handsfree';
+const VAD_KEY = 'aiskra.call.vad';
+const stored = (key: string) => { try { return localStorage.getItem(key); } catch { return null; } };
+const store = (key: string, value: string) => { try { localStorage.setItem(key, value); } catch { /* приватный режим */ } };
+const HANDS_FREE_TEXT: Record<HandsFreeState, string> = {
+  off: '', starting: 'включаю микрофон…', calibrating: 'слушаю фон — помолчите секунду', listening: 'слушаю',
+  party: 'собеседник говорит — можно перебить', hearing: 'слышу вас…', error: 'микрофон недоступен',
+};
 
 /** Подача голоса по состоянию заявителя (п. 3.6, спецификация — таблица 7.3). Нет состояния — ровный голос. */
 const RATE: Record<Tone['pace'], number> = { slow: 0.9, normal: 1, fast: 1.15, very_fast: 1.3 };
@@ -94,6 +107,7 @@ export function CallPanel({ callId, title, subtitle, partyName, initial, onEnded
   const [voice, setVoice] = useState(() => { try { return localStorage.getItem(VOICE_KEY) === '1'; } catch { return false; } });
   const spoken = useRef(0);
   const audio = useRef<HTMLAudioElement | null>(null);
+  const lastParty = useRef<{ text: string; at: number } | null>(null); // для отсева эха собеседника
   const status = useSpeechStatus();
   const serverVoice = status.data?.tts ?? false;
 
@@ -105,6 +119,7 @@ export function CallPanel({ callId, title, subtitle, partyName, initial, onEnded
   /** Реплика собеседника: серверный голос с эмоцией, при сбое — голос браузера. */
   const play = (m: CallMessage) => {
     stopVoice();
+    lastParty.current = { text: m.text, at: Date.now() };
     if (!serverVoice || !m.id) { speak(m.text, m.tone); return; }
     const a = new Audio(replicaAudioUrl(callId, m.id));
     audio.current = a;
@@ -135,21 +150,42 @@ export function CallPanel({ callId, title, subtitle, partyName, initial, onEnded
     spoken.current = party.length;
   }, [messages, voice, status.isLoading]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const send = async (spoken?: string) => {
-    const t = (spoken ?? text).trim();
-    if (!t || busy || ended) return;
-    if (spoken === undefined) setText('');
+  const endedRef = useRef(ended);
+  endedRef.current = ended;
+  const deliver = async (t: string, via: ReplicaVia) => {
     setBusy(true);
     setError('');
-    const at = new Date().toISOString();
-    setMessages((m) => [...m, { speaker: 'operator', text: t, at }]);
+    setMessages((m) => [...m, { speaker: 'operator', text: t, at: new Date().toISOString() }]);
     try {
-      const r = await sendReplica(callId, t);
+      const r = await sendReplica(callId, t, via);
       setMessages((m) => [...m, { speaker: r.speaker, text: r.text, at: new Date().toISOString(), id: r.message_id, tone: r.tone }]);
     } catch (e) {
       setError((e as Error).message);
     } finally {
       setBusy(false);
+    }
+  };
+  const send = async () => {
+    const t = text.trim();
+    if (!t || busy || ended) return;
+    setText('');
+    await deliver(t, 'text');
+  };
+  /** Голосовые реплики — по очереди: сказанное, пока собеседник отвечает, не теряется, а его ответ не обрывается —
+   *  он уже сохранён в звонке и участвует в автооценке. */
+  const pending = useRef<{ text: string; via: ReplicaVia }[]>([]);
+  const draining = useRef(false);
+  const enqueue = async (t: string, via: ReplicaVia) => {
+    pending.current.push({ text: t, via });
+    if (draining.current) return;
+    draining.current = true;
+    try {
+      for (let next = pending.current.shift(); next && !endedRef.current; next = pending.current.shift()) {
+        await deliver(next.text, next.via);
+      }
+    } finally {
+      pending.current = [];
+      draining.current = false;
     }
   };
   const hangup = async () => {
@@ -160,13 +196,48 @@ export function CallPanel({ callId, title, subtitle, partyName, initial, onEnded
   };
   const speech = status.data?.enabled ?? false;
   const secure = typeof window !== 'undefined' && window.isSecureContext && !!navigator.mediaDevices;
-  const talk = useTalk((t) => { setError(''); void send(t); }, setError);
+  const talk = useTalk((t) => { setError(''); void enqueue(t, 'voice'); }, setError);
+
+  const [handsFree, setHandsFree] = useState(() => stored(HANDS_FREE_KEY) === '1');
+  const [vadProfile, setVadProfile] = useState<VadProfileName>(() => {
+    const v = stored(VAD_KEY);
+    return v && v in VAD_PROFILES ? (v as VadProfileName) : 'balanced'; // в классе несколько операторов — не «высокая»
+  });
+  const [recognizing, setRecognizing] = useState(0);
+  const tour = useActiveTour(); // на время подсказок микрофон закрыт (п. 5.3)
+  const handsFreeOn = handsFree && speech && secure && !ended && !tour;
+  const hf = useHandsFree({
+    enabled: handsFreeOn,
+    profile: vadProfile,
+    partySpeaking: () => (!!audio.current && !audio.current.paused) || (window.speechSynthesis?.speaking ?? false),
+    onSpeechStart: stopVoice, // перебивание
+    onPhrase: async (blob) => {
+      setRecognizing((n) => n + 1);
+      try {
+        const t = (await transcribe(blob)).trim();
+        if (!t || isLikelyEcho(t, lastParty.current, Date.now())) return; // шум или голос собеседника из динамиков
+        setError('');
+        void enqueue(t, 'hands_free');
+      } catch (e) {
+        setError((e as Error).message);
+      } finally {
+        setRecognizing((n) => n - 1);
+      }
+    },
+    onError: (m) => { setError(m); setHandsFree(false); },
+  });
+  const toggleHandsFree = () => {
+    const v = !handsFree;
+    setHandsFree(v);
+    store(HANDS_FREE_KEY, v ? '1' : '0');
+  };
+  const hfText = tour && handsFree ? 'микрофон выключен на время подсказок' : recognizing > 0 && hf !== 'hearing' ? 'распознаю…' : HANDS_FREE_TEXT[hf];
   const talkSecs = talk.state === 'recording' ? Math.floor((now - talk.since) / 1000) : 0;
   const toggleVoice = () => {
     const v = !voice;
     if (!v) stopVoice();
     setVoice(v);
-    try { localStorage.setItem(VOICE_KEY, v ? '1' : '0'); } catch { /* приватный режим */ }
+    store(VOICE_KEY, v ? '1' : '0');
   };
 
   const secs = Math.max(0, Math.floor(((ended ? now : now) - startedAt) / 1000));
@@ -190,7 +261,18 @@ export function CallPanel({ callId, title, subtitle, partyName, initial, onEnded
         <Transcript messages={transcript} />
         {error && <div className="call-panel__err" role="alert">{error}</div>}
         {!ended && <Composer value={text} onChange={setText} onSend={() => { void send(); }} />}
-        {!ended && speech && (
+        {!ended && speech && handsFree && (
+          <div className={`call-panel__hf is-${hf}`} role="status" aria-live="polite">
+            <span className="call-panel__hf-dot" aria-hidden="true" />
+            <span className="call-panel__hf-text">{hfText}</span>
+            <select className="call-panel__hf-level" value={vadProfile} aria-label="Чувствительность микрофона"
+              title="Чувствительность: как громко нужно говорить, чтобы фраза началась"
+              onChange={(e) => { const v = e.target.value as VadProfileName; setVadProfile(v); store(VAD_KEY, v); }}>
+              {(Object.keys(VAD_PROFILES) as VadProfileName[]).map((k) => <option key={k} value={k}>{VAD_PROFILES[k].label}</option>)}
+            </select>
+          </div>
+        )}
+        {!ended && speech && !handsFree && (
           <button type="button" className={`call-panel__talk${talk.state === 'recording' ? ' is-on' : ''}`}
             disabled={!secure || busy || talk.state === 'recognizing' || talk.state === 'starting'}
             title={secure ? 'Сказать реплику в трубку голосом' : 'Голосовой ввод работает по https или на localhost'}
@@ -203,10 +285,18 @@ export function CallPanel({ callId, title, subtitle, partyName, initial, onEnded
         )}
       </div>
       <div className="arm-dock__section call-panel__actions">
-        <label className="arm-switch" title="Озвучивать реплики собеседника">
-          <input type="checkbox" role="switch" checked={voice} onChange={toggleVoice} />
-          <span className="arm-switch__track" aria-hidden="true" />голос
-        </label>
+        <span className="call-panel__switches">
+          <label className="arm-switch" title="Озвучивать реплики собеседника">
+            <input type="checkbox" role="switch" checked={voice} onChange={toggleVoice} />
+            <span className="arm-switch__track" aria-hidden="true" />голос
+          </label>
+          {!ended && speech && secure && (
+            <label className="arm-switch" title="Говорить без кнопки: микрофон слушает весь звонок, фразы распознаются сами">
+              <input type="checkbox" role="switch" checked={handsFree} onChange={toggleHandsFree} />
+              <span className="arm-switch__track" aria-hidden="true" />без рук
+            </label>
+          )}
+        </span>
         {!ended
           ? <button type="button" className="call-panel__end" onClick={() => { void hangup(); }}><Icon name="call_end" size="sm" /> завершить</button>
           : onClose && <button type="button" className="call-panel__close" onClick={onClose}>закрыть</button>}
