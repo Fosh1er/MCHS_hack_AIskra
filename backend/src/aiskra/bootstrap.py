@@ -23,7 +23,7 @@ from aiskra.ai.config import load_ai_config
 from aiskra.ai.router import ModelRouter
 from aiskra.integration.assessment_sources import IncidentAttempts
 from aiskra.integration.session_sources import IncidentSystemCards, SessionFactsReader, SessionProgress, SqlScenarioBank
-from aiskra.integration.system_sources import SystemRetentionPolicy, SystemSessionDefaults
+from aiskra.integration.system_sources import SystemRetentionPolicy, SystemServiceSwitches, SystemSessionDefaults
 from aiskra.integration.training_sources import DictionaryScenarioFacts, IncidentCardContext
 from aiskra.integration.validation_sources import ScenarioBankCases
 from aiskra.modules.assessment.api import deps as assessment_deps
@@ -541,6 +541,7 @@ def _wire_training(app: FastAPI, services: Services) -> None:
         return StartIncomingCallHandler(
             *call_parts(session),
             generator=ScenarioGenerator(DictionaryScenarioFacts(session), router, SqlMaterialContext(session)),
+            switches=SystemServiceSwitches(session),
             **psy_parts(session),
         )
 
@@ -643,6 +644,7 @@ def _wire_sessions(app: FastAPI, services: Services) -> None:
             IncidentSystemCards(session),
             SqlAlchemyUnitOfWork(session),
             clock,
+            switches=SystemServiceSwitches(session),
         )
 
     def list_sessions(session: Session) -> ListSessionsHandler:
