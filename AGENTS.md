@@ -111,6 +111,13 @@ cd backend && uv run python -m aiskra.cli create-user --login admin --full-name 
 - **API:** `/api/v1/training/scenarios…`, `/training/calls/incoming`, `/calls/dds`, `/calls/{id}/answer|replicas|end`, `/training/cards/{id}/calls`. CLI `generate-scenarios --count N`.
 - **Фронт:** входящий вызов — `pages/journal/JournalPage.tsx`; панель разговора — `shared/ui/CallPanel.tsx`; софтфон ДДС — `pages/dds/DdsSoftphone.tsx`.
 
+## Эмоции ИИ-заявителя (п. 3.6, этап V1) — что уже есть
+- **Состояние** — `training/domain/tone.py:CallerTone`: эмоция, напряжение, доверие, готовность отвечать (0–10). Начальное — `tone_for_legend` (сложность легенды, группа — первые цифры кода классификатора). Хранится в `training_calls.tone`, снимок у каждой реплики заявителя — `training_call_messages.tone` (миграция 0015).
+- **Правила** — `CallerTone.react`: словари `CALMING` / `INVALIDATING` / `PRESSURE` + вопрос по новой теме (`topic_of`). Категория — раз на реплику, успокаивающая фраза — раз за звонок, успокоение — не больше 6. Меняете словари — поправьте таблицу 7.2 в `specs/3.6-emotional-voice.md` и `unit/test_caller_tone.py`.
+- **Модель** получает состояние в промпте `applicant_actor/v2.md` (версия — `prompt_version` задачи в `config/ai*.yaml`), кеш делится по полосе напряжения; **без модели** ответ окрашивает `color_reply` — только слова вокруг фактов, факты легенды не меняются. Состояние меняют только правила, не модель.
+- **API:** `ReplicaOut.tone`, `message_id`; `GET /training/calls/{id}` — `tone` звонка и у реплик. **Фронт:** `CallPanel.tsx:prosody` — темп, высота, громкость озвучки браузером; подпись «Заявитель · <эмоция>».
+- Дальше — серверный синтез (V2), разговор без рук (V3): [спецификация](specs/3.6-emotional-voice.md), [ADR-0011](docs/adr/0011-voice-emotional-caller.md).
+
 ## Автооценка (п. 3.4) — что уже есть
 - **Правила** — `modules/assessment/domain/scoring.py` (формулы и веса описаны в `specs/3.4-assessment.md`); ИИ-судья — `application/judge.py` (без модели критерии «не проверено»).
 - **Попытка** (карточка, сценарий, статусы, звонки) — `aiskra/integration/assessment_sources.py`.

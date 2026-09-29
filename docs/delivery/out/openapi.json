@@ -6210,6 +6210,16 @@
       },
       "type": "array",
       "title": "Messages"
+     },
+     "tone": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/ToneSnapshot"
+       },
+       {
+        "type": "null"
+       }
+      ]
      }
     },
     "type": "object",
@@ -9251,6 +9261,28 @@
       "type": "string",
       "format": "date-time",
       "title": "At"
+     },
+     "id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Id"
+     },
+     "tone": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/ToneSnapshot"
+       },
+       {
+        "type": "null"
+       }
+      ]
      }
     },
     "type": "object",
@@ -10434,6 +10466,29 @@
      "text": {
       "type": "string",
       "title": "Text"
+     },
+     "message_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Message Id"
+     },
+     "tone": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/ToneSnapshot"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Состояние заявителя у этой реплики (п. 3.6): эмоция, шкалы 0–10, подача, причины"
      }
     },
     "type": "object",
@@ -11796,6 +11851,101 @@
      "districts"
     ],
     "title": "Territory"
+   },
+   "ToneChange": {
+    "properties": {
+     "reason": {
+      "type": "string",
+      "title": "Reason"
+     },
+     "fragment": {
+      "type": "string",
+      "title": "Fragment"
+     },
+     "tension": {
+      "type": "integer",
+      "title": "Tension",
+      "default": 0
+     },
+     "trust": {
+      "type": "integer",
+      "title": "Trust",
+      "default": 0
+     },
+     "readiness": {
+      "type": "integer",
+      "title": "Readiness",
+      "default": 0
+     }
+    },
+    "type": "object",
+    "required": [
+     "reason",
+     "fragment"
+    ],
+    "title": "ToneChange",
+    "description": "Что изменило состояние: код причины, сработавший фрагмент реплики и сдвиги шкал."
+   },
+   "ToneSnapshot": {
+    "properties": {
+     "emotion": {
+      "type": "string",
+      "title": "Emotion"
+     },
+     "emotion_title": {
+      "type": "string",
+      "title": "Emotion Title"
+     },
+     "tension": {
+      "type": "integer",
+      "title": "Tension"
+     },
+     "trust": {
+      "type": "integer",
+      "title": "Trust"
+     },
+     "readiness": {
+      "type": "integer",
+      "title": "Readiness"
+     },
+     "band": {
+      "type": "string",
+      "title": "Band"
+     },
+     "pace": {
+      "type": "string",
+      "title": "Pace"
+     },
+     "volume": {
+      "type": "string",
+      "title": "Volume"
+     },
+     "breathing": {
+      "type": "string",
+      "title": "Breathing"
+     },
+     "changes": {
+      "items": {
+       "$ref": "#/components/schemas/ToneChange"
+      },
+      "type": "array",
+      "title": "Changes"
+     }
+    },
+    "type": "object",
+    "required": [
+     "emotion",
+     "emotion_title",
+     "tension",
+     "trust",
+     "readiness",
+     "band",
+     "pace",
+     "volume",
+     "breathing"
+    ],
+    "title": "ToneSnapshot",
+    "description": "Состояние у конкретной реплики собеседника — то, что видит интерфейс и по чему озвучивается реплика.\nФактов легенды здесь нет (R3.3-02)."
    },
    "TreeNode": {
     "properties": {
