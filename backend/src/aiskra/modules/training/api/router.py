@@ -127,6 +127,8 @@ from aiskra.modules.training.application.queries.sessions import (
     SessionView,
 )
 from aiskra.modules.training.application.speech import (
+    CallRecordingHandler,
+    GetCallRecording,
     GetReplicaAudio,
     ReplicaAudioHandler,
     SpeechStatus,
@@ -395,6 +397,25 @@ async def replica_audio(
 ) -> Response:
     audio = await handler(GetReplicaAudio(actor=actor, call_id=call_id, message_id=message_id))
     return Response(content=audio.content, media_type=audio.mime)
+
+
+@router.get(
+    "/calls/{call_id}/recording",
+    response_class=Response,
+    responses={200: {"content": {"audio/wav": {}, "audio/mpeg": {}}, "description": "Запись звонка одним файлом"}},
+    summary="Запись звонка (п. 8.7): все реплики, озвученные серверным синтезом, одним файлом WAV (или MP3)",
+)
+async def call_recording(
+    call_id: UUID,
+    actor: CurrentPrincipal,
+    handler: Annotated[CallRecordingHandler, Depends(deps.provide_call_recording)],
+) -> Response:
+    rec = await handler(GetCallRecording(actor=actor, call_id=call_id))
+    return Response(
+        content=rec.content,
+        media_type=rec.mime,
+        headers={"Content-Disposition": f'attachment; filename="{rec.file_name}"'},
+    )
 
 
 @router.get("/cards/{card_id}/calls", response_model=list[CallView], summary="Звонки по карточке")

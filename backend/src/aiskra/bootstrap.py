@@ -179,7 +179,12 @@ from aiskra.modules.training.application.queries.sessions import (
     MySessionsHandler,
     SessionMonitorHandler,
 )
-from aiskra.modules.training.application.speech import ReplicaAudioHandler, SpeechStatus, TranscribeHandler
+from aiskra.modules.training.application.speech import (
+    CallRecordingHandler,
+    ReplicaAudioHandler,
+    SpeechStatus,
+    TranscribeHandler,
+)
 from aiskra.modules.training.infrastructure.materials import (
     DocumentTextExtractor,
     LocalFileStorage,
@@ -562,6 +567,9 @@ def _wire_training(app: FastAPI, services: Services) -> None:
     def replica_audio(session: Session) -> ReplicaAudioHandler:
         return ReplicaAudioHandler(services.tts, SqlCallRepository(session), SqlScenarioRepository(session))
 
+    def call_recording(session: Session) -> CallRecordingHandler:
+        return CallRecordingHandler(services.tts, SqlCallRepository(session), SqlScenarioRepository(session))
+
     def card_calls(session: Session) -> CardCallsHandler:
         return CardCallsHandler(SqlCallRepository(session))
 
@@ -583,6 +591,7 @@ def _wire_training(app: FastAPI, services: Services) -> None:
     ov[training_deps.provide_psy_catalog] = lambda: catalog
     ov[training_deps.provide_get_call] = get_call
     ov[training_deps.provide_replica_audio] = replica_audio
+    ov[training_deps.provide_call_recording] = call_recording
     ov[training_deps.provide_card_calls] = card_calls
     _wire_sessions(app, services)
 

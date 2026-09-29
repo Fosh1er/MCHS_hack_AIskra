@@ -1,7 +1,7 @@
 /** Разбор разговора с ИИ-заявителем для преподавателя (п. 3.6, V4): как менялось напряжение заявителя по репликам
  *  и какие слова оператора его изменили. Данные — снимки состояния у реплик заявителя (`GET /training/cards/{id}/calls`). */
 import { LineChart } from '@smena112/ui-kit';
-import { useCardCalls, type CallMessage, type CallView, type ToneChange } from '../api/training';
+import { useCardCalls, useSpeechStatus, type CallMessage, type CallView, type ToneChange } from '../api/training';
 
 const REASON: Record<ToneChange['reason'], string> = {
   calming: 'успокоил',
@@ -20,6 +20,7 @@ function effect(c: ToneChange): string {
 }
 
 function Conversation({ call }: { call: CallView }) {
+  const tts = useSpeechStatus().data?.tts;
   const party = call.messages.filter((m) => m.speaker === 'party' && m.tone);
   if (!party.length) return null;
   const first = party[0].tone!;
@@ -35,6 +36,7 @@ function Conversation({ call }: { call: CallView }) {
       <div className="call-review__sum">
         Напряжение заявителя <b>{first.tension} → {last.tension}</b> из 10 ({first.emotion_title} → {last.emotion_title}),
         доверие {first.trust} → {last.trust}{call.mode ? ` · разговор ${MODE[call.mode] ?? call.mode}` : ''}
+        {tts && <> · <a href={`/api/v1/training/calls/${call.id}/recording`} download>скачать запись звонка (WAV)</a></>}
       </div>
       {party.length > 1 && (
         <LineChart points={party.map((m, i) => ({ t: `${i + 1}`, v: m.tone!.tension }))} yMax={10} yStep={2}
