@@ -12,6 +12,7 @@ from enum import StrEnum
 from typing import Any
 from uuid import UUID, uuid4
 
+from aiskra.modules.training.domain.psy import PSY_DEFAULTS, check_settings, psy_settings
 from aiskra.shared.errors import DomainError
 
 
@@ -41,6 +42,7 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "call_interval_s": 40,  # темп входящих вызовов для 112
     "feed_interval_s": 45,  # темп системных карточек для ДДС
     "max_waiting": 3,  # сколько карточек одновременно ждут в очереди ДДС (#706)
+    "psy": dict(PSY_DEFAULTS),  # п. 3.6: психологический модификатор, по умолчанию выключен
 }
 
 
@@ -76,6 +78,11 @@ class TrainingSession:
         if not self.title.strip():
             raise DomainError("Название занятия не может быть пустым", code="empty_title")
         self.settings = {**DEFAULT_SETTINGS, **self.settings}
+        self.settings["psy"] = psy_settings(self.settings.get("psy"))
+        try:
+            check_settings(self.settings["psy"])
+        except ValueError as e:
+            raise DomainError(str(e), code="bad_psy_setting") from e
         for key in ("norm_112", "norm_dds", "call_interval_s", "feed_interval_s"):
             if not 5 <= float(self.settings[key]) <= 3600:
                 raise DomainError(f"Параметр {key} — от 5 до 3600 с", code="bad_setting")

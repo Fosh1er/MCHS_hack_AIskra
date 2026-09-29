@@ -3654,6 +3654,127 @@
     }
    }
   },
+  "/api/v1/training/calls/{call_id}/pause": {
+   "post": {
+    "tags": [
+     "training"
+    ],
+    "summary": "«Пауза»: обучающийся останавливает тяжёлый звонок, блок «Работа с заявителем» не оценивается (п. 3.6)",
+    "operationId": "pause_call_api_v1_training_calls__call_id__pause_post",
+    "parameters": [
+     {
+      "name": "call_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Call Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/StatusOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/training/psy/profiles": {
+   "get": {
+    "tags": [
+     "training"
+    ],
+    "summary": "Каталог психологических профилей заявителя (п. 3.6)",
+    "operationId": "psy_profiles_api_v1_training_psy_profiles_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/PsyProfileOut"
+         },
+         "type": "array",
+         "title": "Response Psy Profiles Api V1 Training Psy Profiles Get"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/training/scenarios/{scenario_id}/psy": {
+   "post": {
+    "tags": [
+     "training"
+    ],
+    "summary": "Закрепить за сценарием психологический профиль заявителя (п. 3.6)",
+    "operationId": "set_scenario_psy_api_v1_training_scenarios__scenario_id__psy_post",
+    "parameters": [
+     {
+      "name": "scenario_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Scenario Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ScenarioPsyIn"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/StatusOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/training/calls/{call_id}": {
    "get": {
     "tags": [
@@ -6103,6 +6224,17 @@
      "channel": {
       "type": "string",
       "title": "Channel"
+     },
+     "warning": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Warning"
      }
     },
     "type": "object",
@@ -6210,6 +6342,29 @@
       },
       "type": "array",
       "title": "Messages"
+     },
+     "ended_by": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Ended By"
+     },
+     "psy": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Psy"
      }
     },
     "type": "object",
@@ -9251,6 +9406,25 @@
       "type": "string",
       "format": "date-time",
       "title": "At"
+     },
+     "remarks": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Remarks"
+     },
+     "meta": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Meta"
      }
     },
     "type": "object",
@@ -10147,6 +10321,161 @@
     ],
     "title": "ProgressView"
    },
+   "PsyProfileOut": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "title": "Id"
+     },
+     "title": {
+      "type": "string",
+      "title": "Title"
+     },
+     "group": {
+      "type": "string",
+      "title": "Group"
+     },
+     "sensitive": {
+      "type": "boolean",
+      "title": "Sensitive"
+     },
+     "pinned_only": {
+      "type": "boolean",
+      "title": "Pinned Only"
+     },
+     "start": {
+      "type": "integer",
+      "title": "Start"
+     },
+     "floor": {
+      "type": "integer",
+      "title": "Floor"
+     },
+     "pool": {
+      "type": "integer",
+      "title": "Pool"
+     },
+     "key_acts": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Key Acts"
+     },
+     "critical": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Critical"
+     },
+     "required_routing": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Required Routing"
+     },
+     "speech": {
+      "additionalProperties": {
+       "type": "string"
+      },
+      "type": "object",
+      "title": "Speech"
+     },
+     "sources": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Sources"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "title",
+     "group",
+     "sensitive",
+     "pinned_only",
+     "start",
+     "floor",
+     "pool",
+     "key_acts",
+     "critical",
+     "required_routing",
+     "speech",
+     "sources"
+    ],
+    "title": "PsyProfileOut"
+   },
+   "PsySettingsIn": {
+    "properties": {
+     "enabled": {
+      "type": "boolean",
+      "title": "Enabled",
+      "default": false
+     },
+     "share": {
+      "type": "number",
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "title": "Share",
+      "description": "Доля звонков с психологическим профилем заявителя",
+      "default": 0.3
+     },
+     "profiles": {
+      "anyOf": [
+       {
+        "items": {
+         "type": "string"
+        },
+        "type": "array"
+       },
+       {
+        "type": "string",
+        "const": "auto"
+       }
+      ],
+      "title": "Profiles",
+      "description": "Профили; auto — по сложности сценария",
+      "default": "auto"
+     },
+     "intensity": {
+      "type": "integer",
+      "maximum": 3.0,
+      "minimum": 1.0,
+      "title": "Intensity",
+      "default": 2
+     },
+     "weight": {
+      "type": "number",
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "title": "Weight",
+      "description": "Вес блока «Работа с заявителем» в итоговом балле",
+      "default": 0
+     },
+     "sensitive": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Sensitive",
+      "description": "Явно разрешённые кризисные профили"
+     },
+     "llm_acts": {
+      "type": "boolean",
+      "title": "Llm Acts",
+      "description": "Разметка действий оператора моделью (PSY_ACTS)",
+      "default": false
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "title": "PsySettingsIn",
+    "description": "Психологический модификатор занятия (п. 3.6, ADR-0011)."
+   },
    "PurgeResult": {
     "properties": {
      "retention_days": {
@@ -10416,6 +10745,26 @@
       "maxLength": 500,
       "minLength": 1,
       "title": "Text"
+     },
+     "latency_ms": {
+      "anyOf": [
+       {
+        "type": "integer",
+        "maximum": 600000.0,
+        "minimum": 0.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Latency Ms",
+      "description": "Пауза перед ответом оператора, мс"
+     },
+     "interrupted": {
+      "type": "boolean",
+      "title": "Interrupted",
+      "description": "Оператор перебил реплику заявителя",
+      "default": false
      }
     },
     "additionalProperties": false,
@@ -10434,6 +10783,33 @@
      "text": {
       "type": "string",
       "title": "Text"
+     },
+     "remarks": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Remarks",
+      "description": "Ремарки заявителя: плачет, кричит… (п. 3.6)"
+     },
+     "voice": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Voice",
+      "description": "Параметры голоса реплики для синтеза речи (п. 3.6, руководство §7)"
+     },
+     "hung_up": {
+      "type": "boolean",
+      "title": "Hung Up",
+      "description": "Заявитель положил трубку",
+      "default": false
      }
     },
     "type": "object",
@@ -10727,6 +11103,26 @@
     ],
     "title": "ScenarioPage"
    },
+   "ScenarioPsyIn": {
+    "properties": {
+     "profile": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 32
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Profile",
+      "description": "Профиль заявителя; null — снять"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "title": "ScenarioPsyIn"
+   },
    "ScenarioRow": {
     "properties": {
      "id": {
@@ -10774,6 +11170,17 @@
      },
      "created_at": {
       "title": "Created At"
+     },
+     "psy_profile": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Psy Profile"
      }
     },
     "type": "object",
@@ -10834,6 +11241,17 @@
       "additionalProperties": true,
       "type": "object",
       "title": "Reference Dds"
+     },
+     "psy_profile": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Psy Profile"
      }
     },
     "type": "object",
@@ -11256,6 +11674,16 @@
        }
       ],
       "title": "Max Waiting"
+     },
+     "psy": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/PsySettingsIn"
+       },
+       {
+        "type": "null"
+       }
+      ]
      }
     },
     "additionalProperties": false,

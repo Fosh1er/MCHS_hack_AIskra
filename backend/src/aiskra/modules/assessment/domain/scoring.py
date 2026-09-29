@@ -60,6 +60,18 @@ TITLES: dict[str, str] = {
     "comments": "Комментарии к статусам",
     "calls": "Звонки",
     "regulation": "Регламентность формулировок (ИИ)",
+    # п. 3.6 — блок «Работа с заявителем» (domain/psy_scoring.py)
+    "psy_contact": "Контакт с заявителем",
+    "psy_critical_info": "Данные под стрессом: адрес",
+    "psy_emotion": "Ответ на эмоцию",
+    "psy_techniques": "Приёмы для этого состояния",
+    "psy_forbidden": "Недопустимые действия",
+    "psy_speech": "Речевой стандарт",
+    "psy_instructions": "Инструкции заявителю",
+    "psy_routing": "Решение: психолог, службы",
+    "psy_outcome": "Деэскалация (исход)",
+    "psy_judge": "Тон и уместность (ИИ)",
+    "psy_voice": "Спокойствие в голосе",
 }
 INTERVIEW_TOPICS = {"address": "адрес", "what": "что случилось", "victims": "пострадавшие"}
 CHAIN = ["accepted", "response_started", "arrived", "works_in_progress", "works_completed"]

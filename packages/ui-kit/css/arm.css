@@ -613,6 +613,7 @@
 .arm-msg__who { display: block; font-size: var(--fs-2xs); color: var(--text-inverse-muted); margin-bottom: 2px; }
 .arm-msg--them { align-self: flex-start; background: var(--bg-dark-2); }
 .arm-msg--me { align-self: flex-end; background: var(--c-blue-700); }
+.arm-msg__note { color: var(--text-inverse-muted); }
 .arm-msg--sys { align-self: center; background: none; color: var(--text-inverse-muted); font-size: var(--fs-xs); padding: 0; }
 .arm-composer { display: flex; gap: 6px; margin-top: 8px; }
 .arm-composer input {
@@ -1142,6 +1143,22 @@ body:has(.dds-editor) .ipphone > .arm-dock__section:not(.ipphone__screen) { disp
 }
 .session-banner__go { margin-left: auto; color: var(--accent); font-weight: 500; }
 .progress-page { display: flex; flex-direction: column; gap: 12px; }
+/* ---- Работа с заявителем (п. 3.6): психологический модификатор, лента разбора ----------------- */
+.assess__psy { border-top: 1px solid var(--border-subtle); padding-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+.assess__psy-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: var(--fs-sm); }
+.assess__psy-sources { margin: 0; font-size: var(--fs-2xs); color: var(--text-muted); }
+.psy-levels { display: inline-flex; gap: 2px; vertical-align: middle; }
+.psy-levels i { width: 10px; height: 10px; background: var(--border-subtle); display: inline-block; }
+.psy-levels i.is-on { background: var(--s-warn); }
+.psy-levels i.is-on.is-hot { background: var(--s-critical); }
+.psy-timeline { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-sm); max-height: 360px; overflow-y: auto; }
+.psy-timeline li { display: grid; grid-template-columns: 44px 72px minmax(0, 1fr); gap: 2px 8px; padding: 3px 0; border-bottom: 1px dotted var(--border-subtle); }
+.psy-timeline__at { color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.psy-timeline__who { color: var(--text-muted); }
+.psy-timeline__acts { grid-column: 3; display: flex; flex-wrap: wrap; gap: 4px; }
+.psy-act { font-size: var(--fs-2xs); padding: 0 6px; background: var(--c-blue-100); color: var(--text-strong); }
+.psy-act--bad { background: #fbe3dc; color: #8a3a1c; }
+.psy-warning { padding: 10px 12px; background: #fff4e0; border-left: 4px solid var(--s-warn); color: var(--text-strong); font-size: var(--fs-sm); }
 .assess__expert { margin: 6px 0; padding: 6px 10px; font-size: 13px; background: var(--c-blue-100); border-left: 3px solid var(--accent); }
 .progress-page .cab-card, .progress-page .cab-stat { color: var(--text); }
 .session-banner__clock { font-variant-numeric: tabular-nums; font-weight: 500; }

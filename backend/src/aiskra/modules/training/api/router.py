@@ -20,8 +20,10 @@ from aiskra.modules.training.api.schemas import (
     GeneratedOut,
     GenerateIn,
     IncomingIn,
+    PsyProfileOut,
     ReplicaIn,
     ReplicaOut,
+    ScenarioPsyIn,
     StatusOut,
 )
 from aiskra.modules.training.application.commands.calls import (
@@ -30,6 +32,9 @@ from aiskra.modules.training.application.commands.calls import (
     CallStarted,
     EndCall,
     EndCallHandler,
+    PauseCall,
+    PauseCallHandler,
+    Replica,
     SendReplica,
     SendReplicaHandler,
     StartDdsCall,
@@ -52,6 +57,8 @@ from aiskra.modules.training.application.commands.scenarios import (
     GenerateScenariosHandler,
     ReviewScenario,
     ReviewScenarioHandler,
+    SetScenarioPsy,
+    SetScenarioPsyHandler,
 )
 from aiskra.modules.training.application.commands.sessions import (
     ChangeSessionState,
@@ -64,7 +71,9 @@ from aiskra.modules.training.application.commands.sessions import (
     ParticipantIn,
 )
 from aiskra.modules.training.application.ports.materials import MaterialRow
+from aiskra.modules.training.application.ports.psy import PsyCatalog
 from aiskra.modules.training.application.ports.sessions import StudentRow
+from aiskra.modules.training.application.psy import TurnSignals
 from aiskra.modules.training.application.queries.calls import (
     CallView,
     CardCalls,
@@ -201,7 +210,11 @@ async def answer(
     call_id: UUID, body: AnswerIn, actor: Trainee, handler: Annotated[AnswerCallHandler, Depends(deps.provide_answer)]
 ) -> ReplicaOut | None:
     replica = await handler(AnswerCall(actor=actor, call_id=call_id, card_id=body.card_id))
-    return ReplicaOut(speaker=replica.speaker, text=replica.text) if replica else None
+    return _replica_out(replica) if replica else None
+
+
+def _replica_out(r: Replica) -> ReplicaOut:
+    return ReplicaOut(speaker=r.speaker, text=r.text, remarks=r.remarks, voice=r.voice, hung_up=r.hung_up)
 
 
 @router.post(
@@ -229,8 +242,9 @@ async def replica(
     actor: Trainee,
     handler: Annotated[SendReplicaHandler, Depends(deps.provide_replica)],
 ) -> ReplicaOut:
-    r = await handler(SendReplica(actor=actor, call_id=call_id, text=body.text))
-    return ReplicaOut(speaker=r.speaker, text=r.text)
+    signals = TurnSignals(latency_ms=body.latency_ms, interrupted=body.interrupted)
+    r = await handler(SendReplica(actor=actor, call_id=call_id, text=body.text, signals=signals))
+    return _replica_out(r)
 
 
 class SpeechOut(BaseModel):
@@ -264,6 +278,62 @@ async def end_call(
     call_id: UUID, actor: Trainee, meta: Meta, handler: Annotated[EndCallHandler, Depends(deps.provide_end_call)]
 ) -> StatusOut:
     return StatusOut(status=await handler(EndCall(actor=actor, call_id=call_id, meta=meta)))
+
+
+@router.post(
+    "/calls/{call_id}/pause",
+    response_model=StatusOut,
+    summary="«Пауза»: обучающийся останавливает тяжёлый звонок, блок «Работа с заявителем» не оценивается (п. 3.6)",
+)
+async def pause_call(
+    call_id: UUID, actor: Trainee, meta: Meta, handler: Annotated[PauseCallHandler, Depends(deps.provide_pause_call)]
+) -> StatusOut:
+    return StatusOut(status=await handler(PauseCall(actor=actor, call_id=call_id, meta=meta)))
+
+
+@router.get(
+    "/psy/profiles",
+    response_model=list[PsyProfileOut],
+    summary="Каталог психологических профилей заявителя (п. 3.6)",
+)
+async def psy_profiles(
+    _: Annotated[Principal, Depends(require(Permission.LESSONS_CONDUCT, Permission.SCENARIOS_MANAGE))],
+    catalog: Annotated[PsyCatalog, Depends(deps.provide_psy_catalog)],
+) -> list[PsyProfileOut]:
+    return [
+        PsyProfileOut(
+            id=p.id,
+            title=p.title,
+            group=p.group,
+            sensitive=p.sensitive,
+            pinned_only=p.pinned_only,
+            start=p.start,
+            floor=p.floor,
+            pool=p.pool,
+            key_acts=sorted(p.key_acts),
+            critical=sorted(p.critical),
+            required_routing=list(p.required_routing),
+            speech=dict(p.speech),
+            sources=list(p.sources),
+        )
+        for p in catalog.profiles().values()
+    ]
+
+
+@router.post(
+    "/scenarios/{scenario_id}/psy",
+    response_model=StatusOut,
+    summary="Закрепить за сценарием психологический профиль заявителя (п. 3.6)",
+)
+async def set_scenario_psy(
+    scenario_id: UUID,
+    body: ScenarioPsyIn,
+    actor: Manager,
+    meta: Meta,
+    handler: Annotated[SetScenarioPsyHandler, Depends(deps.provide_set_scenario_psy)],
+) -> StatusOut:
+    profile = await handler(SetScenarioPsy(actor=actor, scenario_id=scenario_id, profile=body.profile, meta=meta))
+    return StatusOut(status=profile or "none")
 
 
 @router.get("/calls/{call_id}", response_model=CallView, summary="Звонок с репликами")

@@ -9,7 +9,21 @@ export interface Assessment {
   details: {
     criteria: CriterionResult[]; errors: string[]; critical?: string[]; has_reference: boolean; card_number: number; stats: Record<string, number | null>; version?: number;
     expert?: { score: number; comment: string; teacher_id: string; auto_score: number };
+    role_score?: number;
+    psy?: PsyBlock;
   };
+}
+/** Блок «Работа с заявителем» (п. 3.6): отдельный от балла роли, с лентой разбора. */
+export interface PsyTimelineItem {
+  at_s: number; speaker: 'operator' | 'party' | 'system'; text: string;
+  acts?: { code: string; good: boolean; title: string; why: string }[]; level_before?: number | null; level_after?: number | null;
+  remarks?: string[]; level?: number | null; blocked?: string | null;
+}
+export interface PsyBlock {
+  paused?: boolean; note?: string; score?: number; passed?: boolean; weight?: number;
+  criteria?: CriterionResult[]; errors?: string[]; critical?: string[];
+  stats: { title?: string; start?: number; final?: number; peak?: number; hung_up?: boolean; time_to_address_s?: number | null; sources?: string[] };
+  timeline?: PsyTimelineItem[];
 }
 export interface Insights {
   assessments: number; average_score: number; passed_share: number;

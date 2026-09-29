@@ -18,7 +18,11 @@ from aiskra.modules.training.application.ports.scenarios import (
     DdsCallContext,
     ScenarioRepository,
 )
+from aiskra.modules.training.application.ports.sessions import SessionRepository
+from aiskra.modules.training.application.psy import PsyDirector, TurnSignals, start_psy
 from aiskra.modules.training.domain.call import Call, CallMessage, CallParty, Speaker
+from aiskra.modules.training.domain.psy import choose_profile, psy_settings
+from aiskra.modules.training.domain.scenario import Scenario
 from aiskra.shared.application import Clock, Command, UnitOfWork
 from aiskra.shared.audit import AuditEntry, AuditEvent, AuditRecorder, RequestMeta
 from aiskra.shared.errors import DomainError, NotFoundError
@@ -31,18 +35,28 @@ PARTY_GREETING = {
 }
 
 
+SENSITIVE_WARNING = (
+    "Учебный звонок может затрагивать тяжёлую тему (кризисное состояние заявителя). Вы можете отказаться — "
+    "отказ не оценивается. После звонка обязателен разбор с преподавателем."
+)
+
+
 @dataclass(frozen=True)
 class CallStarted:
     call_id: UUID
     scenario_id: UUID | None
     aon: str
     channel: str
+    warning: str | None = None  # п. 3.6: предупреждение перед профилем `sensitive`
 
 
 @dataclass(frozen=True)
 class Replica:
     speaker: str
     text: str
+    remarks: list[str] = field(default_factory=list)  # п. 3.6: ремарки заявителя (*плачет*)
+    voice: dict[str, object] | None = None  # п. 3.6: параметры голоса для синтеза / дуплекс-адаптера
+    hung_up: bool = False  # заявитель положил трубку
 
 
 class _CallBase:
@@ -54,6 +68,9 @@ class _CallBase:
         actors: Actors,
         uow: UnitOfWork,
         clock: Clock,
+        *,
+        psy: PsyDirector | None = None,
+        sessions: SessionRepository | None = None,
     ) -> None:
         self._calls = calls
         self._scenarios = scenarios
@@ -61,6 +78,29 @@ class _CallBase:
         self._actors = actors
         self._uow = uow
         self._clock = clock
+        self._psy = psy
+        self._sessions = sessions
+
+    async def _assign_psy(self, call: Call, scenario: Scenario | None, rng: random.Random) -> str | None:
+        """Психологический профиль заявителя по настройкам идущего занятия (п. 3.6). Возвращает предупреждение."""
+        if self._psy is None or self._sessions is None or scenario is None:
+            return None
+        session = await self._sessions.running_for_student(call.student_id)
+        if session is None:
+            return None
+        settings = psy_settings(session.settings.get("psy"))
+        catalog = self._psy.catalog.profiles()
+        profile = choose_profile(catalog, settings, scenario.difficulty, rng, pinned=scenario.psy_profile)
+        if profile is None:
+            return None
+        call.psy = start_psy(
+            profile,
+            seed=rng.randrange(1, 2**31),
+            catalog_version=self._psy.catalog.version,
+            settings=settings,
+            session_id=str(session.id),
+        )
+        return SENSITIVE_WARNING if profile.sensitive else None
 
     async def _own_call(self, call_id: UUID, actor: Principal) -> Call:
         call = await self._calls.get(call_id)
@@ -75,8 +115,8 @@ class _CallBase:
             await self._uow.rollback()
             raise
 
-    async def _say(self, call: Call, speaker: Speaker, text: str) -> CallMessage:
-        msg = CallMessage(call_id=call.id, speaker=speaker, text=text, at=self._clock.now())
+    async def _say(self, call: Call, speaker: Speaker, text: str, meta: dict[str, object] | None = None) -> CallMessage:
+        msg = CallMessage(call_id=call.id, speaker=speaker, text=text, at=self._clock.now(), meta=meta)
         await self._calls.add_message(msg)
         return msg
 
@@ -96,6 +136,7 @@ class StartIncomingCallHandler(_CallBase):
 
     async def __call__(self, cmd: StartIncomingCall) -> CallStarted:
         rng = random.Random(cmd.seed)
+        warning: str | None = None
         scenario = await self._scenarios.random_approved(rng, cmd.groups or None, cmd.difficulty)
         if scenario is None:  # банк пуст — сценарий на лету, сохраняется черновиком для проверки преподавателем
             scenario = await self._gen.generate(rng, cmd.groups, cmd.difficulty or 2, None)
@@ -110,9 +151,10 @@ class StartIncomingCallHandler(_CallBase):
             scenario_id=scenario.id,
             aon=aon,
         )
+        warning = await self._assign_psy(call, scenario, rng)
         await self._calls.add(call)
         await self._commit()
-        return CallStarted(call_id=call.id, scenario_id=scenario.id, aon=aon, channel="mts")
+        return CallStarted(call_id=call.id, scenario_id=scenario.id, aon=aon, channel="mts", warning=warning)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -135,8 +177,14 @@ class AnswerCallHandler(_CallBase):
             if scenario is not None:
                 text = scenario.legend.get("opening") or f"Здравствуйте, у нас {scenario.legend.get('what', 'беда')}."
                 call.revealed = [*call.revealed, "opening"]
-                await self._say(call, Speaker.PARTY, text)
-                opening = Replica(speaker=Speaker.PARTY.value, text=text)
+                styled = self._psy.opening(call.psy, scenario.legend) if self._psy and call.psy else None
+                if styled is not None:
+                    text, remarks, meta = styled
+                    await self._say(call, Speaker.PARTY, text, meta)
+                    opening = Replica(speaker=Speaker.PARTY.value, text=text, remarks=remarks, voice=meta["voice"])
+                else:
+                    await self._say(call, Speaker.PARTY, text)
+                    opening = Replica(speaker=Speaker.PARTY.value, text=text)
         await self._calls.save(call)
         await self._commit()
         return opening
@@ -172,6 +220,8 @@ class StartDdsCallHandler(_CallBase):
             aon=ctx.applicant_phone if cmd.party is CallParty.APPLICANT else "",
         )
         call.answer(self._clock.now())  # абонент снимает трубку сразу
+        if cmd.party is CallParty.APPLICANT and ctx.scenario_id:  # п. 3.6: заявитель в стрессе и для ДДС
+            await self._assign_psy(call, await self._scenarios.get(ctx.scenario_id), random.Random())
         await self._calls.add(call)
         if cmd.incoming and cmd.party is CallParty.BRIGADE:
             short = ctx.services.get(cmd.service_code, (cmd.service_code, ""))[0]
@@ -192,6 +242,7 @@ class SendReplica(Command):
     actor: Principal
     call_id: UUID
     text: str
+    signals: TurnSignals = field(default_factory=TurnSignals)  # голосовой канал: задержка, перебивание
 
 
 class SendReplicaHandler(_CallBase):
@@ -204,12 +255,43 @@ class SendReplicaHandler(_CallBase):
         call = await self._own_call(cmd.call_id, cmd.actor)
         call.ensure_active()
         history = await self._calls.messages(call.id)
+        if call.psy and self._psy and call.party is CallParty.APPLICANT:
+            psy_reply = await self._psy_reply(call, history, text, cmd.signals)
+            if psy_reply is not None:
+                return psy_reply
         await self._say(call, Speaker.OPERATOR, text)
         reply = await self._reply(call, history, text)
         await self._say(call, Speaker.PARTY, reply)
         await self._calls.save(call)
         await self._commit()
         return Replica(speaker=Speaker.PARTY.value, text=reply)
+
+    async def _psy_reply(
+        self, call: Call, history: list[CallMessage], text: str, signals: TurnSignals
+    ) -> Replica | None:
+        """Ход с психологическим профилем (п. 3.6): состояние, ворота, реплика и разметка — в `PsyDirector`."""
+        assert self._psy is not None and call.psy is not None
+        scenario = await self._scenarios.get(call.scenario_id) if call.scenario_id else None
+        if scenario is None:
+            return None
+        now = self._clock.now()
+        elapsed = (now - (call.answered_at or call.started_at)).total_seconds()
+        turn = await self._psy.turn(
+            call.psy, scenario.legend, history, text, call.revealed, elapsed, signals, str(scenario.id)
+        )
+        if turn is None:
+            return None
+        await self._say(call, Speaker.OPERATOR, text, turn.operator_meta)
+        await self._say(call, Speaker.PARTY, turn.text, turn.party_meta)
+        call.revealed = turn.revealed
+        call.psy = turn.psy
+        if turn.hung_up:
+            call.end(self._clock.now(), by="party")
+        await self._calls.save(call)
+        await self._commit()
+        return Replica(
+            speaker=Speaker.PARTY.value, text=turn.text, remarks=turn.remarks, voice=turn.voice, hung_up=turn.hung_up
+        )
 
     async def _legend_for_card(self, ctx: DdsCallContext) -> dict[str, object]:
         """Карточка без сценария (заполнена обучающимся) — заявитель знает то, что есть в карточке."""
@@ -280,8 +362,51 @@ class EndCallHandler(_CallBase):
                     description=f"{direction} звонок: {who[call.party]}, {secs} с",
                     object_type="call",
                     object_id=str(call.id),
-                    data={"card_id": str(call.card_id) if call.card_id else None, "party": call.party.value},
+                    data={
+                        "card_id": str(call.card_id) if call.card_id else None,
+                        "party": call.party.value,
+                        "psy_profile": (call.psy or {}).get("profile"),
+                    },
                 )
             )
+        await self._commit()
+        return call.status.value
+
+
+@dataclass(frozen=True, kw_only=True)
+class PauseCall(Command):
+    """«Пауза» обучающегося (п. 3.6, безопасность): звонок мягко завершается и не оценивается блоком «Работа с
+    заявителем». Нужна прежде всего для профилей `sensitive` (INACSL, SPRC 2024 — docs/research/psychology/04 §5)."""
+
+    actor: Principal
+    call_id: UUID
+    meta: RequestMeta = field(default_factory=RequestMeta)
+
+
+class PauseCallHandler(_CallBase):
+    def __init__(self, *args: object, audit: AuditRecorder, **kwargs: object) -> None:
+        super().__init__(*args, **kwargs)  # type: ignore[arg-type]
+        self._audit = audit
+
+    async def __call__(self, cmd: PauseCall) -> str:
+        call = await self._own_call(cmd.call_id, cmd.actor)
+        if call.psy is not None:
+            call.psy = {**call.psy, "paused": True}
+        if call.ended_at is None:
+            await self._say(call, Speaker.SYSTEM, "Звонок остановлен обучающимся (пауза)")
+        call.end(self._clock.now(), by="operator")
+        await self._calls.save(call)
+        await self._audit.record(
+            AuditEntry(
+                event=AuditEvent.CALL_PAUSED,
+                actor=cmd.actor,
+                meta=cmd.meta,
+                description="Учебный звонок остановлен обучающимся"
+                + (f" (профиль: {call.psy.get('title')})" if call.psy else ""),
+                object_type="call",
+                object_id=str(call.id),
+                data={"psy_profile": (call.psy or {}).get("profile")},
+            )
+        )
         await self._commit()
         return call.status.value

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -47,11 +48,19 @@ class DdsCallIn(_Strict):
 
 class ReplicaIn(_Strict):
     text: str = Field(min_length=1, max_length=500)
+    # п. 3.6: сигналы голосового канала — передаёт голосовой или дуплекс-адаптер; в текстовом режиме не нужны
+    latency_ms: int | None = Field(default=None, ge=0, le=600_000, description="Пауза перед ответом оператора, мс")
+    interrupted: bool = Field(default=False, description="Оператор перебил реплику заявителя")
 
 
 class ReplicaOut(BaseModel):
     speaker: str
     text: str
+    remarks: list[str] = Field(default_factory=list, description="Ремарки заявителя: плачет, кричит… (п. 3.6)")
+    voice: dict[str, object] | None = Field(
+        default=None, description="Параметры голоса реплики для синтеза речи (п. 3.6, руководство §7)"
+    )
+    hung_up: bool = Field(default=False, description="Заявитель положил трубку")
 
 
 class EditScenarioIn(_Strict):
@@ -81,6 +90,39 @@ class SessionSettingsIn(_Strict):
     call_interval_s: float | None = Field(default=None, ge=5, le=3600)
     feed_interval_s: float | None = Field(default=None, ge=5, le=3600)
     max_waiting: int | None = Field(default=None, ge=1, le=10)
+    psy: PsySettingsIn | None = None
+
+
+class PsySettingsIn(_Strict):
+    """Психологический модификатор занятия (п. 3.6, ADR-0011)."""
+
+    enabled: bool = False
+    share: float = Field(default=0.3, ge=0, le=1, description="Доля звонков с психологическим профилем заявителя")
+    profiles: list[str] | Literal["auto"] = Field(default="auto", description="Профили; auto — по сложности сценария")
+    intensity: int = Field(default=2, ge=1, le=3)
+    weight: float = Field(default=0, ge=0, le=1, description="Вес блока «Работа с заявителем» в итоговом балле")
+    sensitive: list[str] = Field(default_factory=list, description="Явно разрешённые кризисные профили")
+    llm_acts: bool = Field(default=False, description="Разметка действий оператора моделью (PSY_ACTS)")
+
+
+class ScenarioPsyIn(_Strict):
+    profile: str | None = Field(default=None, max_length=32, description="Профиль заявителя; null — снять")
+
+
+class PsyProfileOut(BaseModel):
+    id: str
+    title: str
+    group: str
+    sensitive: bool
+    pinned_only: bool
+    start: int
+    floor: int
+    pool: int
+    key_acts: list[str]
+    critical: list[str]
+    required_routing: list[str]
+    speech: dict[int, str]
+    sources: list[str]
 
 
 class CreateSessionIn(_Strict):

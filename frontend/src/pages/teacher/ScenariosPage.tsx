@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { Banner, Button, Card, Segmented, StatusPill, Tag } from '@smena112/ui-kit';
 import { useCardTypes, useEnum, useIncidentGroups, useServices } from '../../shared/api/dictionaries';
 import {
-  useEditScenario, useGenerateScenarios, useReviewScenario, useScenario, useScenarioPreview, useScenarios,
+  useEditScenario, useGenerateScenarios, usePsyProfiles, useReviewScenario, useScenario, useScenarioPreview, useScenarios, useSetScenarioPsy,
   type ScenarioFilter, type ScenarioRow, type ScenarioView,
 } from '../../shared/api/training';
 import { TeacherShell } from '../../shared/ui/TeacherShell';
@@ -117,6 +117,30 @@ function EditForm({ s, onClose }: { s: ScenarioView; onClose: () => void }) {
   );
 }
 
+/** Психологический профиль заявителя (п. 3.6): модификатор сценария, легенда и эталоны не меняются. */
+function PsyPick({ s }: { s: ScenarioView }) {
+  const profiles = usePsyProfiles().data ?? [];
+  const setPsy = useSetScenarioPsy();
+  const current = profiles.find((p) => p.id === s.psy_profile);
+  return (
+    <div className="tch-form" style={{ marginTop: 10 }}>
+      <label>Психологический профиль заявителя
+        <select value={s.psy_profile ?? ''} disabled={setPsy.isPending} onChange={(e) => setPsy.mutate({ id: s.id, profile: e.target.value || null })}>
+          <option value="">без профиля (по настройкам занятия)</option>
+          {profiles.map((p) => <option key={p.id} value={p.id}>{p.title}{p.sensitive ? ' ⚠ тяжёлая тема' : ''}</option>)}
+        </select>
+      </label>
+      {current && (
+        <small className="c-slate">
+          Старт: {current.speech[String(current.start)]} Работает, если в занятии включён модификатор
+          {current.sensitive ? ' и профиль явно разрешён' : ''}. Источники: {current.sources.join(', ')}.
+        </small>
+      )}
+      {setPsy.isError && <Banner status="critical">{setPsy.error.message}</Banner>}
+    </div>
+  );
+}
+
 function Detail({ id }: { id: string }) {
   const q = useScenario(id);
   const review = useReviewScenario();
@@ -130,6 +154,7 @@ function Detail({ id }: { id: string }) {
       actions={<Segmented ariaLabel="Режим" value={mode} onChange={setMode}
         options={[{ value: 'view', label: 'легенда' }, { value: 'preview', label: 'прогон' }, { value: 'edit', label: 'правка' }]} />}>
       {mode === 'view' && <Legend s={s} />}
+      {mode === 'view' && <PsyPick s={s} />}
       {mode === 'edit' && <EditForm s={s} onClose={() => setMode('view')} />}
       {mode === 'preview' && (
         <ol className="tch-preview">

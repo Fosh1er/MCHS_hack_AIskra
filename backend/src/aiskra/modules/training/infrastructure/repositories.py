@@ -49,6 +49,7 @@ class SqlScenarioRepository:
         row.reference_card = scenario.reference_card
         row.reference_dds = scenario.reference_dds
         row.source = scenario.source
+        row.psy_profile = scenario.psy_profile
         row.author_id = scenario.author_id
         row.approved_by = scenario.approved_by
         if scenario.status is ScenarioStatus.APPROVED and row.approved_at is None:
@@ -72,6 +73,7 @@ class SqlScenarioRepository:
             status=ScenarioStatus(row.status),
             author_id=row.author_id,
             approved_by=row.approved_by,
+            psy_profile=row.psy_profile,
         )
 
     async def page(
@@ -106,6 +108,7 @@ class SqlScenarioRepository:
                 incident_type_code=r.incident_type_code,
                 source=r.source,
                 created_at=as_utc(r.created_at),
+                psy_profile=r.psy_profile,
             )
             for r in rows
         ], total
@@ -158,6 +161,8 @@ class SqlCallRepository:
         row.aon = call.aon
         row.status = call.status.value
         row.revealed = list(call.revealed)
+        row.psy = dict(call.psy) if call.psy is not None else None
+        row.ended_by = call.ended_by
         row.answered_at = call.answered_at
         row.ended_at = call.ended_at
 
@@ -181,6 +186,8 @@ class SqlCallRepository:
             answered_at=as_utc(row.answered_at),
             ended_at=as_utc(row.ended_at),
             revealed=list(row.revealed or []),
+            psy=dict(row.psy) if row.psy else None,
+            ended_by=row.ended_by,
         )
 
     async def get(self, call_id: UUID) -> Call | None:
@@ -190,7 +197,12 @@ class SqlCallRepository:
     async def add_message(self, message: CallMessage) -> None:
         self._s.add(
             CallMessageModel(
-                id=message.id, call_id=message.call_id, speaker=message.speaker.value, text=message.text, at=message.at
+                id=message.id,
+                call_id=message.call_id,
+                speaker=message.speaker.value,
+                text=message.text,
+                at=message.at,
+                meta=message.meta,
             )
         )
         await self._s.flush()
@@ -207,7 +219,16 @@ class SqlCallRepository:
         for r in rows:
             at = as_utc(r.at)
             assert at is not None
-            out.append(CallMessage(id=r.id, call_id=r.call_id, speaker=Speaker(r.speaker), text=r.text, at=at))
+            out.append(
+                CallMessage(
+                    id=r.id,
+                    call_id=r.call_id,
+                    speaker=Speaker(r.speaker),
+                    text=r.text,
+                    at=at,
+                    meta=dict(r.meta) if r.meta else None,
+                )
+            )
         return out
 
     async def calls_of_card(self, card_id: UUID, student_id: UUID | None) -> list[Call]:

@@ -8,6 +8,8 @@ from uuid import UUID, uuid4
 
 from aiskra.modules.assessment.application.judge import Judge, JudgeOut
 from aiskra.modules.assessment.application.ports.attempts import AssessmentRecord, AssessmentRepository, AttemptSource
+from aiskra.modules.assessment.application.psy_judge import PsyJudge
+from aiskra.modules.assessment.domain.psy_scoring import PsyAttempt, assess_psy, timeline
 from aiskra.modules.assessment.domain.scoring import (
     CARD_NORM_SECONDS,
     DDS_NORM_SECONDS,
@@ -56,6 +58,30 @@ def _judge_criteria(out: JudgeOut | None, keys: list[str]) -> list[Criterion]:
     return crit
 
 
+def psy_details(result: Result, attempt: PsyAttempt) -> dict[str, object]:
+    """Блок «Работа с заявителем» в details оценки (п. 3.6)."""
+    return {
+        "score": result.score,
+        "passed": result.passed,
+        "weight": float(attempt.profile.get("weight") or 0),
+        "criteria": [{**asdict(c), "title": c.title} for c in result.criteria],
+        "errors": result.errors,
+        "critical": [c.title for c in result.criteria if c.critical],
+        "stats": result.stats,
+        "timeline": timeline(attempt),
+        "call_id": attempt.call_id,
+    }
+
+
+def combine(role_score: float, role_passed: bool, block: dict[str, object], threshold: float) -> tuple[float, bool]:
+    """Итог с блоком при весе w > 0: (1 − w) × роль + w × блок; критическая ошибка блока — «не зачтено»."""
+    w = float(block.get("weight") or 0)  # type: ignore[arg-type]
+    if w <= 0:
+        return role_score, role_passed
+    score = round((1 - w) * role_score + w * float(block["score"]), 1)  # type: ignore[arg-type]
+    return score, role_passed and score >= threshold and not block["critical"]
+
+
 def to_details(result: Result, service_code: str | None, card_number: int) -> dict[str, object]:
     return {
         "role": result.role,
@@ -71,13 +97,28 @@ def to_details(result: Result, service_code: str | None, card_number: int) -> di
 
 class AssessCardHandler:
     def __init__(
-        self, attempts: AttemptSource, repo: AssessmentRepository, judge: Judge, audit: AuditRecorder, uow: UnitOfWork
+        self,
+        attempts: AttemptSource,
+        repo: AssessmentRepository,
+        judge: Judge,
+        audit: AuditRecorder,
+        uow: UnitOfWork,
+        psy_judge: PsyJudge | None = None,
     ) -> None:
         self._attempts = attempts
         self._repo = repo
         self._judge = judge
         self._audit = audit
         self._uow = uow
+        self._psy_judge = psy_judge
+
+    async def _psy_block(self, attempt: PsyAttempt | None, threshold: float) -> dict[str, object] | None:
+        if attempt is None:
+            return None
+        if attempt.profile.get("paused"):
+            return {"paused": True, "note": "звонок остановлен обучающимся — блок не оценивался", "stats": {}}
+        judged = await self._psy_judge.check(attempt) if self._psy_judge else None
+        return psy_details(assess_psy(attempt, judge=judged, threshold=threshold), attempt)
 
     async def __call__(self, cmd: AssessCard) -> AssessmentRecord:
         teacher = cmd.actor.can(Permission.RESULTS_READ_ALL)
@@ -112,6 +153,7 @@ class AssessCardHandler:
             stats = {"processing_s": a.processing_s, "norm_s": s.norm_seconds or CARD_NORM_SECONDS}
             result = finish("112", criteria, weights, a.reference is not None, s.threshold, stats)
             student, number, service = a.author_id, a.card_number, None
+            psy_attempt = a.psy
         elif cmd.role == "dds":
             if not cmd.service_code:
                 raise DomainError("Укажите службу ДДС", code="service_required")
@@ -136,24 +178,33 @@ class AssessCardHandler:
                 {"norm_s": s.norm_seconds or DDS_NORM_SECONDS},
             )
             student, number, service = actor, d.card_number, cmd.service_code
+            psy_attempt = d.psy
         else:
             raise DomainError("Роль — 112 или dds", code="bad_role")
 
+        details = to_details(result, service, number)
+        score, passed = result.score, result.passed
+        block = await self._psy_block(psy_attempt, s.threshold)
+        if block is not None:
+            details["psy"] = block
+            if not block.get("paused"):
+                details["role_score"] = result.score
+                score, passed = combine(result.score, result.passed, block, s.threshold)
         record = AssessmentRecord(
             id=uuid4(),
             card_id=cmd.card_id,
             student_id=student,
             role=result.role,
             service_code=service,
-            score=result.score,
-            passed=result.passed,
+            score=score,
+            passed=passed,
             grader="rules+llm" if judged else "rules",
-            details=to_details(result, service, number),
+            details=details,
         )
         prev = await self._repo.latest(cmd.card_id, result.role, service)
         if prev and prev.details.get("expert"):
             # экспертная оценка (п. 4.3) окончательна: повторная автопроверка обновляет критерии, но не балл
-            expert = {**prev.details["expert"], "auto_score": result.score}
+            expert = {**prev.details["expert"], "auto_score": score}
             record = replace(
                 record,
                 score=float(expert["score"]),
@@ -169,8 +220,9 @@ class AssessCardHandler:
                     actor=cmd.actor,
                     card_number=number,
                     meta=cmd.meta,
-                    description=f"{'112' if result.role == '112' else 'ДДС ' + (service or '')}: {result.score} баллов"
-                    + (" — зачтено" if result.passed else " — не зачтено"),
+                    description=f"{'112' if result.role == '112' else 'ДДС ' + (service or '')}: {record.score} баллов"
+                    + (" — зачтено" if record.passed else " — не зачтено")
+                    + (f"; работа с заявителем: {block['score']}" if block and "score" in block else ""),
                     object_type="assessment",
                     object_id=str(record.id),
                 )

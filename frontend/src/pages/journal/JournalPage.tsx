@@ -211,6 +211,7 @@ export function JournalPage() {
       {session && <SessionBanner s={session} here="112" extra={lesson ? `вызовы примерно раз в ${lesson.settings.call_interval_s} с, норматив ${lesson.settings.norm_112} с` : undefined} />}
       {ring && (
         <div className="call-ring">
+          {ring.warning && <div className="psy-warning" role="alert"><b>Внимание.</b> {ring.warning}</div>}
           <IncomingCall who={`Входящий звонок с номера ${ring.aon}`} sub="Учебный вызов · ответьте, откроется карточка" onAnswer={answer} onReject={reject} />
         </div>
       )}

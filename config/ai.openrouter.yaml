@@ -45,6 +45,8 @@ ai:
     service_actor:       {provider: demo_small, temperature: 0.6, cache: task,  cache_ttl: 1d, max_tokens: 160}
     judge:               {provider: demo,       temperature: 0,   cache: exact, cache_ttl: 7d, max_tokens: 600}
     insights:            {provider: demo,       temperature: 0.3, cache: off}
+    psy_acts:            {provider: demo_small, temperature: 0,   cache: exact, cache_ttl: 7d, max_tokens: 300}
+    psy_judge:           {provider: demo, temperature: 0,   cache: exact, cache_ttl: 7d, max_tokens: 700}
   tts: {kind: fake, cache_ttl: 30d}
   # Голосовой ввод оператора (Whisper за OpenAI-совместимым /audio/transcriptions). Выключен, пока STT_KIND не задан.
   # Локально (GPU/CPU): Speaches — docs/ai/Голосовой_ввод.md; STT_URL=http://<машина с GPU>:8000/v1

@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Icon } from '@smena112/ui-kit';
 import { useAssessment, useEvaluate } from '../api/assessment';
 import { num } from '../format';
+import { PsyBlockView } from './PsyBlock';
 
 export function AssessmentPanel({ cardId, role, service, auto }: { cardId: string; role: '112' | 'dds'; service?: string | null; auto: boolean }) {
   const a = useAssessment(cardId, role, service);
@@ -50,6 +51,9 @@ export function AssessmentPanel({ cardId, role, service, auto }: { cardId: strin
               </li>
             ))}
           </ul>
+          {data.details.psy && <PsyBlockView block={data.details.psy} />}
+          {data.details.psy?.weight && data.details.role_score != null
+            ? <p className="assess__meta">Балл роли без блока «Работа с заявителем»: {num(data.details.role_score)}</p> : null}
           <p className="assess__meta">Проверка: {data.grader === 'expert' ? 'преподаватель' : data.grader === 'rules+llm' ? 'правила и ИИ-судья' : 'правила'} · версия {data.details.version ?? 1}</p>
         </>
       )}

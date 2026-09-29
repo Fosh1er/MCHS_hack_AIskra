@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Any
 from uuid import UUID
 
 from aiskra.modules.training.application.ports.scenarios import CallRepository
@@ -18,6 +19,8 @@ class MessageView:
     speaker: str
     text: str
     at: datetime
+    remarks: list[str] = field(default_factory=list)  # п. 3.6: ремарки заявителя
+    meta: dict[str, Any] | None = None  # п. 3.6: действия оператора, уровень заявителя — для разбора
 
 
 @dataclass(frozen=True)
@@ -35,6 +38,8 @@ class CallView:
     answered_at: datetime | None
     ended_at: datetime | None
     messages: list[MessageView]
+    ended_by: str | None = None
+    psy: dict[str, Any] | None = None  # п. 3.6: профиль заявителя, старт, пик и текущий уровень
 
 
 def _visible(call: Call | None, actor: Principal) -> bool:
@@ -56,8 +61,36 @@ async def _view(repo: CallRepository, call: Call, with_messages: bool = True) ->
         started_at=call.started_at,
         answered_at=call.answered_at,
         ended_at=call.ended_at,
-        messages=[MessageView(speaker=m.speaker.value, text=m.text, at=m.at) for m in messages],
+        messages=[
+            MessageView(
+                speaker=m.speaker.value,
+                text=m.text,
+                at=m.at,
+                remarks=list((m.meta or {}).get("remarks") or []),
+                meta=m.meta,
+            )
+            for m in messages
+        ],
+        ended_by=call.ended_by,
+        psy=_psy_summary(call.psy),
     )
+
+
+def _psy_summary(psy: dict[str, Any] | None) -> dict[str, Any] | None:
+    if not psy:
+        return None
+    state = psy.get("state") or {}
+    return {
+        "profile": psy.get("profile"),
+        "title": psy.get("title"),
+        "sensitive": psy.get("sensitive"),
+        "start": psy.get("start"),
+        "level": state.get("level"),
+        "peak": state.get("peak"),
+        "stage": state.get("stage"),
+        "paused": psy.get("paused"),
+        "hung_up": state.get("hung_up"),
+    }
 
 
 @dataclass(frozen=True, kw_only=True)

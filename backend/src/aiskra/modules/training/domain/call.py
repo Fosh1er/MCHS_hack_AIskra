@@ -6,6 +6,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
+from typing import Any
 from uuid import UUID, uuid4
 
 from aiskra.shared.errors import DomainError
@@ -36,6 +37,7 @@ class CallMessage:
     text: str
     at: datetime
     id: UUID = field(default_factory=uuid4)
+    meta: dict[str, Any] | None = None  # п. 3.6: действия оператора, состояние заявителя, ремарки, голос
 
 
 @dataclass
@@ -54,6 +56,8 @@ class Call:
     answered_at: datetime | None = None
     ended_at: datetime | None = None
     revealed: list[str] = field(default_factory=list)  # темы легенды, которые заявитель уже раскрыл
+    psy: dict[str, Any] | None = None  # п. 3.6: снимок профиля заявителя и текущее состояние (ADR-0011)
+    ended_by: str | None = None  # operator | party — кто завершил звонок
     id: UUID = field(default_factory=uuid4)
 
     def answer(self, now: datetime) -> None:
@@ -63,10 +67,11 @@ class Call:
             self.status = CallStatus.ACTIVE
             self.answered_at = now
 
-    def end(self, now: datetime) -> None:
+    def end(self, now: datetime, by: str = "operator") -> None:
         if self.status is not CallStatus.ENDED:
             self.status = CallStatus.ENDED
             self.ended_at = now
+            self.ended_by = by
 
     def ensure_active(self) -> None:
         if self.status is CallStatus.ENDED:

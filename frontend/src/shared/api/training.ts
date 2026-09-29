@@ -2,13 +2,24 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, http } from './http';
 
-export interface CallStarted { call_id: string; scenario_id: string | null; aon: string; channel: string }
-export interface Replica { speaker: 'party' | 'operator' | 'system'; text: string }
-export interface CallMessage { speaker: 'party' | 'operator' | 'system'; text: string; at: string }
+export interface CallStarted { call_id: string; scenario_id: string | null; aon: string; channel: string; warning?: string | null }
+/** Параметры голоса реплики (п. 3.6): контракт для синтеза речи и дуплекс-адаптера — модуль голоса делается отдельно. */
+export interface VoiceParams {
+  profile: string; direction: 'up' | 'down'; level: number; rate: number; pitch_st: number; gain_db: number;
+  nonverbal: string[]; scene: string | null; voice: 'child' | 'elderly' | null; intensity: number;
+}
+export interface Replica { speaker: 'party' | 'operator' | 'system'; text: string; remarks?: string[]; voice?: VoiceParams | null; hung_up?: boolean }
+export interface PsyAct { code: string; title: string; quote: string }
+export interface CallMessage {
+  speaker: 'party' | 'operator' | 'system'; text: string; at: string; remarks?: string[];
+  meta?: { acts?: PsyAct[]; level?: number; level_before?: number; level_after?: number } | null;
+}
+export interface CallPsy { profile: string; title: string; sensitive: boolean; start: number; level: number; peak: number; stage: string; paused: boolean; hung_up: boolean }
 export interface CallView {
   id: string; role: string; party: 'applicant' | 'brigade' | 'service'; direction: 'in' | 'out'; status: string; aon: string;
   card_id: string | null; service_code: string | null; target_service: string | null;
   started_at: string; answered_at: string | null; ended_at: string | null; messages: CallMessage[];
+  ended_by?: string | null; psy?: CallPsy | null;
 }
 
 const T = '/api/v1/training';
@@ -16,8 +27,12 @@ const post = <R,>(path: string, body: unknown = {}) => http<R>(`${T}${path}`, { 
 
 export const startIncomingCall = (b: { groups?: number[]; difficulty?: number } = {}) => post<CallStarted>('/calls/incoming', b);
 export const answerCall = (id: string, cardId: string | null) => post<Replica | null>(`/calls/${id}/answer`, { card_id: cardId });
-export const sendReplica = (id: string, text: string) => post<Replica>(`/calls/${id}/replicas`, { text });
+/** `signals` — задержка ответа и перебивание: их передаёт голосовой канал (дуплекс-адаптер); в тексте не нужны. */
+export const sendReplica = (id: string, text: string, signals: { latency_ms?: number; interrupted?: boolean } = {}) =>
+  post<Replica>(`/calls/${id}/replicas`, { text, ...signals });
 export const endCall = (id: string) => post<{ status: string }>(`/calls/${id}/end`);
+/** «Пауза» (п. 3.6): остановить тяжёлый учебный звонок; блок «Работа с заявителем» не оценивается. */
+export const pauseCall = (id: string) => post<{ status: string }>(`/calls/${id}/pause`);
 export const startDdsCall = (b: { card_id: string; service_code: string; party: CallView['party']; target_service?: string | null; incoming?: boolean }) =>
   post<CallStarted>('/calls/dds', b);
 export const getCall = (id: string) => http<CallView>(`${T}/calls/${id}`);
@@ -41,6 +56,7 @@ export const useCardCalls = (cardId: string | undefined) =>
 export interface ScenarioRow {
   id: string; title: string; status: 'draft' | 'approved' | 'archived'; difficulty: number;
   card_type_code: string | null; incident_type_code: string | null; source: string; created_at: string | null;
+  psy_profile?: string | null;
 }
 export interface ScenarioView {
   id: string; title: string; status: ScenarioRow['status']; difficulty: number; source: string;
@@ -48,6 +64,7 @@ export interface ScenarioView {
   legend: Record<string, unknown> & { opening?: string; what?: string; details?: string; facts?: Record<string, string>; persona?: Record<string, unknown> };
   reference_card: Record<string, unknown> & { final_type?: string; services?: { code: string; main: boolean }[] };
   reference_dds: Record<string, unknown>;
+  psy_profile?: string | null;
 }
 export interface PreviewItem { question: string; answer: string; reference: string }
 export interface ScenarioFilter { status?: string; difficulty?: number; card_type?: string; source?: string; page: number; page_size: number }
@@ -71,6 +88,24 @@ export const useGenerateScenarios = () =>
 export const useReviewScenario = () =>
   useInvalidating(({ id, approve }: { id: string; approve: boolean }) => post<{ status: string }>(`/scenarios/${id}/${approve ? 'approve' : 'archive'}`), [['scenarios'], ['scenario']]);
 export interface ScenarioEdit { title?: string; difficulty?: number; opening?: string; what?: string; details?: string; comment?: string }
+// ------------------------------------------------------------------ п. 3.6: психологический модификатор
+export interface PsyProfile {
+  id: string; title: string; group: 'stress_reaction' | 'crisis' | 'caller_type'; sensitive: boolean; pinned_only: boolean;
+  start: number; floor: number; pool: number; key_acts: string[]; critical: string[]; required_routing: string[];
+  speech: Record<string, string>; sources: string[];
+}
+export const PSY_GROUP_TITLE: Record<PsyProfile['group'], string> = {
+  stress_reaction: 'Острые стрессовые реакции (ЦЭПП МЧС)', crisis: 'Кризисные состояния', caller_type: 'Особые категории заявителей',
+};
+export interface PsySettings {
+  enabled: boolean; share: number; profiles: string[] | 'auto'; intensity: 1 | 2 | 3; weight: number; sensitive: string[]; llm_acts: boolean;
+}
+export const PSY_DEFAULTS: PsySettings = { enabled: false, share: 0.3, profiles: 'auto', intensity: 2, weight: 0, sensitive: [], llm_acts: false };
+export const usePsyProfiles = () =>
+  useQuery({ queryKey: ['psy-profiles'], queryFn: () => http<PsyProfile[]>(`${T}/psy/profiles`), staleTime: 300_000 });
+export const useSetScenarioPsy = () =>
+  useInvalidating(({ id, profile }: { id: string; profile: string | null }) => post<{ status: string }>(`/scenarios/${id}/psy`, { profile }),
+    [['scenarios'], ['scenario']]);
 export const useEditScenario = () =>
   useInvalidating(({ id, ...b }: ScenarioEdit & { id: string }) => http<{ status: string }>(`${T}/scenarios/${id}`, { method: 'PATCH', body: JSON.stringify(b) }),
     [['scenarios'], ['scenario'], ['scenario-preview']]);
@@ -81,6 +116,7 @@ export type CardSource = 'generated' | 'trainee' | 'mixed';
 export interface SessionSettings {
   norm_112: number; norm_dds: number; threshold: number; difficulty: number;
   call_interval_s: number; feed_interval_s: number; max_waiting: number;
+  psy?: PsySettings;
 }
 export interface Participant { student_id: string; full_name: string; login: string; role: '112' | 'dds'; dds_service_code: string | null }
 export interface SessionView {
