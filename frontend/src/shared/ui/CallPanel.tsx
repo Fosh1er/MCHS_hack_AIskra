@@ -3,10 +3,12 @@
  *  с русским голосом); оператор говорит в микрофон — запись распознаёт Whisper на сервере (`POST /training/speech`),
  *  либо печатает. Вид — тёмный док АРМ (ui-kit: Transcript, Composer).
  *  Эмоции (п. 3.6): у реплики заявителя — его состояние; голос следует ему темпом, высотой и громкостью,
- *  а в тексте состояние видно подписью у реплики — в текстовом режиме это единственный канал интонации. */
+ *  а в тексте состояние видно подписью у реплики — в текстовом режиме это единственный канал интонации.
+ *  Если на сервере настроен синтез (`GET /training/speech` → `tts`), реплика звучит голосом модели с эмоцией;
+ *  сбой синтеза — та же реплика голосом браузера. */
 import { useEffect, useRef, useState } from 'react';
 import { Composer, Icon, Transcript, type TranscriptMessage } from '@smena112/ui-kit';
-import { endCall, getCall, sendReplica, transcribe, useSpeechStatus, type CallMessage, type Tone } from '../api/training';
+import { endCall, getCall, replicaAudioUrl, sendReplica, transcribe, useSpeechStatus, type CallMessage, type Tone } from '../api/training';
 
 const pad = (n: number) => String(n).padStart(2, '0');
 const MAX_TALK_MS = 30_000; // реплика в трубку — не дольше 30 с, дальше запись останавливается сама
@@ -91,6 +93,32 @@ export function CallPanel({ callId, title, subtitle, partyName, initial, onEnded
   const [now, setNow] = useState(() => Date.now());
   const [voice, setVoice] = useState(() => { try { return localStorage.getItem(VOICE_KEY) === '1'; } catch { return false; } });
   const spoken = useRef(0);
+  const audio = useRef<HTMLAudioElement | null>(null);
+  const status = useSpeechStatus();
+  const serverVoice = status.data?.tts ?? false;
+
+  const stopVoice = () => {
+    audio.current?.pause();
+    audio.current = null;
+    try { window.speechSynthesis?.cancel(); } catch { /* нет синтеза */ }
+  };
+  /** Реплика собеседника: серверный голос с эмоцией, при сбое — голос браузера. */
+  const play = (m: CallMessage) => {
+    stopVoice();
+    if (!serverVoice || !m.id) { speak(m.text, m.tone); return; }
+    const a = new Audio(replicaAudioUrl(callId, m.id));
+    audio.current = a;
+    let fellBack = false;
+    const fallback = () => {
+      if (fellBack || audio.current !== a) return; // уже заменена следующей репликой или остановлена
+      fellBack = true;
+      audio.current = null;
+      speak(m.text, m.tone);
+    };
+    a.onerror = fallback;
+    a.play().catch((e: DOMException) => { if (e.name !== 'AbortError') fallback(); });
+  };
+  useEffect(() => () => stopVoice(), []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     getCall(callId).then((c) => {
@@ -101,10 +129,11 @@ export function CallPanel({ callId, title, subtitle, partyName, initial, onEnded
   }, [callId]);
   useEffect(() => { if (ended) return; const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, [ended]);
   useEffect(() => {
+    if (status.isLoading) return; // сначала узнаём, есть ли серверный голос, — иначе первую реплику скажет браузер
     const party = messages.filter((m) => m.speaker === 'party');
-    if (voice && party.length > spoken.current) speak(party[party.length - 1].text, party[party.length - 1].tone);
+    if (voice && party.length > spoken.current) play(party[party.length - 1]);
     spoken.current = party.length;
-  }, [messages, voice]);
+  }, [messages, voice, status.isLoading]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const send = async (spoken?: string) => {
     const t = (spoken ?? text).trim();
@@ -125,16 +154,17 @@ export function CallPanel({ callId, title, subtitle, partyName, initial, onEnded
   };
   const hangup = async () => {
     if (!ended) await endCall(callId).catch(() => undefined);
-    try { window.speechSynthesis?.cancel(); } catch { /* нет синтеза */ }
+    stopVoice();
     setEnded(true);
     onEnded?.();
   };
-  const speech = useSpeechStatus().data?.enabled ?? false;
+  const speech = status.data?.enabled ?? false;
   const secure = typeof window !== 'undefined' && window.isSecureContext && !!navigator.mediaDevices;
   const talk = useTalk((t) => { setError(''); void send(t); }, setError);
   const talkSecs = talk.state === 'recording' ? Math.floor((now - talk.since) / 1000) : 0;
   const toggleVoice = () => {
     const v = !voice;
+    if (!v) stopVoice();
     setVoice(v);
     try { localStorage.setItem(VOICE_KEY, v ? '1' : '0'); } catch { /* приватный режим */ }
   };

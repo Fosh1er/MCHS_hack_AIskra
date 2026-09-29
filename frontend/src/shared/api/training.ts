@@ -29,9 +29,12 @@ export const startDdsCall = (b: { card_id: string; service_code: string; party: 
   post<CallStarted>('/calls/dds', b);
 export const getCall = (id: string) => http<CallView>(`${T}/calls/${id}`);
 
-// ------------------------------------------------------------------ голосовой ввод (п. 1.4): Whisper на сервере
+// ------------------------------------------------------------------ речь: голосовой ввод (п. 1.4) и голос собеседника (п. 3.6)
+/** `enabled` — распознавание (кнопка «говорить»); `tts` — серверный синтез, иначе озвучивает браузер. */
 export const useSpeechStatus = () =>
-  useQuery({ queryKey: ['speech-status'], queryFn: () => http<{ enabled: boolean }>(`${T}/speech`), staleTime: 60_000 });
+  useQuery({ queryKey: ['speech-status'], queryFn: () => http<{ enabled: boolean; tts: boolean }>(`${T}/speech`), staleTime: 60_000 });
+/** Звук реплики собеседника — адрес своего сайта: CSP стенда не пускает `blob:` в медиа (п. 3.6). */
+export const replicaAudioUrl = (callId: string, messageId: string) => `${T}/calls/${callId}/messages/${messageId}/audio`;
 export async function transcribe(audio: Blob): Promise<string> {
   const body = new FormData();
   body.append('audio', audio, audio.type.includes('ogg') ? 'speech.ogg' : 'speech.webm');
