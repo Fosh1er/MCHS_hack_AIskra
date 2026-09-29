@@ -56,6 +56,34 @@ def test_incoming_call_with_ai_applicant(app_client: Callable[[], TestClient]) -
     assert teacher.get(f"/api/v1/training/calls/{call['call_id']}").status_code == 200
 
 
+def test_tone_follows_operator(app_client: Callable[[], TestClient]) -> None:
+    """П. 3.6: состояние заявителя меняется от тона оператора и сохраняется у каждой его реплики."""
+    student = as_user(app_client, "student")
+    call = student.post("/api/v1/training/calls/incoming", json={}).json()
+    card = student.post("/api/v1/incidents/cards", json={"aon": call["aon"], "scenario_id": call["scenario_id"]}).json()
+    cid = call["call_id"]
+    opening = student.post(f"/api/v1/training/calls/{cid}/answer", json={"card_id": card["id"]}).json()
+    start = opening["tone"]["tension"]
+    assert opening["message_id"] and opening["tone"]["changes"] == []
+
+    rude = student.post(
+        f"/api/v1/training/calls/{cid}/replicas", json={"text": "Успокойтесь! Быстрее говорите!"}
+    ).json()
+    assert [c["reason"] for c in rude["tone"]["changes"]] == ["invalidating", "pressure"]
+    assert rude["tone"]["tension"] == min(10, start + 3)
+
+    kind = student.post(f"/api/v1/training/calls/{cid}/replicas", json={"text": "Я вас слышу, где вы?"}).json()
+    assert [c["reason"] for c in kind["tone"]["changes"]] == ["calming", "on_topic"]
+    assert kind["tone"]["tension"] == rude["tone"]["tension"] - 2
+
+    view = student.get(f"/api/v1/training/calls/{cid}").json()
+    party = [m for m in view["messages"] if m["speaker"] == "party"]
+    assert [m["tone"]["tension"] for m in party] == [start, rude["tone"]["tension"], kind["tone"]["tension"]]
+    assert all(m["tone"] is None for m in view["messages"] if m["speaker"] == "operator")
+    assert party[-1]["id"] == kind["message_id"] and view["tone"]["tension"] == kind["tone"]["tension"]
+    assert not {"address", "applicant", "facts", "legend"} & set(view["tone"])  # фактов легенды нет
+
+
 def dds_call(c: TestClient, card_id: str, party: str, target: str | None = None) -> Any:
     return c.post(
         "/api/v1/training/calls/dds",
@@ -77,7 +105,7 @@ def test_dds_calls_brigade_applicant_service(app_client: Callable[[], TestClient
     report = dds.post(
         f"/api/v1/training/calls/{brigade['call_id']}/replicas", json={"text": "Доложите обстановку"}
     ).json()
-    assert "наряд 7" in report["text"]
+    assert "наряд 7" in report["text"] and report["tone"] is None  # у старшего группы состояния нет
 
     applicant = dds_call(dds, card["id"], "applicant").json()
     assert applicant["aon"]
@@ -85,6 +113,7 @@ def test_dds_calls_brigade_applicant_service(app_client: Callable[[], TestClient
         f"/api/v1/training/calls/{applicant['call_id']}/replicas", json={"text": "Вы звонили в 112, какой адрес?"}
     ).json()
     assert "Басманная" in ans["text"]
+    assert ans["tone"]["emotion"] == "calm"  # карточка без сценария — заявитель спокоен (п. 3.6)
 
     assert dds_call(dds, card["id"], "service", "S104").status_code in (200, 422)
     services = dds.get(f"/api/v1/incidents/dds/{DDS}/cards/{card['id']}").json()["card"]["services"]

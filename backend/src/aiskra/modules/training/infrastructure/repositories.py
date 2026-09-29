@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from aiskra.modules.training.application.ports.scenarios import ScenarioRow
 from aiskra.modules.training.domain.call import Call, CallMessage, CallParty, CallStatus, Speaker
 from aiskra.modules.training.domain.scenario import Scenario, ScenarioStatus
+from aiskra.modules.training.domain.tone import CallerTone, ToneSnapshot
 from aiskra.modules.training.infrastructure.models import CallMessageModel, CallModel, ScenarioModel
 from aiskra.platform.types import as_utc
 
@@ -158,6 +159,7 @@ class SqlCallRepository:
         row.aon = call.aon
         row.status = call.status.value
         row.revealed = list(call.revealed)
+        row.tone = call.tone.to_json() if call.tone else None
         row.answered_at = call.answered_at
         row.ended_at = call.ended_at
 
@@ -181,6 +183,7 @@ class SqlCallRepository:
             answered_at=as_utc(row.answered_at),
             ended_at=as_utc(row.ended_at),
             revealed=list(row.revealed or []),
+            tone=CallerTone.from_json(row.tone),
         )
 
     async def get(self, call_id: UUID) -> Call | None:
@@ -190,7 +193,12 @@ class SqlCallRepository:
     async def add_message(self, message: CallMessage) -> None:
         self._s.add(
             CallMessageModel(
-                id=message.id, call_id=message.call_id, speaker=message.speaker.value, text=message.text, at=message.at
+                id=message.id,
+                call_id=message.call_id,
+                speaker=message.speaker.value,
+                text=message.text,
+                at=message.at,
+                tone=message.tone.to_json() if message.tone else None,
             )
         )
         await self._s.flush()
@@ -207,7 +215,16 @@ class SqlCallRepository:
         for r in rows:
             at = as_utc(r.at)
             assert at is not None
-            out.append(CallMessage(id=r.id, call_id=r.call_id, speaker=Speaker(r.speaker), text=r.text, at=at))
+            out.append(
+                CallMessage(
+                    id=r.id,
+                    call_id=r.call_id,
+                    speaker=Speaker(r.speaker),
+                    text=r.text,
+                    at=at,
+                    tone=ToneSnapshot.from_json(r.tone),
+                )
+            )
         return out
 
     async def calls_of_card(self, card_id: UUID, student_id: UUID | None) -> list[Call]:

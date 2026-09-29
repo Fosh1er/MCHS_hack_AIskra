@@ -201,7 +201,11 @@ async def answer(
     call_id: UUID, body: AnswerIn, actor: Trainee, handler: Annotated[AnswerCallHandler, Depends(deps.provide_answer)]
 ) -> ReplicaOut | None:
     replica = await handler(AnswerCall(actor=actor, call_id=call_id, card_id=body.card_id))
-    return ReplicaOut(speaker=replica.speaker, text=replica.text) if replica else None
+    return (
+        ReplicaOut(speaker=replica.speaker, text=replica.text, message_id=replica.message_id, tone=replica.tone)
+        if replica
+        else None
+    )
 
 
 @router.post(
@@ -230,7 +234,7 @@ async def replica(
     handler: Annotated[SendReplicaHandler, Depends(deps.provide_replica)],
 ) -> ReplicaOut:
     r = await handler(SendReplica(actor=actor, call_id=call_id, text=body.text))
-    return ReplicaOut(speaker=r.speaker, text=r.text)
+    return ReplicaOut(speaker=r.speaker, text=r.text, message_id=r.message_id, tone=r.tone)
 
 
 class SpeechOut(BaseModel):

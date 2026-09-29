@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from aiskra.modules.training.domain.call import CallParty
 from aiskra.modules.training.domain.session import CardSource, SessionMode
+from aiskra.modules.training.domain.tone import ToneSnapshot
 
 
 class _Strict(BaseModel):
@@ -52,6 +53,10 @@ class ReplicaIn(_Strict):
 class ReplicaOut(BaseModel):
     speaker: str
     text: str
+    message_id: UUID | None = None
+    tone: ToneSnapshot | None = Field(
+        default=None, description="Состояние заявителя у этой реплики (п. 3.6): эмоция, шкалы 0–10, подача, причины"
+    )
 
 
 class EditScenarioIn(_Strict):
