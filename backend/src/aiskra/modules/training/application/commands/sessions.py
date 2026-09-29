@@ -8,7 +8,12 @@ from uuid import UUID
 
 from aiskra.modules.training.application.ports.psy import PsyCatalog
 from aiskra.modules.training.application.ports.scenarios import ScenarioRepository
-from aiskra.modules.training.application.ports.sessions import SessionDefaults, SessionRepository, SystemCards
+from aiskra.modules.training.application.ports.sessions import (
+    ServiceSwitches,
+    SessionDefaults,
+    SessionRepository,
+    SystemCards,
+)
 from aiskra.modules.training.domain.psy import check_settings
 from aiskra.modules.training.domain.session import CardSource, Participant, SessionMode, TrainingSession
 from aiskra.shared.application import Clock, Command, UnitOfWork
@@ -165,14 +170,18 @@ class FeedDdsCardHandler:
         cards: SystemCards,
         uow: UnitOfWork,
         clock: Clock,
+        switches: ServiceSwitches | None = None,
     ) -> None:
         self._sessions = sessions
         self._scenarios = scenarios
         self._cards = cards
         self._uow = uow
         self._clock = clock
+        self._switches = switches
 
     async def __call__(self, cmd: FeedDdsCard) -> FeedResult:
+        if self._switches and not await self._switches.enabled("dds_feed"):
+            return FeedResult(card_id=None, waiting=0, reason="выдача карточек в ДДС остановлена администратором")
         s = await self._sessions.running_for_student(cmd.actor.user_id)
         p = s.participant(cmd.actor.user_id) if s else None
         if s is None or p is None or p.role != "dds" or not p.dds_service_code:

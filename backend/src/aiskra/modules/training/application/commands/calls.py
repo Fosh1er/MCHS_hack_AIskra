@@ -19,7 +19,7 @@ from aiskra.modules.training.application.ports.scenarios import (
     DdsCallContext,
     ScenarioRepository,
 )
-from aiskra.modules.training.application.ports.sessions import SessionRepository
+from aiskra.modules.training.application.ports.sessions import ServiceSwitches, SessionRepository
 from aiskra.modules.training.application.psy import PsyDirector, TurnSignals, start_psy
 from aiskra.modules.training.domain.actors import topic_of
 from aiskra.modules.training.domain.call import Call, CallMessage, CallParty, ReplicaVia, Speaker
@@ -159,11 +159,16 @@ class StartIncomingCall(Command):
 
 
 class StartIncomingCallHandler(_CallBase):
-    def __init__(self, *args: object, generator: ScenarioGenerator, **kwargs: object) -> None:
+    def __init__(
+        self, *args: object, generator: ScenarioGenerator, switches: ServiceSwitches | None = None, **kwargs: object
+    ) -> None:
         super().__init__(*args, **kwargs)  # type: ignore[arg-type]
         self._gen = generator
+        self._switches = switches
 
     async def __call__(self, cmd: StartIncomingCall) -> CallStarted:
+        if self._switches and not await self._switches.enabled("call_stream"):
+            raise DomainError("Поток учебных вызовов остановлен администратором", code="service_stopped")
         rng = random.Random(cmd.seed)
         scenario = await self._scenarios.random_approved(rng, cmd.groups or None, cmd.difficulty)
         if scenario is None:  # банк пуст — сценарий на лету, сохраняется черновиком для проверки преподавателем

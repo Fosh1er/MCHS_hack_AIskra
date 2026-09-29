@@ -27,3 +27,14 @@ class SystemRetentionPolicy:
 
     async def retention_days(self) -> int:
         return int(merged("audit", await SqlSettingsStore(self._s).get("audit"))["retention_days"])
+
+
+class SystemServiceSwitches:
+    """Порт `ServiceSwitches` модуля training (п. 2.2): переключатели подсистем — из настроек администратора."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._s = session
+
+    async def enabled(self, name: str) -> bool:
+        values = merged("services", await SqlSettingsStore(self._s).get("services"))
+        return bool(int(values.get(name, 1)))
