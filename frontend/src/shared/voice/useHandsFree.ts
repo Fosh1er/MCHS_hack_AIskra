@@ -1,14 +1,23 @@
-/** Разговор без рук (п. 3.6, V3): микрофон открыт, пока режим включён; каждая фраза оператора записывается отдельно
+/** Разговор без рук (п. 3.6, V3): микрофон открыт, пока режим включён; каждая фраза оператора выделяется отдельно
  *  (начало и конец — `VadDetector`) и отдаётся наружу для распознавания. Звук на сервер не течёт потоком — только
  *  готовые фразы, тем же `POST /training/speech`, что и кнопка «говорить».
+ *
+ *  Звук пишется непрерывно в кольцевой буфер: детектор срабатывает, когда речь уже идёт, и без «предзаписи» первое
+ *  слово обрезается («Где вы находитесь?» → «вы находитесь») — так было в прототипе и так показал живой Whisper.
+ *  Фраза = предзапись + речь + тишина до конца; кодируется в WAV 16 кГц (`encodeWav`). Предзапись — 0,4 с, а если
+ *  оператор перебил собеседника — 0,9 с: пока тот говорит, порог выше и детектор ловит фразу на громком слове,
+ *  пропуская тихое начало («Есть пострадавшие?» → «пострадавшие?» — проверено на живом Whisper).
  *
  *  Микрофон закрывается, как только режим выключен: звонок завершён, ушли со страницы, идут подсказки. */
 import { useEffect, useRef, useState } from 'react';
 import { VAD, VAD_PROFILES, VadDetector, rmsOf, type VadProfileName } from './vad';
+import { encodeWav } from './wav';
 
 export type HandsFreeState = 'off' | 'starting' | 'calibrating' | 'listening' | 'party' | 'hearing' | 'error';
 
-const FRAME_MS = 20; // таймер, а не requestAnimationFrame: тот замирает, когда вкладка не на переднем плане
+const BLOCK = 1024; // отсчётов на кадр: ~21 мс при 48 кГц — как кадр детектора в прототипе
+const PREROLL_MS = 400; // звук до срабатывания детектора, чтобы не потерять начало первого слова
+const PREROLL_BARGE_IN_MS = 900; // оператор перебил собеседника: срабатывание позже, предзапись длиннее
 
 export function useHandsFree({ enabled, profile, partySpeaking, onSpeechStart, onPhrase, onError }: {
   enabled: boolean;
@@ -30,8 +39,7 @@ export function useHandsFree({ enabled, profile, partySpeaking, onSpeechStart, o
     let closed = false;
     let stream: MediaStream | null = null;
     let ctx: AudioContext | null = null;
-    let timer: number | undefined;
-    let recorder: MediaRecorder | null = null;
+    let proc: ScriptProcessorNode | null = null;
     setState('starting');
 
     (async () => {
@@ -40,41 +48,49 @@ export function useHandsFree({ enabled, profile, partySpeaking, onSpeechStart, o
         if (closed) { stream.getTracks().forEach((t) => t.stop()); return; }
         ctx = new AudioContext();
         await ctx.resume();
-        const analyser = ctx.createAnalyser();
-        analyser.fftSize = 2048;
-        analyser.smoothingTimeConstant = 0.75;
-        ctx.createMediaStreamSource(stream).connect(analyser);
-        const samples = new Uint8Array(analyser.fftSize);
-        const mime = ['audio/webm;codecs=opus', 'audio/ogg;codecs=opus', 'audio/webm'].find((m) => MediaRecorder.isTypeSupported(m));
+        const source = ctx.createMediaStreamSource(stream);
+        // ScriptProcessorNode устарел, но работает во всех браузерах и не требует отдельного файла, как AudioWorklet
+        proc = ctx.createScriptProcessor(BLOCK, 1, 1);
+        const mute = ctx.createGain();
+        mute.gain.value = 0; // узел должен быть подключён к выходу, иначе браузер не вызывает обработку; звук не слышен
+        source.connect(proc);
+        proc.connect(mute);
+        mute.connect(ctx.destination);
+        const rate = ctx.sampleRate;
+        const blocksOf = (ms: number) => Math.ceil(((ms / 1000) * rate) / BLOCK);
+        const [shortPreroll, longPreroll] = [blocksOf(PREROLL_MS), blocksOf(PREROLL_BARGE_IN_MS)];
+        let partyAt = -Infinity; // когда последний раз звучал собеседник
         const vad = new VadDetector(VAD_PROFILES[profile], performance.now() + VAD.calibrationMs);
         detector.current = vad;
         setState('calibrating');
 
-        const startPhrase = (s: MediaStream) => {
-          const r = new MediaRecorder(s, mime ? { mimeType: mime } : undefined);
-          const chunks: Blob[] = [];
-          r.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
-          r.onstop = () => { if (!closed && chunks.length) latest.current.onPhrase(new Blob(chunks, { type: r.mimeType || 'audio/webm' })); };
-          r.start(120);
-          recorder = r;
-        };
-
+        let recent: Float32Array[] = [];
+        let phrase: Float32Array[] | null = null;
         let shown: HandsFreeState = 'calibrating';
-        timer = window.setInterval(() => {
-          if (!stream) return;
-          analyser.getByteTimeDomainData(samples);
+        proc.onaudioprocess = (e) => {
+          if (closed) return;
+          const block = new Float32Array(e.inputBuffer.getChannelData(0)); // буфер переиспользуется браузером
+          const now = performance.now();
           const party = latest.current.partySpeaking();
-          const event = vad.step(rmsOf(samples), performance.now(), party);
+          if (party) partyAt = now;
+          const event = vad.step(rmsOf(block), now, party);
+          if (phrase) phrase.push(block);
+          else {
+            recent.push(block);
+            if (recent.length > longPreroll) recent.shift();
+          }
           if (event === 'start') {
             latest.current.onSpeechStart();
-            startPhrase(stream);
-          } else if (event === 'stop') {
-            if (recorder?.state === 'recording') recorder.stop();
-            recorder = null;
+            const bargeIn = now - partyAt <= VAD.echoGuardMs;
+            phrase = recent.slice(-(bargeIn ? longPreroll : shortPreroll)); // предзапись вместе с текущим кадром
+            recent = [];
+          } else if (event === 'stop' && phrase) {
+            latest.current.onPhrase(encodeWav(phrase, rate));
+            phrase = null;
           }
           const next: HandsFreeState = vad.isRecording ? 'hearing' : !vad.isReady ? 'calibrating' : party ? 'party' : 'listening';
-          if (next !== shown) { shown = next; setState(next); } // 50 кадров в секунду — перерисовка только при смене
-        }, FRAME_MS);
+          if (next !== shown) { shown = next; setState(next); } // ~50 кадров в секунду — перерисовка только при смене
+        };
       } catch {
         if (closed) return;
         setState('error');
@@ -84,8 +100,7 @@ export function useHandsFree({ enabled, profile, partySpeaking, onSpeechStart, o
 
     return () => {
       closed = true;
-      window.clearInterval(timer);
-      if (recorder?.state === 'recording') recorder.stop();
+      if (proc) { proc.onaudioprocess = null; proc.disconnect(); }
       stream?.getTracks().forEach((t) => t.stop());
       void ctx?.close().catch(() => undefined);
       detector.current = null;

@@ -40,7 +40,7 @@ export const useSpeechStatus = () =>
 export const replicaAudioUrl = (callId: string, messageId: string) => `${T}/calls/${callId}/messages/${messageId}/audio`;
 export async function transcribe(audio: Blob): Promise<string> {
   const body = new FormData();
-  body.append('audio', audio, audio.type.includes('ogg') ? 'speech.ogg' : 'speech.webm');
+  body.append('audio', audio, audio.type.includes('wav') ? 'speech.wav' : audio.type.includes('ogg') ? 'speech.ogg' : 'speech.webm');
   const res = await fetch(`${T}/speech`, { method: 'POST', body, credentials: 'same-origin' });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new ApiError(res.status, data.error ?? 'http_error', data.message ?? res.statusText);

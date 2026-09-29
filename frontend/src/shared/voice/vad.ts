@@ -105,10 +105,10 @@ export class VadDetector {
   }
 }
 
-/** Уровень сигнала кадра: среднеквадратичное отклонение от середины (байты 0…255 из `getByteTimeDomainData`). */
-export function rmsOf(samples: Uint8Array): number {
+/** Уровень сигнала кадра: среднеквадратичное значение отсчётов −1…1. */
+export function rmsOf(samples: Float32Array): number {
   let sum = 0;
-  for (const s of samples) { const v = (s - 128) / 128; sum += v * v; }
+  for (const v of samples) sum += v * v;
   return Math.sqrt(sum / samples.length);
 }
 
