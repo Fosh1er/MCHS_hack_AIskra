@@ -244,3 +244,25 @@ def test_scenario_edit_runs_grammar_check(app_client: Callable[[], TestClient], 
     fixed = teacher.patch(f"/api/v1/training/scenarios/{sid}", json={"what": "Горит балкон."}).json()
     assert fixed["grammar"] == []
     teacher.post(f"/api/v1/training/scenarios/{sid}/approve")
+
+
+def test_admin_stops_trainer_services(app_client: Callable[[], TestClient], lesson: dict[str, Any]) -> None:
+    """П. 2.2: администратор останавливает и запускает поток вызовов 112 и выдачу карточек ДДС."""
+    admin, student, petrov = (as_user(app_client, u) for u in ("admin", "student", "petrov"))
+    assert admin.get("/api/v1/system/settings").json()["services"] == {"call_stream": 1, "dds_feed": 1}
+    r = admin.put("/api/v1/system/settings/services", json={"values": {"call_stream": 0, "dds_feed": 0}})
+    assert r.status_code == 200, r.text
+    try:
+        stopped = student.post("/api/v1/training/calls/incoming", json={"groups": [1]})
+        assert stopped.status_code == 422 and stopped.json()["error"] == "service_stopped"
+        feed = petrov.post("/api/v1/training/sessions/feed").json()
+        assert feed["card_id"] is None and "остановлена администратором" in feed["reason"]
+        assert (
+            as_user(app_client, "teacher")
+            .put("/api/v1/system/settings/services", json={"values": {"call_stream": 1}})
+            .status_code
+            == 403
+        )
+    finally:
+        admin.put("/api/v1/system/settings/services", json={"values": {"call_stream": 1, "dds_feed": 1}})
+    assert student.post("/api/v1/training/calls/incoming", json={"groups": [1]}).status_code == 200

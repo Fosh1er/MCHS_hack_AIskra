@@ -72,6 +72,13 @@ class SessionMonitorSource(Protocol):
     async def progress(self, session: TrainingSession) -> list[ParticipantProgress]: ...
 
 
+class ServiceSwitches(Protocol):
+    """Запуск и остановка подсистем тренажёра администратором (п. 2.2): поток учебных вызовов 112, выдача карточек
+    в очередь ДДС. Остановленная подсистема отказывает с понятным сообщением, данные не теряются."""
+
+    async def enabled(self, name: str) -> bool: ...
+
+
 class SessionDefaults(Protocol):
     """Тайминг и пороги занятия по умолчанию — из настроек администратора (п. 5.2)."""
 
