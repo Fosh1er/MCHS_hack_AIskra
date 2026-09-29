@@ -69,16 +69,22 @@ class SectionReview:
     at: str | None = None
 
 
+def _approved_whole(s: Scenario) -> bool:
+    """Утверждён целиком без решений по разделам: до п. 3.3 или засевом стенда (`GenerateScenarios(approve=True)`)."""
+    return s.status.value == "approved"
+
+
 def review_state(s: Scenario) -> list[SectionReview]:
     out = []
     for key, title in SECTIONS.items():
         mark = s.review.get(key) or {}
         stale = bool(mark) and mark.get("hash") != fingerprint(s, key)
+        implicit = not mark and _approved_whole(s)  # утверждённый сценарий: раздел без решения принят
         out.append(
             SectionReview(
                 key=key,
                 title=title,
-                decision=None if stale or not mark else mark.get("decision"),
+                decision=Decision.ACCEPTED.value if implicit else None if stale or not mark else mark.get("decision"),
                 comment="" if stale else str(mark.get("comment") or ""),
                 stale=stale,
                 at=mark.get("at"),
@@ -96,6 +102,9 @@ def mark_sections(s: Scenario, marks: dict[str, tuple[Decision, str]], *, by: st
     at = at or datetime.now(UTC).isoformat()
     if not marks:
         raise DomainError("Отметьте хотя бы один раздел эталона", code="empty_review")
+    if _approved_whole(s):  # принятые неявно разделы остаются принятыми, если сценарий снимут с утверждения
+        for key in SECTIONS:
+            s.review.setdefault(key, {"decision": Decision.ACCEPTED.value, "comment": "", "hash": fingerprint(s, key)})
     for key, (decision, comment) in marks.items():
         if key not in SECTIONS:
             raise DomainError(f"Нет раздела эталона «{key}»", code="unknown_review_section")
