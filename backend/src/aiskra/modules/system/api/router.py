@@ -29,7 +29,15 @@ from aiskra.modules.system.application.commands.settings import (
     UpdateSettingsHandler,
 )
 from aiskra.modules.system.application.ports.admin import BackupInfo, LogRecord, ServiceState
-from aiskra.modules.system.application.queries.admin import GetStatus, GetStatusHandler, RecentLogs, RecentLogsHandler
+from aiskra.modules.system.application.queries.admin import (
+    Alert,
+    GetAlerts,
+    GetAlertsHandler,
+    GetStatus,
+    GetStatusHandler,
+    RecentLogs,
+    RecentLogsHandler,
+)
 from aiskra.modules.system.application.queries.get_ai_config import GetAIConfig, GetAIConfigHandler
 from aiskra.shared.errors import NotFoundError
 from aiskra.shared.security import Permission, Principal
@@ -104,6 +112,11 @@ async def update_settings(
 @router.get("/status", response_model=list[ServiceState], summary="Состояние сервисов: БД, ИИ, телефония, копии")
 async def status(handler: Annotated[GetStatusHandler, Depends(deps.provide_status)]) -> list[ServiceState]:
     return await handler(GetStatus())
+
+
+@router.get("/alerts", response_model=list[Alert], summary="Оповещения о сбоях: сервисы не в норме, ошибки в логе")
+async def alerts(handler: Annotated[GetAlertsHandler, Depends(deps.provide_alerts)]) -> list[Alert]:
+    return await handler(GetAlerts())
 
 
 @router.get("/logs", response_model=list[LogRecord], summary="Последние записи лога процесса")

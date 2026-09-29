@@ -1,7 +1,7 @@
 /** Состояние сервисов (п. 5.2, ТЗ: health-checks БД, ИИ-провайдера, телефонии) и импорт справочников. */
 import { Fragment } from 'react';
 import { Banner, Button, Card, ServiceHealth, type IconName } from '@smena112/ui-kit';
-import { useImport, useStatus } from '../../shared/api/admin';
+import { useAlerts, useImport, useStatus } from '../../shared/api/admin';
 import { CabinetShell } from '../../shared/ui/CabinetShell';
 
 const icon = (name: string): IconName =>
@@ -31,11 +31,20 @@ function ImportCard() {
 
 export function AdminStatusPage() {
   const q = useStatus();
-  const bad = q.data?.filter((s) => s.state === 'critical') ?? [];
+  const alerts = useAlerts().data ?? [];
   return (
     <CabinetShell kind="admin" active="status" title="Состояние системы" subtitle="обновляется каждые 15 с">
       {q.isError && <Banner status="critical">Бэкенд недоступен: {q.error.message}</Banner>}
-      {bad.length > 0 && <Banner status="critical">Неисправно: {bad.map((s) => s.name).join(', ')}</Banner>}
+      {alerts.length > 0 && (
+        <Banner status={alerts.some((a) => a.level === 'critical') ? 'critical' : 'warn'}>
+          <b>Оповещения ({alerts.length})</b>
+          <ul className="tch-errors">
+            {alerts.map((a) => (
+              <li key={a.source + a.text}><b>{a.source}</b>: {a.text}{a.at ? ` · ${new Date(a.at).toLocaleTimeString('ru-RU')}` : ''}</li>
+            ))}
+          </ul>
+        </Banner>
+      )}
       <section className="cab-svcs">
         {q.data?.map((s) => (
           <div key={s.name}>
