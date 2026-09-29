@@ -38,6 +38,7 @@ class StatusHistoryItem:
     operator: str | None
     comment: str | None
     order_no: str | None = None  # «Номер наряда» (ДДС, п. 2.2)
+    brigades: list[str] = field(default_factory=list)  # позывные выбранных сил (п. 5.5)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -50,6 +51,7 @@ class CardServiceView:
     status: str
     status_at: datetime | None
     history: list[StatusHistoryItem] = field(default_factory=list)
+    brigades: list[str] = field(default_factory=list)  # п. 5.5: ключи бригад, работающих сейчас по карточке
 
 
 @dataclass(frozen=True, kw_only=True)

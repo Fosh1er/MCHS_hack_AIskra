@@ -83,6 +83,19 @@ class ServiceModel(Base):
     active: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
+class BrigadeModel(Base):
+    """Бригада или силы службы (п. 5.5): диспетчер ДДС выбирает их при «Принята». Данные синтетические."""
+
+    __tablename__ = "dict_brigades"
+    code: Mapped[str] = mapped_column(String(96), primary_key=True)  # «<служба>:<позывной>»
+    service_code: Mapped[str] = mapped_column(ForeignKey("dict_services.code"), index=True)
+    call_sign: Mapped[str] = mapped_column(String(32))
+    name: Mapped[str] = mapped_column(String(255))
+    kind: Mapped[str] = mapped_column(String(64), default="")
+    crew: Mapped[int] = mapped_column(Integer, default=2)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
 class OkrugModel(Base):
     __tablename__ = "dict_okrugs"
     code: Mapped[str] = mapped_column(String(8), primary_key=True)

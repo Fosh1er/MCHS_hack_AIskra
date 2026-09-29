@@ -73,7 +73,10 @@ export interface ScenarioRow {
   id: string; title: string; status: 'draft' | 'approved' | 'archived'; difficulty: number;
   card_type_code: string | null; incident_type_code: string | null; source: string; created_at: string | null;
   psy_profile?: string | null;
+  review_accepted?: number; review_rework?: number; review_total?: number; // п. 3.3: разделы эталона
 }
+/** Решение преподавателя по разделу эталона (п. 3.3); `stale` — раздел изменили после решения. */
+export interface SectionReview { key: string; title: string; decision: 'accepted' | 'rework' | null; comment: string; stale: boolean; at: string | null }
 export interface ScenarioView {
   id: string; title: string; status: ScenarioRow['status']; difficulty: number; source: string;
   card_type_code: string; incident_type_code: string;
@@ -81,6 +84,7 @@ export interface ScenarioView {
   reference_card: Record<string, unknown> & { final_type?: string; services?: { code: string; main: boolean }[] };
   reference_dds: Record<string, unknown>;
   psy_profile?: string | null;
+  review?: SectionReview[];
 }
 export interface PreviewItem { question: string; answer: string; reference: string }
 export interface ScenarioFilter { status?: string; difficulty?: number; card_type?: string; source?: string; page: number; page_size: number }
@@ -103,6 +107,10 @@ export const useGenerateScenarios = () =>
   useInvalidating((b: { count: number; groups: number[]; difficulty: number }) => post<{ ids: string[] }>('/scenarios/generate', b), [['scenarios']]);
 export const useReviewScenario = () =>
   useInvalidating(({ id, approve }: { id: string; approve: boolean }) => post<{ status: string }>(`/scenarios/${id}/${approve ? 'approve' : 'archive'}`), [['scenarios'], ['scenario']]);
+export type SectionDecision = { decision: 'accepted' | 'rework'; comment?: string };
+export const useReviewSections = () =>
+  useInvalidating(({ id, sections }: { id: string; sections: Record<string, SectionDecision> }) =>
+    post<{ status: string; sections: SectionReview[] }>(`/scenarios/${id}/review`, { sections }), [['scenarios'], ['scenario']]);
 export interface ScenarioEdit { title?: string; difficulty?: number; opening?: string; what?: string; details?: string; comment?: string }
 // ------------------------------------------------------------------ п. 3.7: психологический модификатор
 export interface PsyProfile {

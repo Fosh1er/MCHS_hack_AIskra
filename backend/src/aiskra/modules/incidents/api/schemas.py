@@ -172,6 +172,9 @@ class ServiceStatusIn(_Strict):
     status: ServiceStatus
     order_no: str = Field(default="", max_length=32, description="«Номер наряда»")
     comment: str = Field(default="", max_length=500)
+    brigades: list[str] | None = Field(
+        default=None, max_length=10, description="Силы из справочника службы (п. 5.5); не передано — состав не меняется"
+    )
 
 
 class CardTimerIn(BaseModel):

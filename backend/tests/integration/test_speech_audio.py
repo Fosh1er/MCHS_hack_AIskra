@@ -63,3 +63,48 @@ def test_replica_audio(app_client: Callable[[], TestClient]) -> None:
         assert TestClient(student.app).get(audio).status_code == 401  # без входа
     finally:
         services.tts = real
+
+
+def test_call_recording_wav(app_client: Callable[[], TestClient]) -> None:
+    """П. 8.7: запись звонка одним WAV — реплики оператора и заявителя по порядку, оператор — голос «operator»."""
+    import io
+    import wave
+
+    def tone_wav(n: int) -> bytes:
+        buf = io.BytesIO()
+        with wave.open(buf, "wb") as w:
+            w.setnchannels(1)
+            w.setsampwidth(2)
+            w.setframerate(8000)
+            w.writeframes(b"\x10\x00" * n)
+        return buf.getvalue()
+
+    class WavTTS(RecordingTTS):
+        async def synthesize(self, text: str, *, voice: VoiceProfile) -> AudioBlob:
+            self.calls.append((text, voice))
+            return AudioBlob(content=tone_wav(800), mime="audio/wav")
+
+    student = as_user(app_client, "student")
+    cid = student.post("/api/v1/training/calls/incoming", json={}).json()["call_id"]
+    student.post(f"/api/v1/training/calls/{cid}/answer", json={})
+    student.post(f"/api/v1/training/calls/{cid}/replicas", json={"text": "Служба 112, что случилось?"})
+    url = f"/api/v1/training/calls/{cid}/recording"
+
+    off = student.get(url)
+    assert off.status_code == 422 and off.json()["error"] == "tts_disabled"
+    services = student.app.state.services  # type: ignore[attr-defined]
+    real, stub = services.tts, WavTTS()
+    services.tts = stub
+    try:
+        r = student.get(url)
+        assert r.status_code == 200 and r.headers["content-type"] == "audio/wav"
+        assert "attachment" in r.headers["content-disposition"] and ".wav" in r.headers["content-disposition"]
+        with wave.open(io.BytesIO(r.content), "rb") as w:
+            n = len(stub.calls)
+            assert n >= 3 and w.getnframes() == 800 * n + 8000 * 450 // 1000 * (n - 1)
+        voices = [p.voice for _, p in stub.calls]
+        assert "operator" in voices and any(v.startswith("applicant") for v in voices)
+        assert as_user(app_client, "teacher").get(url).status_code == 200  # преподаватель видит любой звонок
+        assert as_user(app_client, "petrov").get(url).status_code == 404  # чужой звонок
+    finally:
+        services.tts = real

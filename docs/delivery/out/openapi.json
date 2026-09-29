@@ -2876,6 +2876,69 @@
     }
    }
   },
+  "/api/v1/incidents/dds/{service_code}/brigades": {
+   "get": {
+    "tags": [
+     "incidents"
+    ],
+    "summary": "Бригады и силы своей службы для выбора (п. 5.5); занятые на других незакрытых карточках помечены",
+    "operationId": "dds_brigades_api_v1_incidents_dds__service_code__brigades_get",
+    "parameters": [
+     {
+      "name": "service_code",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Service Code"
+      }
+     },
+     {
+      "name": "card_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "format": "uuid"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Card Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "$ref": "#/components/schemas/BrigadeOption"
+         },
+         "title": "Response Dds Brigades Api V1 Incidents Dds  Service Code  Brigades Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/incidents/dds/{service_code}/timer": {
    "post": {
     "tags": [
@@ -3363,6 +3426,59 @@
        "application/json": {
         "schema": {
          "$ref": "#/components/schemas/StatusOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/training/scenarios/{scenario_id}/review": {
+   "post": {
+    "tags": [
+     "training"
+    ],
+    "summary": "Частичное утверждение эталона (п. 3.3): разделы «принят» / «на доработку»; все приняты — утверждён",
+    "operationId": "review_sections_api_v1_training_scenarios__scenario_id__review_post",
+    "parameters": [
+     {
+      "name": "scenario_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Scenario Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ReviewSectionsIn"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/SectionsReviewed"
         }
        }
       }
@@ -3878,6 +3994,46 @@
       "content": {
        "audio/mpeg": {},
        "audio/wav": {}
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/training/calls/{call_id}/recording": {
+   "get": {
+    "tags": [
+     "training"
+    ],
+    "summary": "Запись звонка (п. 8.7): все реплики, озвученные серверным синтезом, одним файлом WAV (или MP3)",
+    "operationId": "call_recording_api_v1_training_calls__call_id__recording_get",
+    "parameters": [
+     {
+      "name": "call_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Call Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Запись звонка одним файлом",
+      "content": {
+       "audio/wav": {},
+       "audio/mpeg": {}
       }
      },
      "422": {
@@ -6481,6 +6637,63 @@
     ],
     "title": "Body_upload_material_api_v1_training_materials_post"
    },
+   "BrigadeOption": {
+    "properties": {
+     "code": {
+      "type": "string",
+      "title": "Code"
+     },
+     "call_sign": {
+      "type": "string",
+      "title": "Call Sign"
+     },
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "kind": {
+      "type": "string",
+      "title": "Kind"
+     },
+     "crew": {
+      "type": "integer",
+      "title": "Crew"
+     },
+     "busy_card_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Busy Card Id"
+     },
+     "busy_card_number": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Busy Card Number"
+     }
+    },
+    "type": "object",
+    "required": [
+     "code",
+     "call_sign",
+     "name",
+     "kind",
+     "crew"
+    ],
+    "title": "BrigadeOption",
+    "description": "Бригада справочника службы (п. 5.5) и где она сейчас работает."
+   },
    "CallParty": {
     "type": "string",
     "enum": [
@@ -7167,6 +7380,13 @@
       },
       "type": "array",
       "title": "History"
+     },
+     "brigades": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Brigades"
      }
     },
     "type": "object",
@@ -11632,6 +11852,25 @@
     ],
     "title": "RestoreIn"
    },
+   "ReviewSectionsIn": {
+    "properties": {
+     "sections": {
+      "additionalProperties": {
+       "$ref": "#/components/schemas/SectionDecisionIn"
+      },
+      "type": "object",
+      "minProperties": 1,
+      "title": "Sections",
+      "description": "Раздел эталона (story, applicant, classification, services, dds) → решение"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "sections"
+    ],
+    "title": "ReviewSectionsIn"
+   },
    "ReworkNote": {
     "properties": {
      "comment": {
@@ -11887,6 +12126,21 @@
        }
       ],
       "title": "Psy Profile"
+     },
+     "review_accepted": {
+      "type": "integer",
+      "title": "Review Accepted",
+      "default": 0
+     },
+     "review_rework": {
+      "type": "integer",
+      "title": "Review Rework",
+      "default": 0
+     },
+     "review_total": {
+      "type": "integer",
+      "title": "Review Total",
+      "default": 0
      }
     },
     "type": "object",
@@ -11958,6 +12212,13 @@
        }
       ],
       "title": "Psy Profile"
+     },
+     "review": {
+      "items": {
+       "$ref": "#/components/schemas/SectionReview"
+      },
+      "type": "array",
+      "title": "Review"
      }
     },
     "type": "object",
@@ -11974,6 +12235,103 @@
      "reference_dds"
     ],
     "title": "ScenarioView"
+   },
+   "SectionDecisionIn": {
+    "properties": {
+     "decision": {
+      "type": "string",
+      "enum": [
+       "accepted",
+       "rework"
+      ],
+      "title": "Decision"
+     },
+     "comment": {
+      "type": "string",
+      "maxLength": 500,
+      "title": "Comment",
+      "description": "Что доработать; для «на доработку» обязателен",
+      "default": ""
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "decision"
+    ],
+    "title": "SectionDecisionIn"
+   },
+   "SectionReview": {
+    "properties": {
+     "key": {
+      "type": "string",
+      "title": "Key"
+     },
+     "title": {
+      "type": "string",
+      "title": "Title"
+     },
+     "decision": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Decision"
+     },
+     "comment": {
+      "type": "string",
+      "title": "Comment"
+     },
+     "stale": {
+      "type": "boolean",
+      "title": "Stale"
+     },
+     "at": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "At"
+     }
+    },
+    "type": "object",
+    "required": [
+     "key",
+     "title",
+     "decision",
+     "comment",
+     "stale"
+    ],
+    "title": "SectionReview"
+   },
+   "SectionsReviewed": {
+    "properties": {
+     "status": {
+      "type": "string",
+      "title": "Status"
+     },
+     "sections": {
+      "items": {
+       "$ref": "#/components/schemas/SectionReview"
+      },
+      "type": "array",
+      "title": "Sections"
+     }
+    },
+    "type": "object",
+    "required": [
+     "status",
+     "sections"
+    ],
+    "title": "SectionsReviewed"
    },
    "ServiceRow": {
     "properties": {
@@ -12131,6 +12489,22 @@
       "maxLength": 500,
       "title": "Comment",
       "default": ""
+     },
+     "brigades": {
+      "anyOf": [
+       {
+        "items": {
+         "type": "string"
+        },
+        "type": "array",
+        "maxItems": 10
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Brigades",
+      "description": "Силы из справочника службы (п. 5.5); не передано — состав не меняется"
      }
     },
     "additionalProperties": false,
@@ -12592,6 +12966,13 @@
        }
       ],
       "title": "Order No"
+     },
+     "brigades": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Brigades"
      }
     },
     "type": "object",

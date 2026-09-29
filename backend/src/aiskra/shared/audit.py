@@ -56,6 +56,7 @@ class AuditEvent(StrEnum):
     SESSION_STARTED = "sessions.started"
     SESSION_FINISHED = "sessions.finished"
     SCENARIO_EDITED = "scenarios.edited"
+    SCENARIO_REVIEWED = "scenarios.reviewed"
     SERVICE_STATUS_CHANGED = "dds.status_changed"
     SERVICE_TIMER_PAUSED = "dds.timer_paused"
     CARD_SAVED = "card.saved"
@@ -110,6 +111,7 @@ AUDIT_EVENT_TITLES: Mapping[AuditEvent, str] = {
     AuditEvent.SESSION_STARTED: "Начало занятия",
     AuditEvent.SESSION_FINISHED: "Завершение занятия",
     AuditEvent.SCENARIO_EDITED: "Правка сценария",
+    AuditEvent.SCENARIO_REVIEWED: "Проверка эталона по разделам (частичное утверждение)",
     AuditEvent.SERVICE_STATUS_CHANGED: "Изменение статуса службы (ДДС)",
     AuditEvent.SERVICE_TIMER_PAUSED: "Пауза таймера решения ДДС на обучение интерфейсу",
     AuditEvent.CARD_SAVED: "Сохранение карточки происшествия",

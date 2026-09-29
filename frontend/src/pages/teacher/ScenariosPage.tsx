@@ -9,6 +9,7 @@ import {
 } from '../../shared/api/training';
 import { TeacherShell } from '../../shared/ui/TeacherShell';
 import { useScreenTour } from '../../shared/onboarding/OnboardingProvider';
+import { ReferenceReview, ReworkNotes } from './ReferenceReview';
 
 const STATUS: Record<ScenarioRow['status'], { label: string; pill: 'info' | 'ok' | 'neutral' }> = {
   draft: { label: 'на проверке', pill: 'info' },
@@ -166,7 +167,9 @@ function Detail({ id }: { id: string }) {
       actions={<Segmented ariaLabel="Режим" value={mode} onChange={setMode}
         options={[{ value: 'view', label: 'легенда' }, { value: 'preview', label: 'прогон' }, { value: 'edit', label: 'правка' }]} />}>
       {mode === 'view' && <Legend s={s} />}
+      {mode === 'view' && <ReferenceReview s={s} />}
       {mode === 'view' && <PsyPick s={s} />}
+      {mode === 'edit' && <ReworkNotes s={s} />}
       {mode === 'edit' && <EditForm s={s} onClose={() => setMode('view')} />}
       {mode === 'preview' && (
         <ol className="tch-preview">
@@ -232,7 +235,12 @@ export function ScenariosPage() {
                   <td>{s.card_type_code ? titles.get(s.card_type_code) ?? s.card_type_code : '—'}</td>
                   <td className="num">{s.difficulty}</td>
                   <td>{SOURCE[s.source] ?? s.source}</td>
-                  <td><StatusPill status={STATUS[s.status].pill}>{STATUS[s.status].label}</StatusPill></td>
+                  <td>
+                    <StatusPill status={STATUS[s.status].pill}>{STATUS[s.status].label}</StatusPill>
+                    {s.status === 'draft' && !!(s.review_accepted || s.review_rework) && (
+                      <small className="c-slate"> принято {s.review_accepted} из {s.review_total}{s.review_rework ? `, на доработке ${s.review_rework}` : ''}</small>
+                    )}
+                  </td>
                 </tr>
               ))}
               {list.data && !total && <tr><td colSpan={5} className="c-slate">Сценариев нет — сгенерируйте их выше.</td></tr>}

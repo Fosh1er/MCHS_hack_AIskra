@@ -35,6 +35,54 @@ def test_generate_review_and_list(app_client: Callable[[], TestClient]) -> None:
     assert student.post("/api/v1/training/scenarios/generate", json={"count": 1}).status_code == 403
 
 
+def test_partial_approval_of_reference(app_client: Callable[[], TestClient]) -> None:
+    """П. 3.3: одни разделы эталона приняты, другие — на доработку; правка раздела сбрасывает решение только по нему;
+    все разделы приняты — сценарий утверждён."""
+    teacher = as_user(app_client, "teacher")
+    sid = teacher.post("/api/v1/training/scenarios/generate", json={"count": 1, "difficulty": 2}).json()["ids"][0]
+    url = f"/api/v1/training/scenarios/{sid}"
+    sections = [r["key"] for r in teacher.get(url).json()["review"]]
+    assert sections == ["story", "applicant", "classification", "services", "dds"]
+
+    no_comment = teacher.post(f"{url}/review", json={"sections": {"story": {"decision": "rework"}}})
+    assert no_comment.status_code == 422 and no_comment.json()["error"] == "rework_comment_required"
+    marks = {k: {"decision": "accepted"} for k in sections if k != "story"}
+    marks["story"] = {"decision": "rework", "comment": "Первая фраза слишком спокойная для сложности"}
+    r = teacher.post(f"{url}/review", json={"sections": marks}).json()
+    assert r["status"] == "draft"
+    by_key = {x["key"]: x for x in r["sections"]}
+    assert by_key["story"]["decision"] == "rework" and "спокойная" in by_key["story"]["comment"]
+    assert by_key["services"]["decision"] == "accepted"
+    row = next(
+        x
+        for x in teacher.get("/api/v1/training/scenarios", params={"status": "draft"}).json()["items"]
+        if x["id"] == sid
+    )
+    assert (row["review_accepted"], row["review_rework"], row["review_total"]) == (4, 1, 5)
+
+    # правка речи заявителя: решение по «story» больше не действует, остальные разделы — приняты
+    assert teacher.patch(url, json={"opening": "Алло! Помогите, тут дым из квартиры!"}).status_code == 200
+    state = {x["key"]: x for x in teacher.get(url).json()["review"]}
+    assert state["story"]["decision"] is None and state["story"]["stale"] is True
+    assert state["dds"]["decision"] == "accepted" and state["dds"]["stale"] is False
+
+    done = teacher.post(f"{url}/review", json={"sections": {"story": {"decision": "accepted"}}}).json()
+    assert done["status"] == "approved"
+    # утверждённый сценарий с разделом на доработку снимается с банка занятий
+    back = teacher.post(f"{url}/review", json={"sections": {"dds": {"decision": "rework", "comment": "нужен звонок"}}})
+    assert back.json()["status"] == "draft"
+    assert teacher.post(f"{url}/approve").json()["status"] == "approved"  # полное утверждение принимает все разделы
+    assert all(x["decision"] == "accepted" for x in teacher.get(url).json()["review"])
+
+    bad = teacher.post(f"{url}/review", json={"sections": {"nope": {"decision": "accepted"}}})
+    assert bad.status_code == 422 and bad.json()["error"] == "unknown_review_section"
+    student = as_user(app_client, "student")
+    assert student.post(f"{url}/review", json={"sections": {"dds": {"decision": "accepted"}}}).status_code == 403
+    admin = as_user(app_client, "admin")
+    titles = {e["event_title"] for e in admin.get("/api/v1/audit", params={"q": ""}).json()["items"]}
+    assert "Проверка эталона по разделам (частичное утверждение)" in titles
+
+
 def test_incoming_call_with_ai_applicant(app_client: Callable[[], TestClient]) -> None:
     student = as_user(app_client, "student")
     call = student.post("/api/v1/training/calls/incoming", json={}).json()

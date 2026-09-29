@@ -23,6 +23,7 @@ from aiskra.modules.training.api.schemas import (
     PsyProfileOut,
     ReplicaIn,
     ReplicaOut,
+    ReviewSectionsIn,
     ScenarioPsyIn,
     StatusOut,
 )
@@ -49,6 +50,11 @@ from aiskra.modules.training.application.commands.materials import (
     UpdateMaterialHandler,
     UploadMaterial,
     UploadMaterialHandler,
+)
+from aiskra.modules.training.application.commands.scenario_review import (
+    ReviewSections,
+    ReviewSectionsHandler,
+    SectionsReviewed,
 )
 from aiskra.modules.training.application.commands.scenarios import (
     EditScenario,
@@ -121,6 +127,8 @@ from aiskra.modules.training.application.queries.sessions import (
     SessionView,
 )
 from aiskra.modules.training.application.speech import (
+    CallRecordingHandler,
+    GetCallRecording,
     GetReplicaAudio,
     ReplicaAudioHandler,
     SpeechStatus,
@@ -128,6 +136,7 @@ from aiskra.modules.training.application.speech import (
     TranscribeHandler,
 )
 from aiskra.modules.training.domain.material import MAX_BYTES, MaterialKind
+from aiskra.modules.training.domain.review import Decision
 from aiskra.shared.errors import NotFoundError
 from aiskra.shared.security import Permission, Principal
 from aiskra.shared.web import CurrentPrincipal, Meta, require
@@ -200,6 +209,22 @@ async def archive(
     return StatusOut(
         status=await handler(ReviewScenario(actor=actor, scenario_id=scenario_id, approve=False, meta=meta))
     )
+
+
+@router.post(
+    "/scenarios/{scenario_id}/review",
+    response_model=SectionsReviewed,
+    summary="Частичное утверждение эталона (п. 3.3): разделы «принят» / «на доработку»; все приняты — утверждён",
+)
+async def review_sections(
+    scenario_id: UUID,
+    body: ReviewSectionsIn,
+    actor: Manager,
+    meta: Meta,
+    handler: Annotated[ReviewSectionsHandler, Depends(deps.provide_review_sections)],
+) -> SectionsReviewed:
+    sections = {k: (Decision(v.decision), v.comment) for k, v in body.sections.items()}
+    return await handler(ReviewSections(actor=actor, scenario_id=scenario_id, sections=sections, meta=meta))
 
 
 @router.post("/calls/incoming", response_model=CallStarted, summary="Учебный входящий вызов в 112 (п. 1.4)")
@@ -372,6 +397,25 @@ async def replica_audio(
 ) -> Response:
     audio = await handler(GetReplicaAudio(actor=actor, call_id=call_id, message_id=message_id))
     return Response(content=audio.content, media_type=audio.mime)
+
+
+@router.get(
+    "/calls/{call_id}/recording",
+    response_class=Response,
+    responses={200: {"content": {"audio/wav": {}, "audio/mpeg": {}}, "description": "Запись звонка одним файлом"}},
+    summary="Запись звонка (п. 8.7): все реплики, озвученные серверным синтезом, одним файлом WAV (или MP3)",
+)
+async def call_recording(
+    call_id: UUID,
+    actor: CurrentPrincipal,
+    handler: Annotated[CallRecordingHandler, Depends(deps.provide_call_recording)],
+) -> Response:
+    rec = await handler(GetCallRecording(actor=actor, call_id=call_id))
+    return Response(
+        content=rec.content,
+        media_type=rec.mime,
+        headers={"Content-Disposition": f'attachment; filename="{rec.file_name}"'},
+    )
 
 
 @router.get("/cards/{card_id}/calls", response_model=list[CallView], summary="Звонки по карточке")

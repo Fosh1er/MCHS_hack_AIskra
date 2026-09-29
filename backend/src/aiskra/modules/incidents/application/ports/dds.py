@@ -18,6 +18,20 @@ class DdsServiceState:
     current_status: str
     paused_ms: int | None = None  # п. 5.3: пауза таймера решения на подсказки
     pause_started_at: datetime | None = None
+    brigades: list[str] = field(default_factory=list)  # п. 5.5: силы службы, работающие по карточке
+
+
+@dataclass(frozen=True, kw_only=True)
+class BrigadeOption:
+    """Бригада справочника службы (п. 5.5) и где она сейчас работает."""
+
+    code: str
+    call_sign: str
+    name: str
+    kind: str
+    crew: int
+    busy_card_id: UUID | None = None  # другая незакрытая карточка службы, по которой бригада направлена
+    busy_card_number: int | None = None
 
 
 class DdsRepository(Protocol):
@@ -31,6 +45,10 @@ class DdsRepository(Protocol):
         self, card_id: UUID, service_code: str, *, paused_ms: int | None, pause_started_at: datetime | None
     ) -> None: ...
 
+    async def brigades(self, service_code: str, *, exclude_card: UUID | None = None) -> list[BrigadeOption]:
+        """Активные бригады службы; занятость — по незакрытым карточкам службы, кроме `exclude_card`."""
+        ...
+
     async def set_status(
         self,
         card_id: UUID,
@@ -41,8 +59,10 @@ class DdsRepository(Protocol):
         comment: str | None,
         actor_id: UUID,
         at: datetime,
+        brigades: list[str] | None = None,
     ) -> None:
-        """Новый текущий статус службы + строка истории (card_service_statuses)."""
+        """Новый текущий статус службы + строка истории (card_service_statuses). `brigades` — новый состав сил
+        (None — не менять)."""
         ...
 
 

@@ -7,7 +7,7 @@ import { CallControl, Icon, IncidentActions, ServiceBar, ServiceTab, SquareButto
 import { PERMISSIONS, type Me } from '../../shared/api/auth';
 import { useCardTypes, useEnum, useServices } from '../../shared/api/dictionaries';
 import {
-  CARD_STATUS, SERVICE_STATUS, markCardViewed, useCardActions,
+  CARD_STATUS, SERVICE_STATUS, markCardViewed, useCardActions, useDdsBrigades,
   type CardServiceView, type CardView, type ServiceStatusBody, type WorkoutBody,
 } from '../../shared/api/incidents';
 import { shortName } from '../../shared/ui/ArmTopBar';
@@ -167,20 +167,27 @@ export interface DdsMode {
   onClose: () => void;
 }
 
-/** Строка «Статус ▾ · Номер наряда · Комментарий · ✓ ✕» (dds/image8–9): в списке — только доступные переходы. */
-function DdsStatusEditor({ next, busy, lastOrderNo, onSave, onCancel }: {
+/** Строка «Статус ▾ · Номер наряда · Комментарий · ✓ ✕» (dds/image8–9): в списке — только доступные переходы.
+ *  Под ней — силы своей службы из справочника (п. 5.5): бригады, занятые на других карточках, выбрать нельзя. */
+function DdsStatusEditor({ service, cardId, current, next, busy, lastOrderNo, onSave, onCancel }: {
+  service: string; cardId: string; current: string[];
   next: string[]; busy: boolean; lastOrderNo: string; onSave: (b: ServiceStatusBody) => Promise<unknown>; onCancel: () => void;
 }) {
   const [status, setStatus] = useState(next.length === 1 ? next[0] : '');
   const [orderNo, setOrderNo] = useState(lastOrderNo);
   const [comment, setComment] = useState('');
+  const [picked, setPicked] = useState<string[]>(current);
   const [error, setError] = useState('');
   const ref = useRef<HTMLSelectElement>(null);
   useEffect(() => ref.current?.focus(), []);
+  const forces = status !== '' && status !== 'rejected';
+  const brigades = useDdsBrigades(service, cardId, forces);
+  const toggle = (code: string) => setPicked(picked.includes(code) ? picked.filter((c) => c !== code) : [...picked, code]);
+  const changed = picked.length !== current.length || picked.some((c) => !current.includes(c));
   const save = () => {
     if (!status) { setError('Выберите статус'); return; }
     setError('');
-    onSave({ status, order_no: orderNo, comment }).then(onCancel, (e: Error) => setError(e.message));
+    onSave({ status, order_no: orderNo, comment, ...(forces && changed && { brigades: picked }) }).then(onCancel, (e: Error) => setError(e.message));
   };
   return (
     <div className="arm-stateditor dds-editor" role="dialog" aria-label="Изменение статуса службы">
@@ -193,6 +200,21 @@ function DdsStatusEditor({ next, busy, lastOrderNo, onSave, onCancel }: {
         onKeyDown={(e) => { if (e.key === 'Enter') save(); }} />
       <button type="button" className="arm-iconsq" aria-label="Сохранить статус" disabled={busy} onClick={save}><Icon name="check" size="sm" /></button>
       <button type="button" className="arm-iconsq" aria-label="Отмена" onClick={onCancel}><Icon name="close" size="sm" /></button>
+      {forces && (
+        <fieldset className="dds-editor__forces">
+          <legend>Силы службы{picked.length ? `: выбрано ${picked.length}` : ''}</legend>
+          {brigades.data?.map((b) => {
+            const taken = b.busy_card_number !== null;
+            return (
+              <label key={b.code} className={picked.includes(b.code) ? 'is-on' : ''} title={taken ? `Работает по карточке № ${b.busy_card_number}` : `${b.kind}, расчёт ${b.crew} чел.`}>
+                <input type="checkbox" checked={picked.includes(b.code)} disabled={taken} onChange={() => toggle(b.code)} />
+                {' '}<b>{b.call_sign}</b> {b.name}{taken && <span className="dds-editor__busy"> · занята, № {b.busy_card_number}</span>}
+              </label>
+            );
+          })}
+          {brigades.data?.length === 0 && <span className="dds-editor__busy">в справочнике службы нет бригад</span>}
+        </fieldset>
+      )}
       {error && <div className="dds-editor__err" role="alert">{error}</div>}
     </div>
   );
@@ -452,7 +474,8 @@ export function CardViewer({ view, me, dds }: { view: CardView; me: Me; dds?: Dd
         onToggleExpand={services.length > 6 ? () => setExpanded(!expanded) : undefined}
         stack={services.length > 6 ? services.slice(6).map(tab) : undefined}
         overlay={(editor && dds) ? (
-          <DdsStatusEditor next={dds.next} busy={dds.busy} lastOrderNo={lastOrderNo} onSave={dds.onStatus} onCancel={() => setEditor(false)} />
+          <DdsStatusEditor service={dds.service} cardId={view.id} current={ownService?.brigades ?? []} next={dds.next} busy={dds.busy}
+            lastOrderNo={lastOrderNo} onSave={dds.onStatus} onCancel={() => setEditor(false)} />
         ) : historyService && (
           <StatusHistory
             service={historyService.short} onClose={() => setHistory(null)} style={{ left: 90, bottom: 'calc(100% + 4px)' }}
@@ -460,7 +483,7 @@ export function CardViewer({ view, me, dds }: { view: CardView; me: Me; dds?: Dd
               operator: h.operator ? `оп. ${h.operator}` : 'оп. 0',
               at: h.at ? `${new Date(h.at).toLocaleDateString('ru-RU')} ${hhmmss(new Date(h.at))}` : '',
               status: SERVICE_STATUS[h.status] ?? h.status,
-              comment: [h.order_no && `наряд ${h.order_no}`, h.comment].filter(Boolean).join(' · ') || undefined,
+              comment: [h.order_no && `наряд ${h.order_no}`, h.brigades?.length && `силы ${h.brigades.join(', ')}`, h.comment].filter(Boolean).join(' · ') || undefined,
             }))}
           />
         )}

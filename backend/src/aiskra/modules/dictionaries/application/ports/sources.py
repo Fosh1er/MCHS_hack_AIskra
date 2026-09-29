@@ -30,6 +30,7 @@ class CuratedDictionaries:
     channels: list[dict[str, Any]]
     card_types: list[dict[str, Any]]
     columns: list[dict[str, Any]]
+    brigades: dict[str, Any] = field(default_factory=dict)  # brigades.yaml: шаблоны бригад служб (п. 5.5)
 
 
 class ClassifierSource(Protocol):
@@ -55,6 +56,7 @@ class DictionaryPayload:
     enums: dict[str, list[dict[str, Any]]]
     channels: list[dict[str, Any]]
     card_types: list[dict[str, Any]]
+    brigades: list[dict[str, Any]] = field(default_factory=list)  # п. 5.5: строки dict_brigades
 
 
 @dataclass

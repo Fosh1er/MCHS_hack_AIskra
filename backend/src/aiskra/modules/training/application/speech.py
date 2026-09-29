@@ -17,7 +17,8 @@ from uuid import UUID
 from aiskra.ai.ports import STTPort, TTSPort, VoiceProfile
 from aiskra.modules.training.application.ports.scenarios import CallRepository, ScenarioRepository
 from aiskra.modules.training.application.queries.calls import call_visible
-from aiskra.modules.training.domain.call import CallParty, Speaker
+from aiskra.modules.training.domain.audio import join_call_audio
+from aiskra.modules.training.domain.call import Call, CallMessage, CallParty, Speaker
 from aiskra.modules.training.domain.scenario import legend_voice
 from aiskra.modules.training.domain.tone import STAFF_STYLE, speech_speed, speech_style
 from aiskra.shared.application import Command, Query
@@ -105,8 +106,8 @@ class ReplicaAudio:
     mime: str
 
 
-class ReplicaAudioHandler:
-    """Звук реплики собеседника. Видит тот же, кто видит звонок: свой — обучающийся, любой — преподаватель."""
+class _Voices:
+    """Голос и подача реплик звонка — общие для звука реплики и записи звонка."""
 
     def __init__(self, tts: TTSPort, calls: CallRepository, scenarios: ScenarioRepository) -> None:
         self._tts = tts
@@ -122,6 +123,24 @@ class ReplicaAudioHandler:
         sex = legend_voice(applicant) if isinstance(applicant, dict) else None
         return f"applicant_{sex}" if sex else "applicant"
 
+    async def _profile(self, call: Call, msg: CallMessage) -> VoiceProfile:
+        if msg.speaker is Speaker.OPERATOR:  # запись звонка (п. 8.7): оператор — ровным голосом роли «operator»
+            return VoiceProfile(voice="operator", style=STAFF_STYLE)
+        if msg.tone is not None:
+            return VoiceProfile(
+                voice=await self._voice(call.party, call.scenario_id),
+                speed=speech_speed(msg.tone),
+                emotion=msg.tone.emotion,
+                style=speech_style(msg.tone),
+            )
+        # старший группы и диспетчер службы — ровная деловая подача; реплика заявителя до п. 3.6 — без стиля
+        staff = call.party is not CallParty.APPLICANT
+        return VoiceProfile(voice=await self._voice(call.party, call.scenario_id), style=STAFF_STYLE if staff else None)
+
+
+class ReplicaAudioHandler(_Voices):
+    """Звук реплики собеседника. Видит тот же, кто видит звонок: свой — обучающийся, любой — преподаватель."""
+
     async def __call__(self, q: GetReplicaAudio) -> ReplicaAudio:
         call = await self._calls.get(q.call_id)
         if call is None or not call_visible(call, q.actor):
@@ -131,21 +150,55 @@ class ReplicaAudioHandler:
             raise NotFoundError("Реплики собеседника нет", code="replica_not_found")
         if not self._tts.enabled:
             raise DomainError("Серверный синтез речи не настроен — озвучивает браузер", code="tts_disabled")
-        if msg.tone is not None:
-            profile = VoiceProfile(
-                voice=await self._voice(call.party, call.scenario_id),
-                speed=speech_speed(msg.tone),
-                emotion=msg.tone.emotion,
-                style=speech_style(msg.tone),
-            )
-        else:  # старший группы и диспетчер службы — ровная деловая подача; реплика заявителя до п. 3.6 — без стиля
-            staff = call.party is not CallParty.APPLICANT
-            profile = VoiceProfile(
-                voice=await self._voice(call.party, call.scenario_id), style=STAFF_STYLE if staff else None
-            )
+        profile = await self._profile(call, msg)
         try:
             blob = await self._tts.synthesize(clip_for_speech(msg.text), voice=profile)
         except ExternalServiceError as e:  # интерфейс озвучит реплику браузером — здесь только запись в журнал
             log.warning("Синтез речи (%s) недоступен: %s", self._tts.model_id, e)
             raise
         return ReplicaAudio(content=blob.content, mime=blob.mime)
+
+
+MAX_RECORDING_REPLICAS = 80  # учебный звонок — 10–30 реплик; предел защищает синтез от очень длинных разговоров
+
+
+@dataclass(frozen=True, kw_only=True)
+class GetCallRecording(Query):
+    actor: Principal
+    call_id: UUID
+
+
+@dataclass(frozen=True)
+class CallRecording:
+    content: bytes
+    mime: str
+    file_name: str
+
+
+class CallRecordingHandler(_Voices):
+    """Запись звонка одним файлом (п. 8.7): реплики оператора и собеседника по порядку, озвученные серверным синтезом
+    (голос и подача — как при разговоре), с паузами. WAV — если синтез отдаёт WAV/PCM, иначе MP3. Голос оператора
+    в трубке не хранится (распознаётся в текст), поэтому его реплики тоже синтезируются."""
+
+    async def __call__(self, q: GetCallRecording) -> CallRecording:
+        call = await self._calls.get(q.call_id)
+        if call is None or not call_visible(call, q.actor):
+            raise NotFoundError("Звонок не найден", code="call_not_found")
+        if not self._tts.enabled:
+            raise DomainError("Запись звонка требует серверного синтеза речи (конфиг tts)", code="tts_disabled")
+        spoken = [m for m in await self._calls.messages(call.id) if m.speaker is not Speaker.SYSTEM and m.text.strip()]
+        if not spoken:
+            raise DomainError("В звонке нет реплик", code="empty_call")
+        segments = []
+        try:
+            for m in spoken[:MAX_RECORDING_REPLICAS]:
+                blob = await self._tts.synthesize(clip_for_speech(m.text), voice=await self._profile(call, m))
+                segments.append(blob.content)
+        except ExternalServiceError as e:
+            log.warning("Запись звонка: синтез речи (%s) недоступен: %s", self._tts.model_id, e)
+            raise
+        content, ext = join_call_audio(segments)
+        stamp = call.started_at.strftime("%Y%m%d-%H%M")
+        return CallRecording(
+            content=content, mime="audio/wav" if ext == "wav" else "audio/mpeg", file_name=f"call-{stamp}.{ext}"
+        )

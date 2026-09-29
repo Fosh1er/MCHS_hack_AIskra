@@ -6,7 +6,13 @@ from dataclasses import dataclass, field
 from uuid import UUID
 
 from aiskra.modules.incidents.application.ports.cards import CardReader, CardView
-from aiskra.modules.incidents.application.ports.dds import DdsFilter, DdsJournalRow, DdsReader
+from aiskra.modules.incidents.application.ports.dds import (
+    BrigadeOption,
+    DdsFilter,
+    DdsJournalRow,
+    DdsReader,
+    DdsRepository,
+)
 from aiskra.modules.incidents.domain.dds import ServiceStatus, next_statuses
 from aiskra.shared.application import Query
 from aiskra.shared.errors import DomainError, NotFoundError, PermissionDeniedError
@@ -97,3 +103,21 @@ class GetDdsCardHandler:
             service_status=own.status,
             next_statuses=[s.value for s in next_statuses(ServiceStatus(own.status))] if can_act else [],
         )
+
+
+@dataclass(frozen=True, kw_only=True)
+class ListDdsBrigades(Query):
+    """Справочник сил своей службы для выбора в карточке ДДС (п. 5.5): занятые на других карточках помечены."""
+
+    actor: Principal
+    service_code: str
+    card_id: UUID | None = None  # бригады этой карточки не считаются занятыми
+
+
+class ListDdsBrigadesHandler:
+    def __init__(self, repo: DdsRepository) -> None:
+        self._repo = repo
+
+    async def __call__(self, query: ListDdsBrigades) -> list[BrigadeOption]:
+        ensure_dds_reader(query.actor)
+        return await self._repo.brigades(query.service_code, exclude_card=query.card_id)

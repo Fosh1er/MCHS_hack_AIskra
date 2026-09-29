@@ -33,6 +33,7 @@ def test_import_counts_match_customer_data(client: TestClient) -> None:
     assert counts["routing_cells"] > 20_000
     assert counts["card_types"] == 51
     assert counts["okrugs"] == 13 and counts["districts"] == 146
+    assert counts["brigades"] >= 2 * counts["services"]  # п. 5.5: у каждой службы — не меньше двух бригад
     warnings = " ".join(client.first_report["warnings"])  # type: ignore[attr-defined]
     assert "групп [24]" in warnings and "Карточки-112" in warnings
 
@@ -40,7 +41,7 @@ def test_import_counts_match_customer_data(client: TestClient) -> None:
 def test_import_is_idempotent(client: TestClient) -> None:
     second = client.post("/api/v1/dictionaries/import").json()
     assert second["counts"] == client.first_report["counts"]  # type: ignore[attr-defined]
-    assert second["deactivated"] == {"incident_types": 0, "services": 0, "districts": 0}
+    assert second["deactivated"] == {"incident_types": 0, "services": 0, "brigades": 0, "districts": 0}
 
 
 def test_card_type_search_with_synonyms(client: TestClient) -> None:

@@ -122,8 +122,8 @@ class TTSConfig(SpeechConfig):
     """Синтез речи собеседника (п. 3.6): сервер с OpenAI-совместимым `/audio/speech` — OpenRouter (Gemini,
     OpenAI TTS) на демо или Speaches с Piper в изолированном контуре.
 
-    - `voices` — роль голоса → имя голоса провайдера: `applicant_female`, `applicant_male`, `brigade`, `service`;
-      роли без имени (или с пустым) получают `voice`;
+    - `voices` — роль голоса → имя голоса провайдера: `applicant_female`, `applicant_male`, `brigade`, `service`,
+      `operator` (реплики оператора в записи звонка, п. 8.7); роли без имени (или с пустым) получают `voice`;
     - `style` — как передать эмоцию: `google` (`speech_metadata.style`), `openai` (`instructions`) — параметрами
       провайдера через OpenRouter; `none` — только темп (`speed`), для Piper и других моделей без инструкций;
     - `response_format: pcm` — сырой звук (Gemini на OpenRouter), сервер оборачивает его в WAV с `pcm_rate`;

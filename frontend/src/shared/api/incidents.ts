@@ -25,10 +25,14 @@ export interface CardData {
 export interface CardServiceIn { code: string; is_main: boolean; added_by: 'auto' | 'manual'; service_type?: string | null }
 export interface CardOpened { id: string; number: number; opened_at: string }
 export interface CardSaved { id: string; number: number; status: string; saved_at: string; processing_ms: number; services: CardServiceIn[] }
-export interface StatusHistoryItem { status: string; at: string | null; operator: string | null; comment: string | null; order_no?: string | null }
+export interface StatusHistoryItem {
+  status: string; at: string | null; operator: string | null; comment: string | null; order_no?: string | null;
+  brigades?: string[]; // п. 5.5: позывные сил, выбранных на этом шаге
+}
 export interface CardServiceView {
   code: string; short: string; integrated: boolean; is_main: boolean; added_by: string;
   status: string; status_at: string | null; history: StatusHistoryItem[];
+  brigades?: string[]; // п. 5.5: ключи бригад справочника, работающих по карточке
 }
 export interface WorkoutView {
   id: string; at: string; operator_number: string | null; service_code: string | null;
@@ -157,7 +161,9 @@ export interface DdsJournalRow {
 }
 export interface DdsJournalPage { items: DdsJournalRow[]; total: number; page: number; page_size: number }
 export interface DdsCardView { card: CardView; service_code: string; service_status: string; next_statuses: string[] }
-export interface ServiceStatusBody { status: string; order_no: string; comment: string }
+export interface ServiceStatusBody { status: string; order_no: string; comment: string; brigades?: string[] }
+/** Бригада справочника своей службы (п. 5.5); `busy_card_number` — занята на другой незакрытой карточке. */
+export interface BrigadeOption { code: string; call_sign: string; name: string; kind: string; crew: number; busy_card_id: string | null; busy_card_number: number | null }
 
 const DDS = '/api/v1/incidents/dds';
 
@@ -183,11 +189,19 @@ export const useDdsCard = (service: string, id: string | undefined) =>
     refetchInterval: 5000, // статусы других служб меняются, пока карточка открыта
   });
 
+export const useDdsBrigades = (service: string, cardId: string, enabled: boolean) =>
+  useQuery({
+    queryKey: ['dds-brigades', service, cardId],
+    queryFn: () => http<BrigadeOption[]>(`${DDS}/${encodeURIComponent(service)}/brigades?card_id=${cardId}`),
+    enabled,
+  });
+
 export function useDdsActions(service: string, id: string) {
   const qc = useQueryClient();
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ['dds-card', service, id] });
     qc.invalidateQueries({ queryKey: ['dds-journal', service] });
+    qc.invalidateQueries({ queryKey: ['dds-brigades', service] });
   };
   const base = `${DDS}/${encodeURIComponent(service)}/cards/${id}`;
   return {

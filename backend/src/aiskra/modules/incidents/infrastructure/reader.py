@@ -26,6 +26,7 @@ from aiskra.modules.incidents.application.ports.cards import (
     StatusHistoryItem,
     WorkoutView,
 )
+from aiskra.modules.incidents.domain.dds import call_sign
 from aiskra.modules.incidents.infrastructure.models import CardServiceModel as CS
 from aiskra.modules.incidents.infrastructure.models import CardServiceStatusModel
 from aiskra.modules.incidents.infrastructure.models import CardWorkoutModel as W
@@ -162,7 +163,7 @@ class SqlCardReader:
         card, display, author_name, checker_name, okrug, district = found
 
         history: dict[str, list[StatusHistoryItem]] = {}
-        for code, status, at, comment, op, order_no in (
+        for code, status, at, comment, op, order_no, brigades in (
             await self._s.execute(
                 select(
                     CardServiceStatusModel.service_code,
@@ -171,6 +172,7 @@ class SqlCardReader:
                     CardServiceStatusModel.comment,
                     _users.c.operator_number,
                     CardServiceStatusModel.order_no,
+                    CardServiceStatusModel.brigades,
                 )
                 .outerjoin(_users, _users.c.id == CardServiceStatusModel.actor_id)
                 .where(CardServiceStatusModel.card_id == card_id)
@@ -178,7 +180,14 @@ class SqlCardReader:
             )
         ).all():
             history.setdefault(code, []).append(
-                StatusHistoryItem(status=status, at=as_utc(at), operator=op, comment=comment, order_no=order_no)
+                StatusHistoryItem(
+                    status=status,
+                    at=as_utc(at),
+                    operator=op,
+                    comment=comment,
+                    order_no=order_no,
+                    brigades=[call_sign(b) for b in brigades or []],
+                )
             )
 
         services: list[CardServiceView] = []
@@ -200,6 +209,7 @@ class SqlCardReader:
                     status=svc.current_status,
                     status_at=items[-1].at if items else None,
                     history=items,
+                    brigades=list(svc.brigades or []),
                 )
             )
         workouts = [

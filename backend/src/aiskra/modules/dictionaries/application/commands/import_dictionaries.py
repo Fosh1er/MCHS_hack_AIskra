@@ -20,6 +20,7 @@ from aiskra.modules.dictionaries.application.ports.sources import (
     DictionaryPayload,
     DictionaryWriter,
 )
+from aiskra.modules.dictionaries.domain.brigades import build_brigades
 from aiskra.modules.dictionaries.domain.model import (
     HIDDEN_FROM_112,
     TERRITORIAL_SERVICES,
@@ -223,18 +224,20 @@ class ImportDictionariesHandler:
         groups, types = parse_sheet(sheet, warnings)
         columns = validate_columns(sheet, curated)
         validate_references(curated, groups, types, warnings)
+        services = build_services(curated)
         payload = DictionaryPayload(
             source_file=sheet.file_name,
             source_sha256=sheet.file_sha256,
             groups=groups,
             incident_types=types,
             columns=columns,
-            services=build_services(curated),
+            services=services,
             okrugs=curated.okrugs,
             districts=curated.districts,
             enums=curated.enums,
             channels=curated.channels,
             card_types=curated.card_types,
+            brigades=build_brigades(services, curated.brigades),
         )
         try:
             stats = await self._writer.replace(payload)

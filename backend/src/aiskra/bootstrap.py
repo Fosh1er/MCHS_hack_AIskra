@@ -115,7 +115,11 @@ from aiskra.modules.incidents.application.commands.open_card import OpenCardHand
 from aiskra.modules.incidents.application.commands.record_card_view import RecordCardViewHandler
 from aiskra.modules.incidents.application.commands.save_card import SaveCardHandler
 from aiskra.modules.incidents.application.commands.set_card_flags import SetCardFlagsHandler
-from aiskra.modules.incidents.application.queries.dds import GetDdsCardHandler, SearchDdsJournalHandler
+from aiskra.modules.incidents.application.queries.dds import (
+    GetDdsCardHandler,
+    ListDdsBrigadesHandler,
+    SearchDdsJournalHandler,
+)
 from aiskra.modules.incidents.application.queries.get_card import GetCardHandler
 from aiskra.modules.incidents.application.queries.search_journal import SearchJournalHandler
 from aiskra.modules.incidents.infrastructure.dds import SqlDdsReader, SqlDdsRepository
@@ -148,6 +152,7 @@ from aiskra.modules.training.application.commands.materials import (
     UpdateMaterialHandler,
     UploadMaterialHandler,
 )
+from aiskra.modules.training.application.commands.scenario_review import ReviewSectionsHandler
 from aiskra.modules.training.application.commands.scenarios import (
     EditScenarioHandler,
     GenerateScenariosHandler,
@@ -177,7 +182,12 @@ from aiskra.modules.training.application.queries.sessions import (
     MySessionsHandler,
     SessionMonitorHandler,
 )
-from aiskra.modules.training.application.speech import ReplicaAudioHandler, SpeechStatus, TranscribeHandler
+from aiskra.modules.training.application.speech import (
+    CallRecordingHandler,
+    ReplicaAudioHandler,
+    SpeechStatus,
+    TranscribeHandler,
+)
 from aiskra.modules.training.infrastructure.materials import (
     DocumentTextExtractor,
     LocalFileStorage,
@@ -466,11 +476,15 @@ def _wire_incidents(app: FastAPI) -> None:
     def dds_card(session: Session) -> GetDdsCardHandler:
         return GetDdsCardHandler(SqlCardReader(session))
 
+    def dds_brigades(session: Session) -> ListDdsBrigadesHandler:
+        return ListDdsBrigadesHandler(SqlDdsRepository(session))
+
     ov[incidents_deps.provide_dds_journal] = dds_journal
     ov[incidents_deps.provide_dds_card] = dds_card
     ov[incidents_deps.provide_dds_received] = dds_received
     ov[incidents_deps.provide_dds_status] = dds_status
     ov[incidents_deps.provide_dds_timer] = dds_timer
+    ov[incidents_deps.provide_dds_brigades] = dds_brigades
 
 
 def build_generate_handler(router: ModelRouter, session: AsyncSession) -> GenerateScenariosHandler:
@@ -509,6 +523,11 @@ def _wire_training(app: FastAPI, services: Services) -> None:
 
     def review(session: Session) -> ReviewScenarioHandler:
         return ReviewScenarioHandler(
+            SqlScenarioRepository(session), SqlAuditRecorder(session), SqlAlchemyUnitOfWork(session)
+        )
+
+    def review_sections(session: Session) -> ReviewSectionsHandler:
+        return ReviewSectionsHandler(
             SqlScenarioRepository(session), SqlAuditRecorder(session), SqlAlchemyUnitOfWork(session)
         )
 
@@ -551,11 +570,15 @@ def _wire_training(app: FastAPI, services: Services) -> None:
     def replica_audio(session: Session) -> ReplicaAudioHandler:
         return ReplicaAudioHandler(services.tts, SqlCallRepository(session), SqlScenarioRepository(session))
 
+    def call_recording(session: Session) -> CallRecordingHandler:
+        return CallRecordingHandler(services.tts, SqlCallRepository(session), SqlScenarioRepository(session))
+
     def card_calls(session: Session) -> CardCallsHandler:
         return CardCallsHandler(SqlCallRepository(session))
 
     ov[training_deps.provide_generate] = generate
     ov[training_deps.provide_review] = review
+    ov[training_deps.provide_review_sections] = review_sections
     ov[training_deps.provide_list_scenarios] = list_scenarios
     ov[training_deps.provide_get_scenario] = get_scenario
     ov[training_deps.provide_incoming] = incoming
@@ -571,6 +594,7 @@ def _wire_training(app: FastAPI, services: Services) -> None:
     ov[training_deps.provide_psy_catalog] = lambda: catalog
     ov[training_deps.provide_get_call] = get_call
     ov[training_deps.provide_replica_audio] = replica_audio
+    ov[training_deps.provide_call_recording] = call_recording
     ov[training_deps.provide_card_calls] = card_calls
     _wire_sessions(app, services)
 

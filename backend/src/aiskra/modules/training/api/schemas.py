@@ -71,6 +71,17 @@ class ReplicaOut(BaseModel):
     hung_up: bool = Field(default=False, description="Заявитель положил трубку")
 
 
+class SectionDecisionIn(_Strict):
+    decision: Literal["accepted", "rework"]
+    comment: str = Field(default="", max_length=500, description="Что доработать; для «на доработку» обязателен")
+
+
+class ReviewSectionsIn(_Strict):
+    sections: dict[str, SectionDecisionIn] = Field(
+        min_length=1, description="Раздел эталона (story, applicant, classification, services, dds) → решение"
+    )
+
+
 class EditScenarioIn(_Strict):
     title: str | None = Field(default=None, min_length=3, max_length=200)
     difficulty: int | None = Field(default=None, ge=1, le=5)

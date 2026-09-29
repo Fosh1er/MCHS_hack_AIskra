@@ -29,6 +29,7 @@ class ScenarioModel(Base):
     reference_dds: Mapped[dict[str, Any]] = mapped_column(JsonType, default=dict)
     source: Mapped[str] = mapped_column(String(16), default="ai")  # ai | manual | trainee | ticket
     psy_profile: Mapped[str | None] = mapped_column(String(32))  # п. 3.7: закреплённый профиль заявителя
+    review: Mapped[dict[str, Any] | None] = mapped_column(JsonType)  # п. 3.3: решения по разделам эталона
     version: Mapped[int] = mapped_column(Integer, default=1)
     author_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
     approved_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
