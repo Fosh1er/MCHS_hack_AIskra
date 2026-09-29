@@ -6270,6 +6270,17 @@
         "type": "null"
        }
       ]
+     },
+     "mode": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Mode"
      }
     },
     "type": "object",
@@ -6562,6 +6573,17 @@
       },
       "type": "object",
       "title": "Criteria"
+     },
+     "call_mode": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Call Mode"
      }
     },
     "type": "object",
@@ -10498,6 +10520,11 @@
       "maxLength": 500,
       "minLength": 1,
       "title": "Text"
+     },
+     "via": {
+      "$ref": "#/components/schemas/ReplicaVia",
+      "description": "Как сказана: text, voice (кнопка), hands_free (п. 3.6)",
+      "default": "text"
      }
     },
     "additionalProperties": false,
@@ -10547,6 +10574,16 @@
      "text"
     ],
     "title": "ReplicaOut"
+   },
+   "ReplicaVia": {
+    "type": "string",
+    "enum": [
+     "text",
+     "voice",
+     "hands_free"
+    ],
+    "title": "ReplicaVia",
+    "description": "Как оператор сказал реплику (п. 3.6): в голосовом режиме в время карточки входит речь собеседника."
    },
    "ResolvedService": {
     "properties": {
