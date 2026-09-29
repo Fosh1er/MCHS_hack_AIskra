@@ -118,13 +118,36 @@ class SpeechConfig(BaseModel):
         return parse_duration(v)
 
 
+class TTSConfig(SpeechConfig):
+    """Синтез речи собеседника (п. 3.6): сервер с OpenAI-совместимым `/audio/speech` — OpenRouter (Gemini,
+    OpenAI TTS) на демо или Speaches с Piper в изолированном контуре.
+
+    - `voices` — роль голоса → имя голоса провайдера: `applicant_female`, `applicant_male`, `brigade`, `service`;
+      роли без имени (или с пустым) получают `voice`;
+    - `style` — как передать эмоцию: `google` (`speech_metadata.style`), `openai` (`instructions`) — параметрами
+      провайдера через OpenRouter; `none` — только темп (`speed`), для Piper и других моделей без инструкций;
+    - `response_format: pcm` — сырой звук (Gemini на OpenRouter), сервер оборачивает его в WAV с `pcm_rate`;
+    - `cache_mb` — лимит кеша аудио в памяти процесса.
+    """
+
+    model: str = "tts-1"
+    voice: str = ""
+    voices: dict[str, str] = Field(default_factory=dict)
+    style: Literal["google", "openai", "none"] = "none"
+    response_format: Literal["mp3", "wav", "pcm"] = "mp3"
+    pcm_rate: int = Field(default=24_000, ge=8_000, le=48_000)
+    cache_mb: int = Field(default=64, ge=0)
+    max_concurrency: int = Field(default=2, ge=1)
+    timeout_s: float = 20.0
+
+
 class AIConfig(BaseModel):
     allow_external: bool = False
     default_provider: str = "fake"
     providers: dict[str, ProviderConfig] = Field(default_factory=lambda: {"fake": ProviderConfig(kind="fake")})
     tasks: dict[str, TaskConfig] = Field(default_factory=dict)
     cache: CacheConfig = Field(default_factory=CacheConfig)
-    tts: SpeechConfig = Field(default_factory=SpeechConfig)
+    tts: TTSConfig = Field(default_factory=TTSConfig)
     stt: SpeechConfig = Field(default_factory=SpeechConfig)
 
     @model_validator(mode="after")

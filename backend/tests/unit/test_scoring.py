@@ -2,13 +2,16 @@
 
 from datetime import UTC, datetime, timedelta
 
+from aiskra.modules.assessment.domain.recommendations import recommend
 from aiskra.modules.assessment.domain.scoring import (
     WEIGHTS_112,
     WEIGHTS_DDS,
+    CallerFacts,
     Criterion,
     StatusStep,
     assess_card_112,
     assess_dds,
+    caller_care,
     f1,
     finish,
     norm_text,
@@ -115,3 +118,28 @@ def test_dds_mistakes() -> None:
 def test_dds_rejection_when_should_react() -> None:
     crit = by_key(assess_dds([step("rejected", 10)], T0, {"first_status": "accepted"}, []))
     assert crit["decision"].score == 0 and "calls" not in crit
+
+
+# --- п. 3.6, V4: работа с эмоциональным заявителем — информативный показатель ---
+
+
+def test_caller_care_scores_calming_and_invalidating() -> None:
+    calmed = caller_care(CallerFacts(start=9, end=3, calming=3))
+    assert calmed.score == 1.0 and not calmed.errors and calmed.note == "напряжение заявителя 9 → 3 из 10"
+    worse = caller_care(CallerFacts(start=4, end=8, invalidating=["успокойтесь", "успокойтесь"], pressure=["быстрее"]))
+    assert worse.score == round(1 - 0.4 - 0.3 - 0.05, 3)
+    assert worse.errors == ["заявитель стал напряжённее: 4 → 8 из 10", "обесценивающие фразы: «успокойтесь»"]
+    assert caller_care(CallerFacts(start=2, end=10, invalidating=["успокойтесь"] * 5)).score == 0.0
+    felt = caller_care(CallerFacts(start=9, end=3, start_emotion="паника", end_emotion="облегчение"))
+    assert felt.note == "заявитель: паника 9/10 → облегчение 3/10"  # эмоция — в пометке критерия
+
+
+def test_caller_care_is_informational() -> None:
+    """Вес 0 по умолчанию: показатель виден, но балл карточки не меняет, пока его не сверят эксперты (3.5)."""
+    base = [Criterion("type", 1.0), Criterion("address", 0.5)]
+    with_care = [*base, caller_care(CallerFacts(start=2, end=10, invalidating=["не кричите"]))]
+    assert total(with_care, WEIGHTS_112) == total(base, WEIGHTS_112)
+    assert total(with_care, {**WEIGHTS_112, "caller_care": 1}) < total(base, WEIGHTS_112)  # вес — в настройках
+    assert not with_care[-1].critical
+    advice = recommend({"caller_care": 0.4, "type": 1.0})
+    assert advice[0]["key"] == "caller_care" and "я вас слышу" in str(advice[0]["text"])

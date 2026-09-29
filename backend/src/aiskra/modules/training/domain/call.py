@@ -8,6 +8,7 @@ from datetime import datetime
 from enum import StrEnum
 from uuid import UUID, uuid4
 
+from aiskra.modules.training.domain.tone import CallerTone, ToneSnapshot
 from aiskra.shared.errors import DomainError
 
 
@@ -29,12 +30,30 @@ class Speaker(StrEnum):
     SYSTEM = "system"
 
 
+class ReplicaVia(StrEnum):
+    """Как оператор сказал реплику (п. 3.6): в голосовом режиме в время карточки входит речь собеседника."""
+
+    TEXT = "text"
+    VOICE = "voice"  # кнопка «говорить»
+    HANDS_FREE = "hands_free"
+
+
+_VIA_RANK = {ReplicaVia.TEXT: 0, ReplicaVia.VOICE: 1, ReplicaVia.HANDS_FREE: 2}
+
+
+def call_mode(vias: list[ReplicaVia]) -> ReplicaVia | None:
+    """Режим звонка — самый «голосовой» из способов реплик оператора; реплик не было — режима нет."""
+    return max(vias, key=_VIA_RANK.__getitem__) if vias else None
+
+
 @dataclass
 class CallMessage:
     call_id: UUID
     speaker: Speaker
     text: str
     at: datetime
+    tone: ToneSnapshot | None = None  # состояние заявителя у его реплики (п. 3.6): по нему озвучивается реплика
+    via: ReplicaVia | None = None  # у реплик оператора: напечатал, сказал кнопкой или без рук
     id: UUID = field(default_factory=uuid4)
 
 
@@ -54,6 +73,7 @@ class Call:
     answered_at: datetime | None = None
     ended_at: datetime | None = None
     revealed: list[str] = field(default_factory=list)  # темы легенды, которые заявитель уже раскрыл
+    tone: CallerTone | None = None  # состояние заявителя (п. 3.6); у старшего группы и службы — нет
     id: UUID = field(default_factory=uuid4)
 
     def answer(self, now: datetime) -> None:

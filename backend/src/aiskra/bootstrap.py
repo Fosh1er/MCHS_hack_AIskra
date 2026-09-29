@@ -168,7 +168,7 @@ from aiskra.modules.training.application.queries.sessions import (
     MySessionsHandler,
     SessionMonitorHandler,
 )
-from aiskra.modules.training.application.speech import TranscribeHandler
+from aiskra.modules.training.application.speech import ReplicaAudioHandler, SpeechStatus, TranscribeHandler
 from aiskra.modules.training.infrastructure.materials import (
     DocumentTextExtractor,
     LocalFileStorage,
@@ -206,7 +206,7 @@ def build_services(settings: Settings) -> Services:
         session_factory=create_session_factory(engine),
         cache=cache,
         model_router=build_router(ai_config, cache),
-        tts=build_tts(ai_config, cache),
+        tts=build_tts(ai_config),
         stt=build_stt(ai_config),
     )
 
@@ -523,6 +523,9 @@ def _wire_training(app: FastAPI, services: Services) -> None:
     def get_call(session: Session) -> GetCallHandler:
         return GetCallHandler(SqlCallRepository(session))
 
+    def replica_audio(session: Session) -> ReplicaAudioHandler:
+        return ReplicaAudioHandler(services.tts, SqlCallRepository(session), SqlScenarioRepository(session))
+
     def card_calls(session: Session) -> CardCallsHandler:
         return CardCallsHandler(SqlCallRepository(session))
 
@@ -535,8 +538,11 @@ def _wire_training(app: FastAPI, services: Services) -> None:
     ov[training_deps.provide_dds_call] = dds_call
     ov[training_deps.provide_replica] = replica
     ov[training_deps.provide_transcribe] = lambda: TranscribeHandler(services.stt)  # голосовой ввод (п. 1.4)
+    # голос собеседника (п. 3.6): сервисы читаются при каждом запросе — адаптер можно подменить в тестах
+    ov[training_deps.provide_speech_status] = lambda: SpeechStatus(stt=services.stt.enabled, tts=services.tts.enabled)
     ov[training_deps.provide_end_call] = end_call
     ov[training_deps.provide_get_call] = get_call
+    ov[training_deps.provide_replica_audio] = replica_audio
     ov[training_deps.provide_card_calls] = card_calls
     _wire_sessions(app, services)
 

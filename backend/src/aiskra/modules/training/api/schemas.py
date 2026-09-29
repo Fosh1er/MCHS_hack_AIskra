@@ -6,8 +6,9 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from aiskra.modules.training.domain.call import CallParty
+from aiskra.modules.training.domain.call import CallParty, ReplicaVia
 from aiskra.modules.training.domain.session import CardSource, SessionMode
+from aiskra.modules.training.domain.tone import ToneSnapshot
 
 
 class _Strict(BaseModel):
@@ -47,11 +48,18 @@ class DdsCallIn(_Strict):
 
 class ReplicaIn(_Strict):
     text: str = Field(min_length=1, max_length=500)
+    via: ReplicaVia = Field(
+        default=ReplicaVia.TEXT, description="Как сказана: text, voice (кнопка), hands_free (п. 3.6)"
+    )
 
 
 class ReplicaOut(BaseModel):
     speaker: str
     text: str
+    message_id: UUID | None = None
+    tone: ToneSnapshot | None = Field(
+        default=None, description="Состояние заявителя у этой реплики (п. 3.6): эмоция, шкалы 0–10, подача, причины"
+    )
 
 
 class EditScenarioIn(_Strict):

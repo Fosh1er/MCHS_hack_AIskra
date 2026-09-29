@@ -89,6 +89,7 @@ class CallModel(Base):
     aon: Mapped[str] = mapped_column(String(32), default="")
     status: Mapped[str] = mapped_column(String(16), default="ringing")
     revealed: Mapped[list[str]] = mapped_column(JsonType, default=list)
+    tone: Mapped[dict[str, Any] | None] = mapped_column(JsonType)  # состояние заявителя (п. 3.6)
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     answered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -101,6 +102,8 @@ class CallMessageModel(Base):
     speaker: Mapped[str] = mapped_column(String(16))  # operator | party | system
     text: Mapped[str] = mapped_column(Text)
     at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    tone: Mapped[dict[str, Any] | None] = mapped_column(JsonType)  # снимок состояния у реплики собеседника (п. 3.6)
+    via: Mapped[str | None] = mapped_column(String(12))  # у реплик оператора: text | voice | hands_free (п. 3.6)
 
 
 class MaterialModel(Base):

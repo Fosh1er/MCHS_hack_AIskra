@@ -7,7 +7,8 @@ from datetime import datetime
 from uuid import UUID
 
 from aiskra.modules.training.application.ports.scenarios import CallRepository
-from aiskra.modules.training.domain.call import Call
+from aiskra.modules.training.domain.call import Call, Speaker, call_mode
+from aiskra.modules.training.domain.tone import ToneSnapshot
 from aiskra.shared.application import Query
 from aiskra.shared.errors import NotFoundError
 from aiskra.shared.security import Permission, Principal
@@ -18,6 +19,8 @@ class MessageView:
     speaker: str
     text: str
     at: datetime
+    id: UUID | None = None
+    tone: ToneSnapshot | None = None  # у реплик заявителя (п. 3.6)
 
 
 @dataclass(frozen=True)
@@ -35,14 +38,17 @@ class CallView:
     answered_at: datetime | None
     ended_at: datetime | None
     messages: list[MessageView]
+    tone: ToneSnapshot | None = None  # текущее состояние заявителя (п. 3.6); у старшего группы и службы — нет
+    mode: str | None = None  # как вёл разговор оператор: text | voice | hands_free (п. 3.6)
 
 
-def _visible(call: Call | None, actor: Principal) -> bool:
+def call_visible(call: Call | None, actor: Principal) -> bool:
     return call is not None and (call.student_id == actor.user_id or actor.can(Permission.RESULTS_READ_ALL))
 
 
 async def _view(repo: CallRepository, call: Call, with_messages: bool = True) -> CallView:
     messages = await repo.messages(call.id) if with_messages else []
+    mode = call_mode([m.via for m in messages if m.speaker is Speaker.OPERATOR and m.via])
     return CallView(
         id=call.id,
         role=call.role,
@@ -56,7 +62,9 @@ async def _view(repo: CallRepository, call: Call, with_messages: bool = True) ->
         started_at=call.started_at,
         answered_at=call.answered_at,
         ended_at=call.ended_at,
-        messages=[MessageView(speaker=m.speaker.value, text=m.text, at=m.at) for m in messages],
+        messages=[MessageView(speaker=m.speaker.value, text=m.text, at=m.at, id=m.id, tone=m.tone) for m in messages],
+        tone=call.tone.snapshot() if call.tone else None,
+        mode=mode.value if mode else None,
     )
 
 
@@ -72,7 +80,7 @@ class GetCallHandler:
 
     async def __call__(self, q: GetCall) -> CallView:
         call = await self._repo.get(q.call_id)
-        if call is None or not _visible(call, q.actor):
+        if call is None or not call_visible(call, q.actor):
             raise NotFoundError("Звонок не найден", code="call_not_found")
         return await _view(self._repo, call)
 

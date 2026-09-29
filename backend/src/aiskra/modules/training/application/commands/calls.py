@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import random
 from dataclasses import dataclass, field
+from typing import Any
 from uuid import UUID
 
 from aiskra.modules.training.application.actors import Actors
@@ -18,7 +19,9 @@ from aiskra.modules.training.application.ports.scenarios import (
     DdsCallContext,
     ScenarioRepository,
 )
-from aiskra.modules.training.domain.call import Call, CallMessage, CallParty, Speaker
+from aiskra.modules.training.domain.actors import topic_of
+from aiskra.modules.training.domain.call import Call, CallMessage, CallParty, ReplicaVia, Speaker
+from aiskra.modules.training.domain.tone import CallerTone, ToneSnapshot, tone_for_legend
 from aiskra.shared.application import Clock, Command, UnitOfWork
 from aiskra.shared.audit import AuditEntry, AuditEvent, AuditRecorder, RequestMeta
 from aiskra.shared.errors import DomainError, NotFoundError
@@ -43,6 +46,8 @@ class CallStarted:
 class Replica:
     speaker: str
     text: str
+    message_id: UUID | None = None
+    tone: ToneSnapshot | None = None  # состояние заявителя у этой реплики (п. 3.6)
 
 
 class _CallBase:
@@ -75,10 +80,26 @@ class _CallBase:
             await self._uow.rollback()
             raise
 
-    async def _say(self, call: Call, speaker: Speaker, text: str) -> CallMessage:
-        msg = CallMessage(call_id=call.id, speaker=speaker, text=text, at=self._clock.now())
+    async def _say(
+        self, call: Call, speaker: Speaker, text: str, tone: ToneSnapshot | None = None, via: ReplicaVia | None = None
+    ) -> CallMessage:
+        msg = CallMessage(call_id=call.id, speaker=speaker, text=text, at=self._clock.now(), tone=tone, via=via)
         await self._calls.add_message(msg)
         return msg
+
+    async def _ensure_tone(
+        self, call: Call, legend: dict[str, Any] | None = None, incident_code: str | None = None
+    ) -> CallerTone | None:
+        """Состояние заявителя (п. 3.6). Звонок, начатый до п. 3.6, получает его при первой реплике."""
+        if call.party is not CallParty.APPLICANT:
+            return None
+        if call.tone is None:
+            if legend is None and call.scenario_id:
+                scenario = await self._scenarios.get(call.scenario_id)
+                if scenario is not None:
+                    legend, incident_code = scenario.legend, scenario.incident_type_code
+            call.tone = tone_for_legend(legend or {}, incident_code)
+        return call.tone
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -109,6 +130,7 @@ class StartIncomingCallHandler(_CallBase):
             started_at=self._clock.now(),
             scenario_id=scenario.id,
             aon=aon,
+            tone=tone_for_legend(scenario.legend, scenario.incident_type_code),
         )
         await self._calls.add(call)
         await self._commit()
@@ -135,8 +157,10 @@ class AnswerCallHandler(_CallBase):
             if scenario is not None:
                 text = scenario.legend.get("opening") or f"Здравствуйте, у нас {scenario.legend.get('what', 'беда')}."
                 call.revealed = [*call.revealed, "opening"]
-                await self._say(call, Speaker.PARTY, text)
-                opening = Replica(speaker=Speaker.PARTY.value, text=text)
+                tone = await self._ensure_tone(call, scenario.legend, scenario.incident_type_code)
+                snapshot = tone.snapshot() if tone else None
+                msg = await self._say(call, Speaker.PARTY, text, snapshot)
+                opening = Replica(speaker=Speaker.PARTY.value, text=text, message_id=msg.id, tone=snapshot)
         await self._calls.save(call)
         await self._commit()
         return opening
@@ -172,6 +196,7 @@ class StartDdsCallHandler(_CallBase):
             aon=ctx.applicant_phone if cmd.party is CallParty.APPLICANT else "",
         )
         call.answer(self._clock.now())  # абонент снимает трубку сразу
+        tone = await self._ensure_tone(call)  # заявитель по сценарию карточки; без сценария — спокоен
         await self._calls.add(call)
         if cmd.incoming and cmd.party is CallParty.BRIGADE:
             short = ctx.services.get(cmd.service_code, (cmd.service_code, ""))[0]
@@ -182,7 +207,7 @@ class StartDdsCallHandler(_CallBase):
         greeting = PARTY_GREETING.get(cmd.party) or (
             f"Дежурный {ctx.services[cmd.target_service or ''][0]}, слушаю." if cmd.target_service else "Слушаю."
         )
-        await self._say(call, Speaker.PARTY, greeting)
+        await self._say(call, Speaker.PARTY, greeting, tone.snapshot() if tone else None)
         await self._commit()
         return CallStarted(call_id=call.id, scenario_id=ctx.scenario_id, aon=call.aon, channel="ip")
 
@@ -192,6 +217,7 @@ class SendReplica(Command):
     actor: Principal
     call_id: UUID
     text: str
+    via: ReplicaVia = ReplicaVia.TEXT
 
 
 class SendReplicaHandler(_CallBase):
@@ -204,14 +230,14 @@ class SendReplicaHandler(_CallBase):
         call = await self._own_call(cmd.call_id, cmd.actor)
         call.ensure_active()
         history = await self._calls.messages(call.id)
-        await self._say(call, Speaker.OPERATOR, text)
-        reply = await self._reply(call, history, text)
-        await self._say(call, Speaker.PARTY, reply)
+        await self._say(call, Speaker.OPERATOR, text, via=cmd.via)
+        reply, tone = await self._reply(call, history, text)
+        msg = await self._say(call, Speaker.PARTY, reply, tone)
         await self._calls.save(call)
         await self._commit()
-        return Replica(speaker=Speaker.PARTY.value, text=reply)
+        return Replica(speaker=Speaker.PARTY.value, text=reply, message_id=msg.id, tone=tone)
 
-    async def _legend_for_card(self, ctx: DdsCallContext) -> dict[str, object]:
+    async def _legend_for_card(self, ctx: DdsCallContext) -> dict[str, Any]:
         """Карточка без сценария (заполнена обучающимся) — заявитель знает то, что есть в карточке."""
         return {
             "applicant": {"name": ctx.applicant_name, "phone": ctx.applicant_phone},
@@ -221,30 +247,35 @@ class SendReplicaHandler(_CallBase):
             "emotion": "спокойно",
         }
 
-    async def _reply(self, call: Call, history: list[CallMessage], text: str) -> str:
+    async def _reply(self, call: Call, history: list[CallMessage], text: str) -> tuple[str, ToneSnapshot | None]:
         if call.party is CallParty.APPLICANT:
-            legend: dict[str, object] = {}
+            legend: dict[str, Any] = {}
+            incident_code: str | None = None
             if call.scenario_id:
                 scenario = await self._scenarios.get(call.scenario_id)
-                legend = scenario.legend if scenario else {}
+                if scenario is not None:
+                    legend, incident_code = scenario.legend, scenario.incident_type_code
             if not legend and call.card_id and call.service_code:
                 ctx = await self._cards.dds_context(call.card_id, call.service_code)
                 legend = await self._legend_for_card(ctx) if ctx else {}
+            # состояние меняется до ответа: на «успокойтесь!» заявитель отвечает уже взвинченным (п. 3.6)
+            tone = await self._ensure_tone(call, legend, incident_code)
+            assert tone is not None  # у заявителя состояние есть всегда
+            changes = tone.react(text, topic=topic_of(text), revealed=call.revealed)
             answer, revealed = await self._actors.applicant(
-                legend, history, text, call.revealed, str(call.scenario_id or call.card_id)
+                legend, history, text, call.revealed, str(call.scenario_id or call.card_id), tone
             )
             call.revealed = revealed
-            return answer
+            return answer, tone.snapshot(changes)
         if call.card_id is None or call.service_code is None:
             raise DomainError("Звонок не связан с карточкой", code="call_without_card")
         ctx = await self._cards.dds_context(call.card_id, call.service_code)
         if ctx is None:
             raise NotFoundError("Карточка не найдена", code="dds_card_not_found")
         if call.party is CallParty.BRIGADE:
-            return await self._actors.brigade(
-                ctx, ctx.services.get(call.service_code, (call.service_code, ""))[0], history, text
-            )
-        return await self._actors.service(ctx, call.target_service or "", history, text)
+            short = ctx.services.get(call.service_code, (call.service_code, ""))[0]
+            return await self._actors.brigade(ctx, short, history, text), None
+        return await self._actors.service(ctx, call.target_service or "", history, text), None
 
 
 @dataclass(frozen=True, kw_only=True)

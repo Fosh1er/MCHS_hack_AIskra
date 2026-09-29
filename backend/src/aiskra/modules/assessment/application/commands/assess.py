@@ -98,6 +98,7 @@ class AssessCardHandler:
                 names=a.service_names,
                 flag_names=a.flag_names,
                 spoken=a.legend_text or None,
+                caller=a.caller,
             )
             judged = (
                 await self._judge.check(

@@ -37,6 +37,10 @@ TIME_BUCKETS = [
 ]
 
 
+# Как оператор вёл разговор с заявителем (п. 3.6): в голосовом режиме во время карточки входит речь собеседника
+CALL_MODE_TITLES = {"text": "текстом", "voice": "голосом", "hands_free": "голосом без рук"}
+
+
 @dataclass(frozen=True)
 class CardResult:
     card_id: UUID
@@ -52,6 +56,7 @@ class CardResult:
     expert_comment: str
     errors: list[str]
     criteria: dict[str, float | None]
+    call_mode: str | None = None  # text | voice | hands_free: в голосовом режиме во время входит речь собеседника
 
 
 @dataclass(frozen=True)
@@ -111,6 +116,7 @@ def _result(card: ReportCard, rec: AssessmentRecord | None, norm: float, role: s
         expert_comment=str((rec.details.get("expert") or {}).get("comment", "")) if rec else "",
         errors=list(rec.details.get("errors", [])) if rec else [],
         criteria={c["key"]: c.get("score") for c in rec.details.get("criteria", [])} if rec else {},
+        call_mode=card.call_mode if role == "112" else None,
     )
 
 
@@ -222,6 +228,7 @@ def report_csv(r: SessionReport) -> str:
             "Время, с",
             "Норматив, с",
             "Отклонение, с",
+            "Разговор",
             "Балл",
             "Зачтено",
             "Экспертная правка",
@@ -241,6 +248,7 @@ def report_csv(r: SessionReport) -> str:
                     c.processing_s if c.processing_s is not None else "",
                     c.norm_s,
                     c.deviation_s if c.deviation_s is not None else "",
+                    CALL_MODE_TITLES.get(c.call_mode or "", ""),
                     c.score if c.score is not None else "не оценена",
                     "" if c.passed is None else ("да" if c.passed else "нет"),
                     "да" if c.expert else "",

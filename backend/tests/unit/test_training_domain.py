@@ -9,6 +9,7 @@ from aiskra.modules.training.domain.scenario import (
     ServiceFacts,
     build_scenario,
     humanize,
+    legend_voice,
     offline_story,
 )
 
@@ -92,3 +93,33 @@ def test_brigade_reports_by_status() -> None:
     assert "Выезжаем" in brigade_reply({"service_status": "accepted", "order_no": "23"}, "Алло")
     assert "наряд 23" in brigade_reply({"service_status": "accepted", "order_no": "23"}, "Алло")
     assert "Прибыли" in brigade_reply({"service_status": "arrived"}, "Как обстановка?")
+
+
+def test_legend_has_voice() -> None:
+    """П. 3.6: генератор сам задаёт голос синтетического заявителя вместе с именем — для озвучки."""
+    voices = set()
+    for seed in range(20):
+        s = build_scenario(
+            incident=FIRE,
+            address=ADDR,
+            services=SERVICES,
+            story={},
+            flags=[],
+            difficulty=2,
+            rng=random.Random(seed),
+            source="template",
+            author_id=None,
+        )
+        applicant = s.legend["applicant"]
+        first = applicant["name"].split()[-1]
+        assert applicant["voice"] == ("female" if first.endswith(("а", "я")) else "male")
+        voices.add(applicant["voice"])
+    assert voices == {"female", "male"}
+
+
+def test_legend_voice_for_old_scenarios() -> None:
+    """Сценарии до п. 3.6 без поля voice: голос — по правилу генератора из имени «Фамилия Имя»."""
+    assert legend_voice({"name": "Кузнецов Алексей"}) == "male"
+    assert legend_voice({"name": "Смирнова Ольга"}) == "female"
+    assert legend_voice({"name": "Кузнецов Алексей", "voice": "female"}) == "female"  # записанное — главнее
+    assert legend_voice({"name": "Аноним"}) is None and legend_voice({}) is None

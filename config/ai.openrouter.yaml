@@ -5,6 +5,10 @@
 #   AISKRA_AI_CONFIG_PATH=<путь к этому файлу>   (в docker — /app/config/ai.openrouter.yaml)
 #   AISKRA_AI_ALLOW_EXTERNAL=true
 #   DEMO_LLM_API_KEY=<ключ OpenRouter>            ключ только в .env, не в этом файле
+#   TTS_KIND=openai_compatible                    голос собеседника (Gemini TTS) — платно, нужен баланс
+#   STT_KIND=openai_compatible                    распознавание речи оператора (Whisper) — платно, нужен баланс
+# Голос и распознавание используют тот же ключ. Для проверки без ключа — локальные make dev-tts и make dev-stt
+# (переменные STT_URL / TTS_URL), тот же адаптер: переключение — только переменными окружения.
 # Модели выбраны 27.09.2026 по https://openrouter.ai/api/v1/models (цена 0, поддержка JSON-ответа) и проверены
 # запросом: qwen3.8-27b и gemma-4 в тот день были перегружены у поставщика (429 upstream), nemotron-3-super
 # отвечал за 2 с чистым русским текстом при reasoning.enabled: false. Бесплатные модели OpenRouter меняются —
@@ -40,18 +44,38 @@ ai:
   tasks:
     probe:               {provider: demo,       temperature: 0,   cache: exact, cache_ttl: 1h}
     scenario_generation: {provider: demo,       temperature: 0.8, cache: off,   max_tokens: 2000}
-    applicant_actor:     {provider: demo_small, temperature: 0.6, cache: task,  cache_ttl: 1d, max_tokens: 160}
+    applicant_actor:     {provider: demo_small, temperature: 0.6, cache: task,  cache_ttl: 1d, max_tokens: 160, prompt_version: v2}
     brigade_actor:       {provider: demo_small, temperature: 0.6, cache: task,  cache_ttl: 1d, max_tokens: 160}
     service_actor:       {provider: demo_small, temperature: 0.6, cache: task,  cache_ttl: 1d, max_tokens: 160}
     judge:               {provider: demo,       temperature: 0,   cache: exact, cache_ttl: 7d, max_tokens: 600}
     insights:            {provider: demo,       temperature: 0.3, cache: off}
-  tts: {kind: fake, cache_ttl: 30d}
-  # Голосовой ввод оператора (Whisper за OpenAI-совместимым /audio/transcriptions). Выключен, пока STT_KIND не задан.
-  # Локально (GPU/CPU): Speaches — docs/ai/Голосовой_ввод.md; STT_URL=http://<машина с GPU>:8000/v1
+  # Голос собеседника (п. 3.6): Gemini TTS через OpenRouter — эмоция передаётся стилем (speech_metadata.style), голос — по роли.
+  # Синтез на OpenRouter ПЛАТНЫЙ (по символам; 29.09.2026 — доли цента за реплику): нужен пополненный счёт.
+  # Выключен, пока TTS_KIND не задан, — тогда реплики озвучивает браузер.
+  tts:
+    kind: ${TTS_KIND:-fake}          # openai_compatible — включить
+    base_url: ${TTS_URL:-https://openrouter.ai/api/v1}
+    api_key_env: DEMO_LLM_API_KEY    # тот же ключ OpenRouter
+    model: ${TTS_MODEL:-google/gemini-3.8-flash-lite-tts}
+    style: ${TTS_STYLE:-google}      # google | openai | none
+    response_format: ${TTS_FORMAT:-pcm}   # Gemini отдаёт сырой звук 24 кГц — сервер оборачивает его в WAV
+    voice: ${TTS_VOICE:-Zephyr}
+    voices:
+      applicant_female: ${TTS_VOICE_FEMALE:-Kore}
+      applicant_male: ${TTS_VOICE_MALE:-Charon}
+      brigade: ${TTS_VOICE_BRIGADE:-Orus}
+      service: ${TTS_VOICE_SERVICE:-Aoede}
+    cache_ttl: 30d
+    cache_mb: 64
+    max_concurrency: 2
+    timeout_s: 30
+  # Голосовой ввод оператора: Whisper через OpenRouter (/audio/transcriptions, multipart — тот же адаптер, что для
+  # локального Whisper). whisper-large-v3-turbo — по цене 29.09.2026 около 0,0002 $ за минуту звука, в 30 раз дешевле
+  # whisper-1. Выключен, пока STT_KIND не задан. Локально: STT_URL=http://localhost:8200/v1 (make dev-stt) или Speaches.
   stt:
     kind: ${STT_KIND:-fake}          # openai_compatible — включить
-    base_url: ${STT_URL:-http://whisper:8000/v1}
-    api_key_env: STT_API_KEY         # для локального сервера не нужен
-    model: ${STT_MODEL:-deepdml/faster-whisper-large-v3-turbo-ct2}
+    base_url: ${STT_URL:-https://openrouter.ai/api/v1}
+    api_key_env: DEMO_LLM_API_KEY    # тот же ключ OpenRouter; локальному серверу он не нужен
+    model: ${STT_MODEL:-openai/whisper-large-v3-turbo}
     language: ru
     timeout_s: 30

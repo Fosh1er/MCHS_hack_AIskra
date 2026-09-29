@@ -30,6 +30,8 @@ WEIGHTS_112: dict[str, float] = {
     "timing": 1,
     "description_meaning": 1,
     "grammar": 0.5,
+    # п. 3.6: информативно, пока показатель не сверят эксперты (3.5); вес можно задать в настройках занятия
+    "caller_care": 0,
 }
 WEIGHTS_DDS: dict[str, float] = {
     "decision": 3,
@@ -53,6 +55,7 @@ TITLES: dict[str, str] = {
     "timing": "Время заполнения",
     "description_meaning": "Описание: смысл (ИИ)",
     "grammar": "Грамотность (ИИ)",
+    "caller_care": "Работа с заявителем (информативно)",
     "decision": "Решение «Принята / Не принята»",
     "reaction": "Время реакции",
     "chain": "Порядок и полнота статусов",
@@ -62,6 +65,40 @@ TITLES: dict[str, str] = {
     "regulation": "Регламентность формулировок (ИИ)",
 }
 INTERVIEW_TOPICS = {"address": "адрес", "what": "что случилось", "victims": "пострадавшие"}
+
+
+@dataclass(frozen=True)
+class CallerFacts:
+    """Как менялось состояние ИИ-заявителя в разговоре (п. 3.6): напряжение 0–10 у первой и последней его реплики
+    и что сказал оператор — по кодам причин из снимков состояния."""
+
+    start: int
+    end: int
+    calming: int = 0
+    invalidating: list[str] = field(default_factory=list)  # сработавшие фразы: «успокойтесь», «не кричите»…
+    pressure: list[str] = field(default_factory=list)
+    start_emotion: str = ""  # «страх», «паника», «облегчение»…
+    end_emotion: str = ""
+
+
+def caller_care(f: CallerFacts) -> Criterion:
+    """Работа с эмоциональным заявителем: 1 — напряжение не выросло и обесценивания не было; −0,1 за каждый пункт
+    роста напряжения, −0,15 за каждую обесценивающую реплику, −0,05 за давление. Вес 0: показатель информативный."""
+    grew = max(0, f.end - f.start)
+    score = max(0.0, 1 - 0.1 * grew - 0.15 * len(f.invalidating) - 0.05 * len(f.pressure))
+    note = (
+        f"заявитель: {f.start_emotion} {f.start}/10 → {f.end_emotion} {f.end}/10"
+        if f.start_emotion and f.end_emotion
+        else f"напряжение заявителя {f.start} → {f.end} из 10"
+    )
+    c = Criterion("caller_care", round(score, 3), note=note)
+    if grew:
+        c.errors.append(f"заявитель стал напряжённее: {f.start} → {f.end} из 10")
+    if f.invalidating:
+        c.errors.append("обесценивающие фразы: " + ", ".join(f"«{p}»" for p in dict.fromkeys(f.invalidating)))
+    return c
+
+
 CHAIN = ["accepted", "response_started", "arrived", "works_in_progress", "works_completed"]
 
 
@@ -156,6 +193,7 @@ def assess_card_112(
     names: dict[str, str] | None = None,
     flag_names: dict[str, str] | None = None,
     spoken: str | None = None,
+    caller: CallerFacts | None = None,
 ) -> list[Criterion]:
     """Критерии карточки 112. `names`, `flag_names` — коды служб и признаков → названия (понятные сообщения);
     `spoken` — что сообщил заявитель: ключевые факты описания учитываются, только если они прозвучали."""
@@ -272,6 +310,8 @@ def assess_card_112(
         if miss:
             c.errors.append("не уточнено у заявителя: " + ", ".join(miss))
         out.append(c)
+    if caller is not None:  # разговор с ИИ-заявителем шёл с состоянием (п. 3.6)
+        out.append(caller_care(caller))
     return out
 
 

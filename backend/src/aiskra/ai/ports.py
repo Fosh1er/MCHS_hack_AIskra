@@ -82,9 +82,14 @@ class LLMPort(Protocol):
 
 @dataclass(frozen=True)
 class VoiceProfile:
+    """Как озвучить реплику. `voice` — роль голоса («applicant_female», «brigade»…): имя голоса провайдера
+    подставляет адаптер по конфигу. `style` — подача словами («panicked, very fast…») — адаптер передаёт её
+    параметром провайдера, а не текстом реплики (п. 3.6, ADR-0011)."""
+
     voice: str = "default"
     speed: float = 1.0
     emotion: str | None = None
+    style: str | None = None
 
 
 @dataclass(frozen=True)
@@ -101,6 +106,16 @@ class Transcript:
 
 
 class TTSPort(Protocol):
+    """Синтез речи. При ошибке провайдера адаптер поднимает ExternalServiceError."""
+
+    @property
+    def enabled(self) -> bool:
+        """False — серверный синтез не настроен: реплики озвучивает браузер."""
+        ...
+
+    @property
+    def model_id(self) -> str: ...
+
     async def synthesize(self, text: str, *, voice: VoiceProfile) -> AudioBlob: ...
 
 

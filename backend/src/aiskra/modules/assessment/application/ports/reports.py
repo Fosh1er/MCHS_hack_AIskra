@@ -32,6 +32,7 @@ class ReportCard:
     incident_group: int | None = None
     difficulty: int | None = None
     reactions: dict[str, float] = field(default_factory=dict)  # код службы → с от поступления до решения ДДС
+    call_mode: str | None = None  # как оператор вёл разговор с заявителем: text | voice | hands_free (п. 3.6)
 
 
 @dataclass(frozen=True)
