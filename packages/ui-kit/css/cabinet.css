@@ -422,6 +422,8 @@
   /* широкие таблицы листаются внутри карточки, страница — нет (6.3) */
   .cab-card__body { overflow-x: auto; }
   .cab-card__body > .cab-table { min-width: 560px; }
+  /* отзыв по занятию (4.7) внутри широкой таблицы — по ширине экрана и не уезжает при прокрутке таблицы вбок */
+  .cab-table .stu-feedback, .cab-table .tch-feedback { position: sticky; left: 10px; box-sizing: border-box; max-width: calc(100vw - 44px); }
 }
 @media (max-width: 600px) {
   .cab-select, .cab-filters input { max-width: 100%; min-width: 0; }
@@ -510,6 +512,21 @@
 .call-review__effect.is-calming { color: var(--s-ok); border-color: var(--s-ok); }
 .call-review__effect.is-invalidating, .call-review__effect.is-pressure { color: var(--s-critical); border-color: var(--s-critical); }
 .tch-expert { margin-top: 6px; padding: 4px 8px; font-size: var(--fs-sm); background: var(--c-blue-100); border-left: 3px solid var(--accent); }
+/* Отзыв по занятию (п. 4.7): у преподавателя в раскрытой строке отчёта, у обучающегося — в истории и результатах */
+.tch-feedback { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; background: var(--bg-panel); border-left: 3px solid var(--accent); }
+.tch-feedback__head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+.tch-feedback__head small, .stu-feedback__head small { color: var(--text-muted); font-size: var(--fs-sm); }
+.tch-feedback__text, .stu-feedback__text { margin: 0; max-width: 80ch; white-space: pre-line; overflow-wrap: anywhere; color: var(--text-strong); font-size: var(--fs-md); line-height: 1.45; }
+.tch-feedback__meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; color: var(--text-muted); font-size: var(--fs-sm); }
+.tch-feedback__prev summary { cursor: pointer; color: var(--text-muted); font-size: var(--fs-sm); }
+.tch-feedback__prev .tch-feedback__text { margin-top: 6px; padding-left: 8px; border-left: 2px solid var(--border); }
+.tch-feedback textarea { line-height: 1.45; }
+.tch-feedback__mark { display: inline-flex; align-items: center; gap: 2px; margin-left: 8px; color: var(--accent); font-size: var(--fs-xs); vertical-align: middle; }
+.cab-table tr.stu-has-feedback td { border-bottom: 0; }
+.cab-table tr.stu-feedback-row td { padding-top: 0; }
+.cab-table tr.stu-feedback-row:hover td { background: transparent; }
+.stu-feedback { padding: 8px 12px; background: var(--c-blue-100); border-left: 3px solid var(--accent); }
+.stu-feedback__head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 4px; font-size: var(--fs-sm); }
 .tch-heat thead th { height: 160px; }
 .tch-heat thead th span { max-height: 160px; }
 

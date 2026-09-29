@@ -1,11 +1,13 @@
 /** Отчёт по занятию (п. 4.3). ТЗ, сценарии 2–3: действия, ошибки, время против норматива, грамматика; наглядные
- *  диаграммы; экспертная правка оценки с комментарием; выгрузка в Excel (CSV) и PDF (печать страницы). */
+ *  диаграммы; экспертная правка оценки с комментарием; отзыв обучающемуся по занятию с черновиком от ИИ (п. 4.7);
+ *  выгрузка в Excel (CSV) и PDF (печать страницы). */
 import { Fragment, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Banner, Button, Card, Icon, LineChart, StatTile, StatusPill } from '@smena112/ui-kit';
 import { reportCsvUrl, useEvaluateSession, useOverride, useSessionReport, type CardResult, type SessionReport } from '../../shared/api/assessment';
 import { CallReview } from '../../shared/ui/CallReview';
 import { TeacherShell } from '../../shared/ui/TeacherShell';
+import { StudentFeedback } from './StudentFeedback';
 import { useScreenTour } from '../../shared/onboarding/OnboardingProvider';
 import { num } from '../../shared/format';
 
@@ -43,7 +45,7 @@ function StudentsTable({ r }: { r: SessionReport }) {
   }, []);
   const threshold = r.settings.threshold ?? 70;
   return (
-    <Card title="Результаты обучающихся" subtitle="Нажмите строку, чтобы раскрыть карточки" flush tour="t-results"
+    <Card title="Результаты обучающихся" subtitle="Нажмите строку, чтобы раскрыть карточки и отзыв" flush tour="t-results"
       actions={<Button size="sm" variant="ghost" onClick={() => setAll(!all)}>{all ? 'свернуть все' : 'раскрыть все'}</Button>}>
       <table className="cab-table">
         <thead><tr><th>ФИО</th><th>Роль</th><th className="num">Карточек</th><th className="num">Средний балл</th><th className="num">Зачтено</th><th className="num">Среднее время, с</th><th className="num">Не оценено</th></tr></thead>
@@ -51,7 +53,10 @@ function StudentsTable({ r }: { r: SessionReport }) {
           {r.students.map((s) => (
             <Fragment key={s.student_id}>
               <tr onClick={() => setOpen(open === s.student_id ? null : s.student_id)} style={{ cursor: 'pointer' }} aria-expanded={open === s.student_id}>
-                <td><b>{s.full_name}</b></td>
+                <td>
+                  <b>{s.full_name}</b>
+                  {s.feedback && <span className="tch-feedback__mark" title="Отзыв по занятию сохранён"><Icon name="chat" size="sm" /> отзыв</span>}
+                </td>
                 <td>{s.role === '112' ? 'оператор 112' : `ДДС ${s.service_code}`}</td>
                 <td className="num">{s.cards.length}</td>
                 <td className="num">{num(s.avg_score)}</td>
@@ -88,6 +93,11 @@ function StudentsTable({ r }: { r: SessionReport }) {
                   </td>
                 </tr>
               ))}
+              {(all || open === s.student_id) && (
+                <tr className="tch-subrow">
+                  <td colSpan={7}><StudentFeedback key={s.student_id + s.role} sessionId={r.session_id} student={s} /></td>
+                </tr>
+              )}
             </Fragment>
           ))}
         </tbody>
