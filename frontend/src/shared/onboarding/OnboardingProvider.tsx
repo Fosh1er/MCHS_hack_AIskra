@@ -1,12 +1,13 @@
-/** Обучение интерфейсу (п. 5.3): какой экран открыт, показать ли подсказки и куда записать прогресс.
+/** Обучение интерфейсу (п. 5.3, 5.4): какой экран открыт, показать ли подсказки и куда записать прогресс.
  *  Страница регистрирует свой экран через `useScreenTour(id, ready)`; когда данные экрана загружены (`ready`),
- *  новому обучающемуся показываются подсказки этого экрана, а перед самым первым — обзор маршрута (WELCOME). */
+ *  новичку показываются подсказки этого экрана, а перед самым первым — обзор маршрута его роли. Сами подсказки
+ *  показываются только своей аудитории (обучающемуся — его экраны, преподавателю — свои), чужие — по кнопке. */
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { SquareButton } from '@smena112/ui-kit';
+import { Button, SquareButton } from '@smena112/ui-kit';
 import { useMe } from '../api/auth';
 import { useOnboarding, useUpdateOnboarding } from '../api/onboarding';
 import { Tour, visibleSteps } from './Tour';
-import { TOURS, WELCOME, WELCOME_ID, type TourId, type TourStep } from './tours';
+import { ALL_TOURS, WELCOMES, tourAudience, type TourId, type TourStep } from './tours';
 
 interface Controls {
   register: (id: TourId, ready: boolean) => void;
@@ -32,19 +33,22 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
   useEffect(() => { started.current.clear(); setActive(null); }, [me?.user_id]);
 
   const start = useCallback((id: TourId, welcome: boolean, auto: boolean) => {
-    const steps = visibleSteps([...(welcome ? WELCOME : []), ...TOURS[id]]);
+    const intro = WELCOMES[tourAudience(id)];
+    const steps = visibleSteps([...(welcome ? intro.steps : []), ...ALL_TOURS[id]]);
     if (!steps.length) return;
-    const ids = welcome ? [WELCOME_ID, id] : [id];
+    const ids = welcome ? [intro.id, id] : [id];
     ids.forEach((x) => started.current.add(x));
     setActive({ key: Date.now(), id, auto, ids, steps });
   }, []);
 
-  // автозапуск: только обучающемуся, если не пропустил обучение и экран не пройден
+  // автозапуск: только экраны своей аудитории, если не пропустил обучение и экран не пройден
   const s = state.data;
   useEffect(() => {
     if (!screen?.ready || active || !s?.enabled || s.dismissed) return;
+    if (s.audience !== tourAudience(screen.id)) return; // преподаватель в журнале 112 — не обучающийся
     if (s.seen.includes(screen.id) || started.current.has(screen.id)) return;
-    start(screen.id, !s.seen.includes(WELCOME_ID) && !started.current.has(WELCOME_ID), true);
+    const welcome = WELCOMES[tourAudience(screen.id)].id;
+    start(screen.id, !s.seen.includes(welcome) && !started.current.has(welcome), true);
   }, [screen, s, active, start]);
 
   // ушли с экрана посреди подсказок — закрыть их, экран не считается пройденным
@@ -52,10 +56,11 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
     if (active && screen && !active.ids.includes(screen.id)) setActive(null);
   }, [screen, active]);
 
-  const finish = async () => {
+  // обзор и экран — одной записью: при перезагрузке сразу после закрытия отметка не теряется (п. 5.4, R5.4-08)
+  const finish = () => {
     const ids = active?.ids ?? [];
     setActive(null);
-    for (const tour of ids) await update.mutateAsync({ action: 'seen', tour }).catch(() => undefined);
+    if (ids.length) update.mutate({ action: 'seen', tours: ids });
   };
   const skip = () => {
     setActive(null);
@@ -83,12 +88,12 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
   return (
     <Ctx.Provider value={value}>
       {children}
-      {active && <Tour key={active.key} steps={active.steps} onFinish={() => { void finish(); }} onSkip={skip} />}
+      {active && <Tour key={active.key} steps={active.steps} onFinish={finish} onSkip={skip} />}
     </Ctx.Provider>
   );
 }
 
-/** Экран обучающегося: подсказки покажутся при первом открытии, когда `ready` (данные экрана загружены). */
+/** Экран с подсказками: покажутся при первом открытии своей аудитории, когда `ready` (данные экрана загружены). */
 export function useScreenTour(id: TourId, ready = true): void {
   const ctx = useContext(Ctx);
   const register = ctx?.register;
@@ -136,6 +141,13 @@ export function useTourPause(tour: TourId, enabled: boolean, handlers: {
 export function useTourControls() {
   const ctx = useContext(Ctx);
   return { available: !!ctx?.screen, replay: ctx?.replay ?? (() => undefined), restart: ctx?.restart ?? (() => undefined) };
+}
+
+/** Кнопка «подсказки» в шапке кабинета преподавателя (п. 5.4): подсказки открытого экрана ещё раз. */
+export function TourCabinetButton() {
+  const tour = useTourControls();
+  if (!tour.available) return null;
+  return <span data-tour="help"><Button icon="help" variant="ghost" onClick={tour.replay}>подсказки</Button></span>;
 }
 
 /** Квадратная кнопка «?» для экранов без шапки АРМ (карточка 112, карточка ДДС) — в ряду кнопок панели служб. */

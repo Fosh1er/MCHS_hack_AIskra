@@ -6,6 +6,7 @@ import { Banner, Button, Card, Icon, LineChart, StatTile, StatusPill } from '@sm
 import { reportCsvUrl, useEvaluateSession, useOverride, useSessionReport, type CardResult, type SessionReport } from '../../shared/api/assessment';
 import { CallReview } from '../../shared/ui/CallReview';
 import { TeacherShell } from '../../shared/ui/TeacherShell';
+import { useScreenTour } from '../../shared/onboarding/OnboardingProvider';
 import { num } from '../../shared/format';
 
 const pct = (x: number | null) => (x === null ? '—' : `${Math.round(x * 100)} %`);
@@ -42,7 +43,7 @@ function StudentsTable({ r }: { r: SessionReport }) {
   }, []);
   const threshold = r.settings.threshold ?? 70;
   return (
-    <Card title="Результаты обучающихся" subtitle="Нажмите строку, чтобы раскрыть карточки" flush
+    <Card title="Результаты обучающихся" subtitle="Нажмите строку, чтобы раскрыть карточки" flush tour="t-results"
       actions={<Button size="sm" variant="ghost" onClick={() => setAll(!all)}>{all ? 'свернуть все' : 'раскрыть все'}</Button>}>
       <table className="cab-table">
         <thead><tr><th>ФИО</th><th>Роль</th><th className="num">Карточек</th><th className="num">Средний балл</th><th className="num">Зачтено</th><th className="num">Среднее время, с</th><th className="num">Не оценено</th></tr></thead>
@@ -126,7 +127,7 @@ function Heatmap({ r }: { r: SessionReport }) {
   }).filter((p) => p.criteria.length);
   if (!parts.length) return null;
   return (
-    <Card title="Тепловая карта: обучающийся × критерий" subtitle="Средний балл критерия, 0–100 %; чем темнее, тем лучше">
+    <Card title="Тепловая карта: обучающийся × критерий" subtitle="Средний балл критерия, 0–100 %; чем темнее, тем лучше" tour="t-heatmap">
       <div className="tch-heat-parts">
         {parts.map((p) => (
           <div key={p.role}>
@@ -162,15 +163,18 @@ export function SessionReportPage() {
   const q = useSessionReport(id);
   const evaluate = useEvaluateSession(id);
   const r = q.data;
+  useScreenTour('teacher-report', !!r);
   return (
     <TeacherShell active="sessions" crumbs="Пульт / Занятия / Отчёт" title={r ? `Отчёт: ${r.title}` : 'Отчёт по занятию'}
       subtitle={r?.started_at ? new Date(r.started_at).toLocaleString('ru-RU') : undefined}
       actions={
         <span className="tch-noprint cab-filters">
-          <Button icon="refresh" disabled={evaluate.isPending} onClick={() => evaluate.mutate()}>{evaluate.isPending ? 'оценка…' : 'оценить все карточки'}</Button>
-          <Link className="cab-btn" to={`/teacher/sessions/${id}/debrief`}>разбор</Link>
-          <a className="cab-btn" href={reportCsvUrl(id)} download>Excel (CSV)</a>
-          <Button icon="description" onClick={() => window.print()}>PDF</Button>
+          <span data-tour="t-evaluate"><Button icon="refresh" disabled={evaluate.isPending} onClick={() => evaluate.mutate()}>{evaluate.isPending ? 'оценка…' : 'оценить все карточки'}</Button></span>
+          <span className="tch-tour-group" data-tour="t-report-more">
+            <Link className="cab-btn" to={`/teacher/sessions/${id}/debrief`}>разбор</Link>
+            <a className="cab-btn" href={reportCsvUrl(id)} download>Excel (CSV)</a>
+            <Button icon="description" onClick={() => window.print()}>PDF</Button>
+          </span>
         </span>
       }>
       {q.isError && <Banner status="critical">{q.error.message}</Banner>}

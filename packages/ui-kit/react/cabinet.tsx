@@ -108,10 +108,11 @@ export function Topbar({ crumbs, title, subtitle, actions, clock }: { crumbs?: s
 }
 
 /* ======================= Карточка ======================= */
-export interface CardProps { title?: ReactNode; subtitle?: ReactNode; dark?: boolean; actions?: ReactNode; flush?: boolean; children: ReactNode; }
-export function Card({ title, subtitle, dark, actions, flush, children }: CardProps) {
+/** `tour` — цель подсказки обучения интерфейсу (`data-tour`, п. 5.3–5.4). */
+export interface CardProps { title?: ReactNode; subtitle?: ReactNode; dark?: boolean; actions?: ReactNode; flush?: boolean; tour?: string; children: ReactNode; }
+export function Card({ title, subtitle, dark, actions, flush, tour, children }: CardProps) {
   return (
-    <section className="cab-card">
+    <section className="cab-card" data-tour={tour}>
       {(title || actions) && (
         <div className={cx('cab-card__head', dark && 'cab-card__head--dark')}>
           <span>

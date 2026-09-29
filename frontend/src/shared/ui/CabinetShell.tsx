@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppShell, Sidebar, TabBar, Topbar, type NavItem } from '@smena112/ui-kit';
 import { useLogout, useMe } from '../api/auth';
+import { TourCabinetButton } from '../onboarding/OnboardingProvider';
 
 export const NAV: Record<'teacher' | 'admin' | 'student', { role: string; items: NavItem[] }> = {
   teacher: {
@@ -62,7 +63,8 @@ export function CabinetShell({ kind, active, title, subtitle, crumbs, actions, c
           user={{ name: me.full_name, sub: me.role_title, initials: initials(me.full_name) }}
           onLogout={() => logout.mutate(undefined, { onSettled: () => navigate('/', { replace: true }) })} />
       }
-      topbar={<Topbar crumbs={crumbs} title={title} subtitle={subtitle} actions={actions} />}
+      topbar={<Topbar crumbs={crumbs} title={title} subtitle={subtitle}
+        actions={kind === 'teacher' ? <>{actions}<TourCabinetButton /></> : actions} />}
       tabbar={<TabBar items={nav.items} activeId={active} onNavigate={go} />}
     >
       {children}

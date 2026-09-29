@@ -8,6 +8,7 @@ import {
   type ScenarioFilter, type ScenarioRow, type ScenarioView,
 } from '../../shared/api/training';
 import { TeacherShell } from '../../shared/ui/TeacherShell';
+import { useScreenTour } from '../../shared/onboarding/OnboardingProvider';
 
 const STATUS: Record<ScenarioRow['status'], { label: string; pill: 'info' | 'ok' | 'neutral' }> = {
   draft: { label: 'на проверке', pill: 'info' },
@@ -24,7 +25,7 @@ function GenerateForm({ onDone }: { onDone: (n: number) => void }) {
   const [difficulty, setDifficulty] = useState(2);
   const [picked, setPicked] = useState<number[]>([]);
   return (
-    <Card title="Сгенерировать сценарии" subtitle="Черновики попадут в банк на проверку">
+    <Card title="Сгенерировать сценарии" subtitle="Черновики попадут в банк на проверку" tour="t-generate">
       <div className="cab-filters">
         <label className="cab-filters__label">Количество <input className="cab-select" type="number" min={1} max={50} value={count} onChange={(e) => setCount(Number(e.target.value))} style={{ width: 70 }} /></label>
         <label className="cab-filters__label">Сложность{' '}
@@ -126,7 +127,7 @@ function Detail({ id }: { id: string }) {
   const s = q.data;
   if (!s) return <Card title="Сценарий">{q.isError ? q.error.message : 'загрузка…'}</Card>;
   return (
-    <Card title={s.title} subtitle={`${STATUS[s.status].label} · сложность ${s.difficulty} · ${SOURCE[s.source] ?? s.source}`}
+    <Card title={s.title} subtitle={`${STATUS[s.status].label} · сложность ${s.difficulty} · ${SOURCE[s.source] ?? s.source}`} tour="t-detail"
       actions={<Segmented ariaLabel="Режим" value={mode} onChange={setMode}
         options={[{ value: 'view', label: 'легенда' }, { value: 'preview', label: 'прогон' }, { value: 'edit', label: 'правка' }]} />}>
       {mode === 'view' && <Legend s={s} />}
@@ -158,6 +159,7 @@ export function ScenariosPage() {
   const [picked, setPicked] = useState<string | null>(null);
   const [info, setInfo] = useState('');
   const list = useScenarios(f);
+  useScreenTour('teacher-scenarios', !!list.data);
   const titles = new Map((cardTypes.data ?? []).map((t) => [t.code, t.title]));
   const total = list.data?.total ?? 0;
   const pages = Math.max(1, Math.ceil(total / f.page_size));
@@ -167,8 +169,10 @@ export function ScenariosPage() {
       <GenerateForm onDone={(n) => { setInfo(`Создано черновиков: ${n}`); set({ status: 'draft' }); }} />
       {info && <Banner actions={<Button size="sm" variant="ghost" onClick={() => setInfo('')}>скрыть</Button>}>{info}</Banner>}
       <div className="cab-filters">
-        <Segmented ariaLabel="Статус" value={f.status ?? ''} onChange={(v) => set({ status: v || undefined })}
-          options={[{ value: 'draft', label: 'на проверке' }, { value: 'approved', label: 'утверждённые' }, { value: 'archived', label: 'архив' }, { value: '', label: 'все' }]} />
+        <span data-tour="t-status">
+          <Segmented ariaLabel="Статус" value={f.status ?? ''} onChange={(v) => set({ status: v || undefined })}
+            options={[{ value: 'draft', label: 'на проверке' }, { value: 'approved', label: 'утверждённые' }, { value: 'archived', label: 'архив' }, { value: '', label: 'все' }]} />
+        </span>
         <select className="cab-select" aria-label="Сложность" value={f.difficulty ?? ''} onChange={(e) => set({ difficulty: e.target.value ? Number(e.target.value) : undefined })}>
           <option value="">любая сложность</option>
           {[1, 2, 3, 4, 5].map((d) => <option key={d} value={d}>{d} — {DIFFICULTY[d]}</option>)}
@@ -182,7 +186,7 @@ export function ScenariosPage() {
         </select>
       </div>
       <div className="cab-grid cab-grid--main-aside">
-        <Card flush>
+        <Card flush tour="t-list">
           <table className="cab-table">
             <thead><tr><th>Название</th><th>Тип</th><th className="num">Сложн.</th><th>Источник</th><th>Статус</th></tr></thead>
             <tbody>
@@ -206,7 +210,7 @@ export function ScenariosPage() {
             </div>
           )}
         </Card>
-        {picked ? <Detail id={picked} /> : <Card title="Сценарий">Выберите сценарий в списке, чтобы посмотреть легенду, эталон и прогон.</Card>}
+        {picked ? <Detail id={picked} /> : <Card title="Сценарий" tour="t-detail">Выберите сценарий в списке, чтобы посмотреть легенду, эталон и прогон.</Card>}
       </div>
     </TeacherShell>
   );

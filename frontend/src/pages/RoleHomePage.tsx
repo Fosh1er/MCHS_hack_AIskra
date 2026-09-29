@@ -4,21 +4,27 @@ import { useInsights } from '../shared/api/assessment';
 import { Button, Card, StatusPill } from '@smena112/ui-kit';
 import { MODE_TITLE, SESSION_STATUS, useSessions } from '../shared/api/training';
 import { TeacherShell } from '../shared/ui/TeacherShell';
+import { useScreenTour, useTourControls } from '../shared/onboarding/OnboardingProvider';
 import { num } from '../shared/format';
 
 /** Пульт преподавателя (п. 4.x): идущие и последние занятия, переходы, инсайты по группе. */
 function TeacherHome() {
   const navigate = useNavigate();
   const sessions = useSessions();
+  const tour = useTourControls();
+  useScreenTour('teacher-home', !!sessions.data);
   const items = sessions.data?.items ?? [];
   const recent = [...items.filter((s) => s.status === 'running'), ...items.filter((s) => s.status !== 'running')].slice(0, 6);
   return (
     <TeacherShell active="home" title="Пульт преподавателя"
       actions={<>
-        <Button icon="library" onClick={() => navigate('/teacher/scenarios')}>банк сценариев</Button>
-        <Button variant="primary" icon="plus" onClick={() => navigate('/teacher/sessions')}>занятие</Button>
+        <Button icon="help" variant="ghost" onClick={tour.restart}>пройти обучение заново</Button>
+        <span className="tch-tour-group" data-tour="t-home-actions">
+          <Button icon="library" onClick={() => navigate('/teacher/scenarios')}>банк сценариев</Button>
+          <Button variant="primary" icon="plus" onClick={() => navigate('/teacher/sessions')}>занятие</Button>
+        </span>
       </>}>
-      <Card title="Занятия" subtitle="Идущие — первыми" flush>
+      <Card title="Занятия" subtitle="Идущие — первыми" flush tour="t-home-sessions">
         <table className="cab-table">
           <tbody>
             {recent.map((s) => (
@@ -31,7 +37,7 @@ function TeacherHome() {
           </tbody>
         </table>
       </Card>
-      <Card title="Инсайты по группе"><GroupInsights /></Card>
+      <Card title="Инсайты по группе" tour="t-home-insights"><GroupInsights /></Card>
     </TeacherShell>
   );
 }

@@ -46,15 +46,19 @@ class Onboarding:
     def to_json(self) -> dict[str, Any]:
         return {"dismissed": self.dismissed, "seen": list(self.seen)}
 
-    def apply(self, action: OnboardingAction, tour: str | None = None) -> None:
+    def mark_seen(self, tours: list[str]) -> None:
+        """Отметить экраны пройденными — все или ни одного (п. 5.4): обзор и первый экран закрываются вместе, и
+        отметка одной записью не теряется, если сразу после закрытия перезагрузить страницу."""
+        new = [t for t in dict.fromkeys(check_tour_id(t) for t in tours) if t not in self.seen]
+        if not tours:
+            raise DomainError("Не указан экран обучения", code="bad_tour")
+        if len(self.seen) + len(new) > MAX_TOURS:
+            raise DomainError(f"Экранов обучения не больше {MAX_TOURS}", code="bad_tour")
+        self.seen.extend(new)
+
+    def apply(self, action: OnboardingAction, tour: str | None = None, tours: list[str] | None = None) -> None:
         if action is OnboardingAction.SEEN:
-            if tour is None:
-                raise DomainError("Не указан экран обучения", code="bad_tour")
-            tour = check_tour_id(tour)
-            if tour not in self.seen:
-                if len(self.seen) >= MAX_TOURS:
-                    raise DomainError(f"Экранов обучения не больше {MAX_TOURS}", code="bad_tour")
-                self.seen.append(tour)
+            self.mark_seen([*([tour] if tour is not None else []), *(tours or [])])
         elif action is OnboardingAction.DISMISS:
             self.dismissed = True
         else:

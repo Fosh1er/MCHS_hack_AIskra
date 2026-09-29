@@ -582,3 +582,6 @@
 .tour__skip:hover { color: var(--accent); }
 .tour-wrap { display: flex; flex-direction: column; min-width: 0; } /* цель подсказки в сетке: карточка тянется как раньше */
 .tour-wrap > .cab-card { flex: 1; }
+
+/* Группа кнопок в шапке — цель подсказки обучения интерфейсу (п. 5.4) */
+.tch-tour-group { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; }
