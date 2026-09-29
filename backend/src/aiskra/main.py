@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -13,7 +14,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from aiskra.bootstrap import build_services, wire
+from aiskra.bootstrap import build_services, daily_backup_loop, wire
 from aiskra.modules.assessment.api.router import router as assessment_router
 from aiskra.modules.audit.api.router import router as audit_router
 from aiskra.modules.dictionaries.api.router import router as dictionaries_router
@@ -58,7 +59,10 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
         svc = services or build_services(settings)
         app.state.services = svc
         wire(app, svc)
+        backup_job = asyncio.create_task(daily_backup_loop(svc)) if settings.scheduler_enabled else None
         yield
+        if backup_job:
+            backup_job.cancel()
         await svc.aclose()
 
     app = FastAPI(

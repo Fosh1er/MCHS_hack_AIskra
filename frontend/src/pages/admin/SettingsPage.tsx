@@ -13,7 +13,7 @@ import { bytes } from '../../shared/format';
 const LABELS: Record<string, string> = {
   norm_112: 'Норматив карточки 112, с', norm_dds: 'Норматив решения ДДС, с', threshold: 'Порог «зачтено», балл',
   difficulty: 'Сложность вызовов, 1–5', call_interval_s: 'Темп вызовов 112, с', feed_interval_s: 'Темп карточек ДДС, с',
-  max_waiting: 'Очередь ДДС, не больше', keep: 'Хранить копий', retention_days: 'Срок хранения журнала аудита, дней (от 183)',
+  max_waiting: 'Очередь ДДС, не больше', keep: 'Хранить копий', auto: 'Ежедневная копия: 1 — включена, 0 — нет', daily_hour: 'Час ежедневной копии (МСК, 0–23)', retention_days: 'Срок хранения журнала аудита, дней (от 183)',
 };
 const TITLES: Record<string, string> = { session_defaults: 'Занятие по умолчанию', backup: 'Хранение копий', audit: 'Журнал аудита' };
 const size = bytes;
