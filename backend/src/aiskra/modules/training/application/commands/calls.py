@@ -20,7 +20,7 @@ from aiskra.modules.training.application.ports.scenarios import (
     ScenarioRepository,
 )
 from aiskra.modules.training.domain.actors import topic_of
-from aiskra.modules.training.domain.call import Call, CallMessage, CallParty, Speaker
+from aiskra.modules.training.domain.call import Call, CallMessage, CallParty, ReplicaVia, Speaker
 from aiskra.modules.training.domain.tone import CallerTone, ToneSnapshot, tone_for_legend
 from aiskra.shared.application import Clock, Command, UnitOfWork
 from aiskra.shared.audit import AuditEntry, AuditEvent, AuditRecorder, RequestMeta
@@ -80,8 +80,10 @@ class _CallBase:
             await self._uow.rollback()
             raise
 
-    async def _say(self, call: Call, speaker: Speaker, text: str, tone: ToneSnapshot | None = None) -> CallMessage:
-        msg = CallMessage(call_id=call.id, speaker=speaker, text=text, at=self._clock.now(), tone=tone)
+    async def _say(
+        self, call: Call, speaker: Speaker, text: str, tone: ToneSnapshot | None = None, via: ReplicaVia | None = None
+    ) -> CallMessage:
+        msg = CallMessage(call_id=call.id, speaker=speaker, text=text, at=self._clock.now(), tone=tone, via=via)
         await self._calls.add_message(msg)
         return msg
 
@@ -215,6 +217,7 @@ class SendReplica(Command):
     actor: Principal
     call_id: UUID
     text: str
+    via: ReplicaVia = ReplicaVia.TEXT
 
 
 class SendReplicaHandler(_CallBase):
@@ -227,7 +230,7 @@ class SendReplicaHandler(_CallBase):
         call = await self._own_call(cmd.call_id, cmd.actor)
         call.ensure_active()
         history = await self._calls.messages(call.id)
-        await self._say(call, Speaker.OPERATOR, text)
+        await self._say(call, Speaker.OPERATOR, text, via=cmd.via)
         reply, tone = await self._reply(call, history, text)
         msg = await self._say(call, Speaker.PARTY, reply, tone)
         await self._calls.save(call)

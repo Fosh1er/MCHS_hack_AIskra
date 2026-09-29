@@ -18,9 +18,15 @@ from aiskra.modules.incidents.domain.incident import AddedBy, CardService, Incid
 from aiskra.modules.incidents.infrastructure.models import CardServiceModel, CardServiceStatusModel, IncidentCardModel
 from aiskra.modules.incidents.infrastructure.repositories import SqlCardRepository
 from aiskra.modules.training.application.ports.sessions import ParticipantProgress
+from aiskra.modules.training.domain.call import ReplicaVia, call_mode
 from aiskra.modules.training.domain.scenario import Scenario
 from aiskra.modules.training.domain.session import TrainingSession
-from aiskra.modules.training.infrastructure.models import ScenarioModel, TrainingSessionModel
+from aiskra.modules.training.infrastructure.models import (
+    CallMessageModel,
+    CallModel,
+    ScenarioModel,
+    TrainingSessionModel,
+)
 from aiskra.modules.training.infrastructure.sessions import SqlSessionRepository, SqlStudentDirectory
 from aiskra.platform.types import as_utc
 
@@ -242,6 +248,7 @@ class SessionFactsReader:
         }
         groups = await self._groups({t for t in itypes.values() if t})
         reactions = await self._reactions([c.id for c in cards])
+        modes = await self._call_modes([c.id for c in cards])
         return SessionFacts(
             session_id=ts.id,
             teacher_id=ts.teacher_id,
@@ -275,6 +282,7 @@ class SessionFactsReader:
                     incident_group=groups.get(itypes[c.id] or ""),
                     difficulty=scen.get(c.scenario_id, (None, None))[1],
                     reactions=reactions.get(c.id, {}),
+                    call_mode=modes.get(c.id),
                 )
                 for c in cards
             ],
@@ -305,6 +313,25 @@ class SessionFactsReader:
             select(IncidentTypeModel.code, IncidentTypeModel.group_id).where(IncidentTypeModel.code.in_(codes))
         )
         return {code: gid for code, gid in rows.all()}
+
+    async def _call_modes(self, card_ids: list[UUID]) -> dict[UUID, str]:
+        """Режим разговора по карточке (п. 3.6): самый «голосовой» способ реплик оператора во всех её звонках."""
+        if not card_ids:
+            return {}
+        rows = await self._s.execute(
+            select(CallModel.card_id, CallMessageModel.via)
+            .join(CallMessageModel, CallMessageModel.call_id == CallModel.id)
+            .where(
+                CallModel.card_id.in_(card_ids),
+                CallMessageModel.speaker == "operator",
+                CallMessageModel.via.is_not(None),
+            )
+        )
+        vias: dict[UUID, list[ReplicaVia]] = {}
+        for cid, via in rows.all():
+            if cid is not None and via:
+                vias.setdefault(cid, []).append(ReplicaVia(via))
+        return {cid: mode.value for cid, v in vias.items() if (mode := call_mode(v))}
 
     async def _reactions(self, card_ids: list[UUID]) -> dict[UUID, dict[str, float]]:
         """Время решения ДДС: от поступления карточки в службу до первого статуса после «Поступила» (как в оценке)."""

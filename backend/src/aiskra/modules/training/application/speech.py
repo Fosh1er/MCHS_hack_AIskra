@@ -27,6 +27,19 @@ log = logging.getLogger(__name__)
 
 MAX_AUDIO_BYTES = 3 * 1024 * 1024  # ≈ 1,5–3 мин речи в webm/opus — реплика в трубку заметно короче
 
+# Whisper на тишине и шуме «досочиняет» титры из видео, на которых учился: «Продолжение следует…», «Субтитры сделал
+# DimaTorzok». В режиме без рук шум попадает в распознавание чаще — такие предложения выбрасываем: оператор 112 их
+# не произносит, а собеседник получил бы бессмыслицу (п. 3.6, V3).
+_PHANTOM = re.compile(
+    r"субтитр|продолжение следует|спасибо за просмотр|подписывайтесь|ставьте лайк|dimatorzok", re.IGNORECASE
+)
+_SENTENCE = re.compile(r"(?<=[.!?…])\s+")
+
+
+def drop_phantoms(text: str) -> str:
+    """Убрать из распознанного текста предложения-галлюцинации Whisper, остальное оставить."""
+    return " ".join(p for p in _SENTENCE.split(text.strip()) if p and not _PHANTOM.search(p)).strip()
+
 
 @dataclass(frozen=True, kw_only=True)
 class Transcribe(Command):
@@ -56,7 +69,7 @@ class TranscribeHandler:
         if len(cmd.audio) > MAX_AUDIO_BYTES:
             raise DomainError("Запись слишком длинная — реплика в трубку до минуты", code="audio_too_long")
         t = await self._stt.transcribe(cmd.audio, mime=cmd.mime)
-        return Transcribed(text=t.text)
+        return Transcribed(text=drop_phantoms(t.text))
 
 
 @dataclass(frozen=True)

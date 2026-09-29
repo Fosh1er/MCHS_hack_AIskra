@@ -16,6 +16,7 @@ from aiskra.modules.training.application.speech import (
     Transcribe,
     TranscribeHandler,
     clip_for_speech,
+    drop_phantoms,
 )
 from aiskra.shared.errors import DomainError, ExternalServiceError
 from aiskra.shared.security import Principal, Role
@@ -161,3 +162,11 @@ def test_long_reply_clipped_by_sentence() -> None:
     clipped = clip_for_speech(text, 100)
     assert len(clipped) <= 100 and clipped.endswith(".")
     assert clip_for_speech("Короткая реплика") == "Короткая реплика"
+
+
+def test_whisper_phantoms_dropped() -> None:
+    """П. 3.6, V3: на тишине Whisper сочиняет титры — такие предложения не должны уйти собеседнику."""
+    assert drop_phantoms("Продолжение следует...") == ""
+    assert drop_phantoms("Субтитры сделал DimaTorzok") == ""
+    assert drop_phantoms("Где вы находитесь? Продолжение следует...") == "Где вы находитесь?"
+    assert drop_phantoms("Назовите адрес, пожалуйста.") == "Назовите адрес, пожалуйста."

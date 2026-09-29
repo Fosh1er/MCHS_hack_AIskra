@@ -71,8 +71,11 @@ def test_end_to_end_chain(app_client: Callable[[], TestClient]) -> None:
     ).json()
     first = operator.post(f"/api/v1/training/calls/{call['call_id']}/answer", json={"card_id": card["id"]}).json()
     assert first and first["text"]
-    for q in ("Назовите адрес", "Что случилось?", "Есть пострадавшие?"):
-        assert operator.post(f"/api/v1/training/calls/{call['call_id']}/replicas", json={"text": q}).json()["text"]
+    # вопросы голосом: последний — без рук (п. 3.6); режим разговора уйдёт в отчёт
+    for q, via in (("Назовите адрес", "text"), ("Что случилось?", "voice"), ("Есть пострадавшие?", "hands_free")):
+        r = operator.post(f"/api/v1/training/calls/{call['call_id']}/replicas", json={"text": q, "via": via})
+        assert r.json()["text"]
+    assert operator.get(f"/api/v1/training/calls/{call['call_id']}").json()["mode"] == "hands_free"
 
     # E4: карточка сохранена, службы — по автоподбору (эталон)
     services = [{"code": s["code"], "is_main": s["main"], "added_by": "auto"} for s in ref["services"]]
@@ -124,6 +127,7 @@ def test_end_to_end_chain(app_client: Callable[[], TestClient]) -> None:
     op_card, dds_card = by_role["112"]["cards"][0], by_role["dds"]["cards"][0]
     assert op_card["card_number"] == dds_card["card_number"] == card["number"]
     assert op_card["score"] >= 90 and op_card["processing_s"] is not None
+    assert op_card["call_mode"] == "hands_free" and dds_card["call_mode"] is None  # у ДДС разговора с заявителем нет
     assert dds_card["score"] >= 70 and dds_card["passed"], dds_card["errors"]
     r = teacher.post(
         f"/api/v1/assessment/{dds_card['assessment_id']}/override",
@@ -137,3 +141,4 @@ def test_end_to_end_chain(app_client: Callable[[], TestClient]) -> None:
     )
     csv = teacher.get(f"/api/v1/assessment/sessions/{session_id}/report.csv").text
     assert csv.count(str(card["number"])) == 2  # строка оператора и строка диспетчера
+    assert "голосом без рук" in csv

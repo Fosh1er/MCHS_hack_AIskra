@@ -239,7 +239,7 @@ async def replica(
     actor: Trainee,
     handler: Annotated[SendReplicaHandler, Depends(deps.provide_replica)],
 ) -> ReplicaOut:
-    r = await handler(SendReplica(actor=actor, call_id=call_id, text=body.text))
+    r = await handler(SendReplica(actor=actor, call_id=call_id, text=body.text, via=body.via))
     return ReplicaOut(speaker=r.speaker, text=r.text, message_id=r.message_id, tone=r.tone)
 
 

@@ -82,6 +82,9 @@ def test_tone_follows_operator(app_client: Callable[[], TestClient]) -> None:
     assert all(m["tone"] is None for m in view["messages"] if m["speaker"] == "operator")
     assert party[-1]["id"] == kind["message_id"] and view["tone"]["tension"] == kind["tone"]["tension"]
     assert not {"address", "applicant", "facts", "legend"} & set(view["tone"])  # фактов легенды нет
+    assert view["mode"] == "text"  # реплики напечатаны (п. 3.6, R3.6-26)
+    bad = student.post(f"/api/v1/training/calls/{cid}/replicas", json={"text": "Алло", "via": "telepathy"})
+    assert bad.status_code == 422
 
 
 def dds_call(c: TestClient, card_id: str, party: str, target: str | None = None) -> Any:

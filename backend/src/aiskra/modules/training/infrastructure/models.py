@@ -103,6 +103,7 @@ class CallMessageModel(Base):
     text: Mapped[str] = mapped_column(Text)
     at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     tone: Mapped[dict[str, Any] | None] = mapped_column(JsonType)  # снимок состояния у реплики собеседника (п. 3.6)
+    via: Mapped[str | None] = mapped_column(String(12))  # у реплик оператора: text | voice | hands_free (п. 3.6)
 
 
 class MaterialModel(Base):

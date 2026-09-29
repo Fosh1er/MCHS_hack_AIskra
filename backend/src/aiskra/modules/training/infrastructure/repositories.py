@@ -9,7 +9,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from aiskra.modules.training.application.ports.scenarios import ScenarioRow
-from aiskra.modules.training.domain.call import Call, CallMessage, CallParty, CallStatus, Speaker
+from aiskra.modules.training.domain.call import Call, CallMessage, CallParty, CallStatus, ReplicaVia, Speaker
 from aiskra.modules.training.domain.scenario import Scenario, ScenarioStatus
 from aiskra.modules.training.domain.tone import CallerTone, ToneSnapshot
 from aiskra.modules.training.infrastructure.models import CallMessageModel, CallModel, ScenarioModel
@@ -199,6 +199,7 @@ class SqlCallRepository:
                 text=message.text,
                 at=message.at,
                 tone=message.tone.to_json() if message.tone else None,
+                via=message.via.value if message.via else None,
             )
         )
         await self._s.flush()
@@ -223,6 +224,7 @@ class SqlCallRepository:
                     text=r.text,
                     at=at,
                     tone=ToneSnapshot.from_json(r.tone),
+                    via=ReplicaVia(r.via) if r.via else None,
                 )
             )
         return out

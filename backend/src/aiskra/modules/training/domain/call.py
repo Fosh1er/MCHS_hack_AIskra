@@ -30,6 +30,22 @@ class Speaker(StrEnum):
     SYSTEM = "system"
 
 
+class ReplicaVia(StrEnum):
+    """Как оператор сказал реплику (п. 3.6): в голосовом режиме в время карточки входит речь собеседника."""
+
+    TEXT = "text"
+    VOICE = "voice"  # кнопка «говорить»
+    HANDS_FREE = "hands_free"
+
+
+_VIA_RANK = {ReplicaVia.TEXT: 0, ReplicaVia.VOICE: 1, ReplicaVia.HANDS_FREE: 2}
+
+
+def call_mode(vias: list[ReplicaVia]) -> ReplicaVia | None:
+    """Режим звонка — самый «голосовой» из способов реплик оператора; реплик не было — режима нет."""
+    return max(vias, key=_VIA_RANK.__getitem__) if vias else None
+
+
 @dataclass
 class CallMessage:
     call_id: UUID
@@ -37,6 +53,7 @@ class CallMessage:
     text: str
     at: datetime
     tone: ToneSnapshot | None = None  # состояние заявителя у его реплики (п. 3.6): по нему озвучивается реплика
+    via: ReplicaVia | None = None  # у реплик оператора: напечатал, сказал кнопкой или без рук
     id: UUID = field(default_factory=uuid4)
 
 
