@@ -228,3 +228,19 @@ def test_report_xlsx_is_native_excel(app_client: Callable[[], TestClient], lesso
         .status_code
         == 403
     )
+
+
+def test_scenario_edit_runs_grammar_check(app_client: Callable[[], TestClient], lesson: dict[str, Any]) -> None:
+    """П. 3.6: правка сценария преподавателем — проверка грамотности автоматически, замечания в ответе и сценарии."""
+    teacher = as_user(app_client, "teacher")
+    sid = teacher.get("/api/v1/training/scenarios", params={"status": "approved"}).json()["items"][0]["id"]
+    r = teacher.patch(f"/api/v1/training/scenarios/{sid}", json={"what": "Горит горит балкон"})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["status"] == "draft" and body["checked_by"] == "rules"
+    assert {g["rule"] for g in body["grammar"]} >= {"повтор слова", "нет знака препинания в конце"}
+    saved = teacher.get(f"/api/v1/training/scenarios/{sid}").json()["legend"]["grammar_check"]
+    assert saved["by"] == "rules" and len(saved["remarks"]) == len(body["grammar"])
+    fixed = teacher.patch(f"/api/v1/training/scenarios/{sid}", json={"what": "Горит балкон."}).json()
+    assert fixed["grammar"] == []
+    teacher.post(f"/api/v1/training/scenarios/{sid}/approve")

@@ -5,7 +5,7 @@ import { Banner, Button, Card, Segmented, StatusPill, Tag } from '@smena112/ui-k
 import { useCardTypes, useEnum, useIncidentGroups, useServices } from '../../shared/api/dictionaries';
 import {
   useEditScenario, useGenerateScenarios, usePsyProfiles, useReviewScenario, useScenario, useScenarioPreview, useScenarios, useSetScenarioPsy,
-  type ScenarioFilter, type ScenarioRow, type ScenarioView,
+  type EditScenarioResult, type ScenarioFilter, type ScenarioRow, type ScenarioView,
 } from '../../shared/api/training';
 import { TeacherShell } from '../../shared/ui/TeacherShell';
 import { useScreenTour } from '../../shared/onboarding/OnboardingProvider';
@@ -86,13 +86,18 @@ function Legend({ s }: { s: ScenarioView }) {
   );
 }
 
+const FIELD: Record<string, string> = { title: 'Название', opening: 'Первая фраза', what: 'Что случилось', details: 'Подробности', текст: 'Текст' };
+
 function EditForm({ s, onClose }: { s: ScenarioView; onClose: () => void }) {
   const edit = useEditScenario();
   const lg = s.legend as Record<string, string>;
   const [f, setF] = useState({ title: s.title, difficulty: s.difficulty, opening: lg.opening ?? '', what: lg.what ?? '', details: lg.details ?? '' });
   const [comment, setComment] = useState('');
-  const save = () => edit.mutate({ id: s.id, ...f, details: f.details || undefined }, { onSuccess: onClose });
-  const regen = () => edit.mutate({ id: s.id, comment }, { onSuccess: () => { setComment(''); onClose(); } });
+  // п. 3.6: после каждой правки — проверка грамотности; есть замечания — форма остаётся открытой, чтобы поправить
+  const [grammar, setGrammar] = useState<EditScenarioResult | null>(null);
+  const done = (r: EditScenarioResult) => { if (r.grammar.length) setGrammar(r); else onClose(); };
+  const save = () => edit.mutate({ id: s.id, ...f, details: f.details || undefined }, { onSuccess: done });
+  const regen = () => edit.mutate({ id: s.id, comment }, { onSuccess: (r) => { setComment(''); done(r); } });
   return (
     <div className="tch-form">
       <label>Название<input value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} /></label>
@@ -113,7 +118,13 @@ function EditForm({ s, onClose }: { s: ScenarioView; onClose: () => void }) {
       </label>
       <Button icon="refresh" onClick={regen} disabled={edit.isPending || comment.trim().length < 3}>перегенерировать речь заявителя</Button>
       {edit.isError && <Banner status="critical">{edit.error.message}</Banner>}
-      <small className="c-slate">После правки сценарий возвращается на проверку — утвердите его снова.</small>
+      {grammar && (
+        <Banner actions={<Button size="sm" variant="ghost" onClick={onClose}>закрыть</Button>}>
+          Сохранено. Проверка грамотности ({grammar.checked_by === 'rules' ? 'правила' : 'правила и модель'}): замечаний {grammar.grammar.length} — поправьте и сохраните снова.
+          <ul className="tch-errors">{grammar.grammar.map((g, i) => <li key={i}><b>{FIELD[g.field] ?? g.field}</b>: «{g.quote}» → «{g.fix}» <span className="c-slate">({g.rule})</span></li>)}</ul>
+        </Banner>
+      )}
+      <small className="c-slate">После правки сценарий возвращается на проверку — утвердите его снова. Грамотность проверяется автоматически при каждом сохранении.</small>
     </div>
   );
 }
