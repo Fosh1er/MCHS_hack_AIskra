@@ -1072,6 +1072,13 @@
 /* пока открыт редактор статуса, IP-телефон сворачивается до заголовка — иначе на узком экране он закрывает поля */
 body:has(.dds-editor) .ipphone > .arm-dock__section:not(.ipphone__screen) { display: none; }
 .dds-editor__err { flex-basis: 100%; color: #c0461f; font-size: var(--fs-xs); }
+/* п. 5.5: силы своей службы из справочника — строка флажков под полями статуса */
+.dds-editor__forces { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 0; padding: 4px 0 0; border: 0; border-top: 1px solid var(--border-subtle); max-height: 132px; overflow-y: auto; font-size: var(--fs-xs); }
+.dds-editor__forces legend { float: left; width: 100%; padding: 0; color: var(--text-muted); }
+.dds-editor__forces label { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; cursor: pointer; }
+.dds-editor__forces label.is-on b { color: var(--c-blue-700); }
+.dds-editor__forces input:disabled + b { opacity: .55; }
+.dds-editor__busy { color: var(--c-red-700); }
 
 /* ==========================================================================
    Учебные звонки (п. 1.4, 2.3): входящий вызов, панель разговора, IP-телефон ДДС (РТУ Т16Р)

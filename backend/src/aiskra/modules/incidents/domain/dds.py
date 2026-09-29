@@ -55,6 +55,7 @@ TITLES: dict[ServiceStatus, str] = {
     S.WORKS_REFUSED: "Отказ от выполнения работ",
 }
 ORDER_NO_MAX, COMMENT_MAX = 32, 500
+BRIGADES_MAX = 10  # сил на один вызов — больше в учебной карточке не бывает, защита от мусора
 
 
 def next_statuses(current: ServiceStatus) -> list[ServiceStatus]:
@@ -76,3 +77,27 @@ def check_transition(current: ServiceStatus, new: ServiceStatus, order_no: str, 
         raise DomainError("Для «Принята» укажите номер наряда", code="order_no_required")
     if new in (S.ACCEPTED, S.REJECTED, S.WORKS_REFUSED) and not comment.strip():
         raise DomainError(f"Для «{TITLES[new]}» нужен комментарий", code="comment_required")
+
+
+def call_sign(brigade_code: str) -> str:
+    """Позывной из ключа справочника «<служба>:<позывной>» (п. 5.5)."""
+    return brigade_code.split(":", 1)[-1]
+
+
+def check_brigades(
+    service_code: str, new: ServiceStatus, chosen: list[str], known: set[str], busy: dict[str, int]
+) -> None:
+    """Ручной выбор сил своей службы (п. 5.5, #684): только бригады справочника своей службы, не занятые на другой
+    незакрытой карточке; при «Не принята» силы не направляются. `busy` — бригада → номер карточки, где она работает."""
+    if not chosen:
+        return
+    if new is S.REJECTED:
+        raise DomainError("При «Не принята» силы не направляются", code="brigades_on_reject")
+    if len(chosen) > BRIGADES_MAX or len(set(chosen)) != len(chosen):
+        raise DomainError(f"Выберите до {BRIGADES_MAX} разных бригад", code="bad_brigades")
+    foreign = [call_sign(b) for b in chosen if b not in known or not b.startswith(f"{service_code}:")]
+    if foreign:
+        raise DomainError(f"Нет в справочнике сил службы: {', '.join(foreign)}", code="unknown_brigade")
+    taken = [f"{call_sign(b)} (карточка № {busy[b]})" for b in chosen if b in busy]
+    if taken:
+        raise DomainError(f"Бригада уже работает по другой карточке: {', '.join(taken)}", code="brigade_busy")

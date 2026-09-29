@@ -9,8 +9,8 @@ from uuid import UUID
 from sqlalchemy import ColumnElement, column, func, select, table, tuple_, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from aiskra.modules.incidents.application.ports.dds import DdsFilter, DdsJournalRow, DdsServiceState
-from aiskra.modules.incidents.domain.dds import WAITING
+from aiskra.modules.incidents.application.ports.dds import BrigadeOption, DdsFilter, DdsJournalRow, DdsServiceState
+from aiskra.modules.incidents.domain.dds import FINAL, WAITING
 from aiskra.modules.incidents.infrastructure.models import CardServiceModel as CS
 from aiskra.modules.incidents.infrastructure.models import CardServiceStatusModel as H
 from aiskra.modules.incidents.infrastructure.models import IncidentCardModel as C
@@ -19,6 +19,16 @@ from aiskra.platform.types import as_utc
 from aiskra.shared.text import search_key
 
 _services = table("dict_services", column("code"), column("short_name"))
+_brigades = table(
+    "dict_brigades",
+    column("code"),
+    column("service_code"),
+    column("call_sign"),
+    column("name"),
+    column("kind"),
+    column("crew"),
+    column("active"),
+)
 _users = table("users", column("id"), column("full_name"))
 _okrugs = table("dict_okrugs", column("code"), column("short"))
 _districts = table("dict_districts", column("code"), column("name"))
@@ -31,7 +41,15 @@ class SqlDdsRepository:
     async def state(self, card_id: UUID, service_code: str) -> DdsServiceState | None:
         found = (
             await self._s.execute(
-                select(C.number, C.status, CS.current_status, _services.c.short_name, CS.paused_ms, CS.pause_started_at)
+                select(
+                    C.number,
+                    C.status,
+                    CS.current_status,
+                    _services.c.short_name,
+                    CS.paused_ms,
+                    CS.pause_started_at,
+                    CS.brigades,
+                )
                 .select_from(CS)
                 .join(C, C.id == CS.card_id)
                 .outerjoin(_services, _services.c.code == CS.service_code)
@@ -40,7 +58,7 @@ class SqlDdsRepository:
         ).first()
         if found is None:
             return None
-        number, card_status, current, short, paused_ms, pause_started_at = found
+        number, card_status, current, short, paused_ms, pause_started_at, brigades = found
         return DdsServiceState(
             card_id=card_id,
             card_number=number,
@@ -50,7 +68,40 @@ class SqlDdsRepository:
             current_status=current,
             paused_ms=paused_ms,
             pause_started_at=as_utc(pause_started_at),
+            brigades=list(brigades or []),
         )
+
+    async def brigades(self, service_code: str, *, exclude_card: UUID | None = None) -> list[BrigadeOption]:
+        rows = (
+            await self._s.execute(
+                select(_brigades.c.code, _brigades.c.call_sign, _brigades.c.name, _brigades.c.kind, _brigades.c.crew)
+                .where(_brigades.c.service_code == service_code, _brigades.c.active.is_(True))
+                .order_by(_brigades.c.code)
+            )
+        ).all()
+        busy: dict[str, tuple[UUID, int | None]] = {}
+        working = await self._s.execute(
+            select(CS.card_id, CS.card_number, CS.brigades).where(
+                CS.service_code == service_code,
+                CS.current_status.not_in([s.value for s in FINAL]),
+                CS.brigades.is_not(None),
+            )
+        )
+        for card_id, number, codes in working.all():
+            if card_id != exclude_card:
+                busy.update({b: (card_id, number) for b in codes or []})
+        return [
+            BrigadeOption(
+                code=code,
+                call_sign=sign,
+                name=name,
+                kind=kind or "",
+                crew=int(crew or 0),
+                busy_card_id=busy[code][0] if code in busy else None,
+                busy_card_number=busy[code][1] if code in busy else None,
+            )
+            for code, sign, name, kind, crew in rows
+        ]
 
     async def timer_states(self, service_code: str, *, paused: bool) -> list[DdsServiceState]:
         cond = CS.pause_started_at.is_not(None) if paused else CS.current_status.in_(WAITING)
@@ -102,10 +153,12 @@ class SqlDdsRepository:
         comment: str | None,
         actor_id: UUID,
         at: datetime,
+        brigades: list[str] | None = None,
     ) -> None:
-        await self._s.execute(
-            update(CS).where(CS.card_id == card_id, CS.service_code == service_code).values(current_status=status)
-        )
+        values: dict[str, Any] = {"current_status": status}
+        if brigades is not None:
+            values["brigades"] = brigades or None
+        await self._s.execute(update(CS).where(CS.card_id == card_id, CS.service_code == service_code).values(values))
         self._s.add(
             H(
                 card_id=card_id,
@@ -113,6 +166,7 @@ class SqlDdsRepository:
                 status=status,
                 order_no=order_no,
                 comment=comment,
+                brigades=brigades or None,
                 actor_id=actor_id,
                 at=at,
             )

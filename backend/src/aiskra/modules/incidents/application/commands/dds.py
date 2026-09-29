@@ -10,7 +10,14 @@ from dataclasses import dataclass, field
 from uuid import UUID
 
 from aiskra.modules.incidents.application.ports.dds import DdsRepository, DdsServiceState
-from aiskra.modules.incidents.domain.dds import TITLES, WAITING, ServiceStatus, check_transition
+from aiskra.modules.incidents.domain.dds import (
+    TITLES,
+    WAITING,
+    ServiceStatus,
+    call_sign,
+    check_brigades,
+    check_transition,
+)
 from aiskra.modules.incidents.domain.timer_pause import end_pause, start_pause
 from aiskra.shared.application import Clock, Command, UnitOfWork
 from aiskra.shared.audit import AuditEntry, AuditEvent, AuditRecorder, RequestMeta
@@ -92,6 +99,7 @@ class ChangeServiceStatus(Command):
     status: ServiceStatus
     order_no: str = ""
     comment: str = ""
+    brigades: list[str] | None = None  # п. 5.5: силы из справочника службы; None — состав не меняется
     meta: RequestMeta = field(default_factory=RequestMeta)
 
 
@@ -100,7 +108,17 @@ class ChangeServiceStatusHandler(_Base):
         st = await load_state(self._repo, cmd.card_id, cmd.service_code)
         order_no, comment = cmd.order_no.strip(), cmd.comment.strip()
         check_transition(ServiceStatus(st.current_status), cmd.status, order_no, comment)
-        text = TITLES[cmd.status] + (f" · наряд {order_no}" if order_no else "") + (f" · {comment}" if comment else "")
+        brigades = list(cmd.brigades) if cmd.brigades is not None else None
+        if brigades:
+            options = await self._repo.brigades(cmd.service_code, exclude_card=cmd.card_id)
+            busy = {o.code: o.busy_card_number or 0 for o in options if o.busy_card_id is not None}
+            check_brigades(cmd.service_code, cmd.status, brigades, {o.code for o in options}, busy)
+        text = (
+            TITLES[cmd.status]
+            + (f" · наряд {order_no}" if order_no else "")
+            + (f" · силы: {', '.join(call_sign(b) for b in brigades)}" if brigades else "")
+            + (f" · {comment}" if comment else "")
+        )
         try:
             if st.pause_started_at is not None:  # решение во время паузы на подсказки — пауза кончилась сейчас
                 paused = end_pause(st.paused_ms, st.pause_started_at, self._clock.now())
@@ -113,6 +131,7 @@ class ChangeServiceStatusHandler(_Base):
                 comment=comment or None,
                 actor_id=cmd.actor.user_id,
                 at=self._clock.now(),
+                brigades=brigades,
             )
             await self._audit.record(
                 _entry(

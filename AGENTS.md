@@ -103,6 +103,7 @@ cd backend && uv run python -m aiskra.cli create-user --login admin --full-name 
 - **Экраны:** `frontend/src/pages/dds/` — `DdsSelectPage` (`/arm/dds`, выбор службы), `DdsJournalPage` (`/arm/dds/:service`, реестр с таймерами), `DdsCardPage` (`/arm/dds/:service/:id` → `CardViewer` с `dds`).
 - **API:** `GET /api/v1/incidents/dds/{service}/journal`, `GET …/cards/{id}` (с `next_statuses`), `POST …/cards/{id}/received`, `POST …/cards/{id}/status`.
 - **Правила статусов** — `modules/incidents/domain/dds.py` (`NEXT`, `check_transition`). Очередь ДДС = `card_services` сохранённых карточек; `dds_queue_items` — для потока по расписанию (4.2).
+- **Бригады (п. 5.5)** — справочник `dict_brigades` из `data/dictionaries/brigades.yaml` (импорт вместе со справочниками, ключ «<служба>:<позывной>»); `GET /incidents/dds/{service}/brigades`, выбор — `ServiceStatusIn.brigades` → `dds.py:check_brigades`; состав — `card_services.brigades`. Бригада занята, пока её карточка не в окончательном статусе.
 
 ## Сценарии, ИИ-собеседники, звонки (п. 3.2, 3.3, 1.4, 2.3) — что уже есть
 - **Модуль `training`:** `domain/scenario.py` (легенда + эталоны, офлайн-легенда), `domain/actors.py` (офлайн-агенты), `domain/call.py`; `application/actors.py` (агенты поверх `ModelRouter`, при `fake` или ошибке модели — офлайн), `commands/scenarios.py`, `commands/calls.py`.

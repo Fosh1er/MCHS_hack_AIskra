@@ -78,6 +78,7 @@ class CardServiceModel(Base):
     # п. 5.3: пауза таймера решения ДДС на подсказки по экрану — не входит во время реакции
     paused_ms: Mapped[int | None] = mapped_column(Integer)
     pause_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    brigades: Mapped[list[str] | None] = mapped_column(JsonType)  # п. 5.5: силы службы по карточке (dict_brigades)
 
 
 class CardServiceStatusModel(Base):
@@ -92,6 +93,7 @@ class CardServiceStatusModel(Base):
     service_code: Mapped[str] = mapped_column(String(64))
     status: Mapped[str] = mapped_column(String(32))
     order_no: Mapped[str | None] = mapped_column(String(32))  # «Номер наряда»
+    brigades: Mapped[list[str] | None] = mapped_column(JsonType)  # п. 5.5: выбранные силы на этом шаге
     comment: Mapped[str | None] = mapped_column(Text)
     actor_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
     at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

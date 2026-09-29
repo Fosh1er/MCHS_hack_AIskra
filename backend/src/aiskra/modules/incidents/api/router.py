@@ -50,11 +50,14 @@ from aiskra.modules.incidents.application.commands.record_card_view import Recor
 from aiskra.modules.incidents.application.commands.save_card import SaveCard, SaveCardHandler
 from aiskra.modules.incidents.application.commands.set_card_flags import SetCardFlags, SetCardFlagsHandler
 from aiskra.modules.incidents.application.ports.cards import CardView
+from aiskra.modules.incidents.application.ports.dds import BrigadeOption
 from aiskra.modules.incidents.application.queries.dds import (
     DdsCardView,
     DdsJournalPage,
     GetDdsCard,
     GetDdsCardHandler,
+    ListDdsBrigades,
+    ListDdsBrigadesHandler,
     SearchDdsJournal,
     SearchDdsJournalHandler,
 )
@@ -312,6 +315,20 @@ async def dds_card(
     return await handler(GetDdsCard(actor=actor, card_id=card_id, service_code=service_code))
 
 
+@router.get(
+    "/dds/{service_code}/brigades",
+    response_model=list[BrigadeOption],
+    summary="Бригады и силы своей службы для выбора (п. 5.5); занятые на других незакрытых карточках помечены",
+)
+async def dds_brigades(
+    service_code: str,
+    actor: CurrentPrincipal,
+    handler: Annotated[ListDdsBrigadesHandler, Depends(deps.provide_dds_brigades)],
+    card_id: UUID | None = None,
+) -> list[BrigadeOption]:
+    return await handler(ListDdsBrigades(actor=actor, service_code=service_code, card_id=card_id))
+
+
 @router.post(
     "/dds/{service_code}/timer",
     response_model=DdsTimerOut,
@@ -368,6 +385,7 @@ async def dds_status(
             status=body.status,
             order_no=body.order_no,
             comment=body.comment,
+            brigades=body.brigades,
             meta=meta,
         )
     )

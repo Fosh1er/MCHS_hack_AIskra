@@ -72,4 +72,5 @@ class YamlCuratedSource:
             channels=channels,
             card_types=self._load("card_types.yaml")["card_types"],
             columns=self._load("classifier_columns.yaml")["columns"],
+            brigades=self._load("brigades.yaml"),
         )

@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from aiskra.modules.dictionaries.application.ports.sources import DictionaryPayload, WriteStats
 from aiskra.modules.dictionaries.domain.model import search_form
 from aiskra.modules.dictionaries.infrastructure.models import (
+    BrigadeModel,
     CardTypeModel,
     DistrictModel,
     EnumValueModel,
@@ -116,6 +117,12 @@ class SqlDictionaryWriter:
             ServiceModel, ServiceModel.code, {x["code"] for x in services}
         )
 
+        if p.brigades:  # п. 5.5: после служб — бригада ссылается на службу
+            await upsert(s, BrigadeModel, p.brigades, ["code"])
+        stats.deactivated["brigades"] = await self._deactivate(
+            BrigadeModel, BrigadeModel.code, {b["code"] for b in p.brigades}
+        )
+
         await upsert(
             s,
             OkrugModel,
@@ -193,6 +200,7 @@ class SqlDictionaryWriter:
             "service_columns": len(p.columns),
             "routing_cells": len(routing),
             "services": len(services),
+            "brigades": len(p.brigades),
             "okrugs": len(p.okrugs),
             "districts": len(districts),
             "card_types": len(p.card_types),
