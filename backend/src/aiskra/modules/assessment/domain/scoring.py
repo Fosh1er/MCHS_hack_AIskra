@@ -77,6 +77,8 @@ class CallerFacts:
     calming: int = 0
     invalidating: list[str] = field(default_factory=list)  # сработавшие фразы: «успокойтесь», «не кричите»…
     pressure: list[str] = field(default_factory=list)
+    start_emotion: str = ""  # «страх», «паника», «облегчение»…
+    end_emotion: str = ""
 
 
 def caller_care(f: CallerFacts) -> Criterion:
@@ -84,7 +86,12 @@ def caller_care(f: CallerFacts) -> Criterion:
     роста напряжения, −0,15 за каждую обесценивающую реплику, −0,05 за давление. Вес 0: показатель информативный."""
     grew = max(0, f.end - f.start)
     score = max(0.0, 1 - 0.1 * grew - 0.15 * len(f.invalidating) - 0.05 * len(f.pressure))
-    c = Criterion("caller_care", round(score, 3), note=f"напряжение заявителя {f.start} → {f.end} из 10")
+    note = (
+        f"заявитель: {f.start_emotion} {f.start}/10 → {f.end_emotion} {f.end}/10"
+        if f.start_emotion and f.end_emotion
+        else f"напряжение заявителя {f.start} → {f.end} из 10"
+    )
+    c = Criterion("caller_care", round(score, 3), note=note)
     if grew:
         c.errors.append(f"заявитель стал напряжённее: {f.start} → {f.end} из 10")
     if f.invalidating:

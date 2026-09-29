@@ -130,6 +130,8 @@ def test_caller_care_scores_calming_and_invalidating() -> None:
     assert worse.score == round(1 - 0.4 - 0.3 - 0.05, 3)
     assert worse.errors == ["заявитель стал напряжённее: 4 → 8 из 10", "обесценивающие фразы: «успокойтесь»"]
     assert caller_care(CallerFacts(start=2, end=10, invalidating=["успокойтесь"] * 5)).score == 0.0
+    felt = caller_care(CallerFacts(start=9, end=3, start_emotion="паника", end_emotion="облегчение"))
+    assert felt.note == "заявитель: паника 9/10 → облегчение 3/10"  # эмоция — в пометке критерия
 
 
 def test_caller_care_is_informational() -> None:

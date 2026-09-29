@@ -1136,6 +1136,8 @@ body:has(.dds-editor) .ipphone > .arm-dock__section:not(.ipphone__screen) { disp
 .assess__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .assess__item { display: grid; grid-template-columns: minmax(160px, 38%) 1fr; gap: 4px 12px; align-items: center; font-size: var(--fs-sm); }
 .assess__na { font-size: var(--fs-xs); color: var(--text-muted); }
+.arm112v-talk { margin-top: 8px; } /* разбор разговора с заявителем в просмотре карточки (п. 3.6) */
+.assess__detail { grid-column: 1 / -1; font-size: var(--fs-xs); color: var(--text-muted); } /* пояснение к проверенному критерию: «заявитель: страх 4/10 → облегчение 1/10» */
 .assess__bar { height: 8px; background: var(--border-subtle); position: relative; }
 .assess__bar > span { position: absolute; inset: 0 auto 0 0; }
 .assess__bar .ok { background: var(--s-ok); }

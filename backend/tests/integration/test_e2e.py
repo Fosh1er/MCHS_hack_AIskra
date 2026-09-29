@@ -133,6 +133,12 @@ def test_end_to_end_chain(app_client: Callable[[], TestClient]) -> None:
     assert op_card["score"] >= 90 and op_card["processing_s"] is not None
     assert op_card["call_mode"] == "hands_free" and dds_card["call_mode"] is None  # у ДДС разговора с заявителем нет
     assert op_card["criteria"]["caller_care"] == 1.0  # вопросы по делу, без «успокойтесь» (информативно, вес 0)
+    care = next(
+        c
+        for c in teacher.get(f"/api/v1/assessment/cards/{card['id']}?role=112").json()["details"]["criteria"]
+        if c["key"] == "caller_care"
+    )
+    assert care["note"].startswith("заявитель: ")  # эмоция и напряжение — видны в панели оценки карточки
     assert dds_card["score"] >= 70 and dds_card["passed"], dds_card["errors"]
     r = teacher.post(
         f"/api/v1/assessment/{dds_card['assessment_id']}/override",

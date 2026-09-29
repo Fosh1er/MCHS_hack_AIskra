@@ -54,6 +54,8 @@ class IncidentAttempts:
             calming=sum(1 for c in changes if c.reason == "calming"),
             invalidating=[c.fragment for c in changes if c.reason == "invalidating"],
             pressure=[c.fragment for c in changes if c.reason == "pressure"],
+            start_emotion=snaps[0].emotion_title,
+            end_emotion=snaps[-1].emotion_title,
         )
 
     async def card_112(self, card_id: UUID) -> Card112Attempt | None:
