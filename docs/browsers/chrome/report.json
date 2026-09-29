@@ -1,0 +1,101 @@
+{
+ "browser": "chrome",
+ "pages": [
+  {
+   "user": "teacher",
+   "path": "/teacher",
+   "title": "АИскра — тренажёр 112 / ДДС",
+   "ok": true
+  },
+  {
+   "user": "teacher",
+   "path": "/teacher/scenarios",
+   "title": "АИскра — тренажёр 112 / ДДС",
+   "ok": true
+  },
+  {
+   "user": "teacher",
+   "path": "/teacher/sessions",
+   "title": "АИскра — тренажёр 112 / ДДС",
+   "ok": true
+  },
+  {
+   "user": "teacher",
+   "path": "/teacher/analytics",
+   "title": "АИскра — тренажёр 112 / ДДС",
+   "ok": true
+  },
+  {
+   "user": "teacher",
+   "path": "/teacher/readiness",
+   "title": "АИскра — тренажёр 112 / ДДС",
+   "ok": true
+  },
+  {
+   "user": "teacher",
+   "path": "/teacher/validation",
+   "title": "АИскра — тренажёр 112 / ДДС",
+   "ok": true
+  },
+  {
+   "user": "teacher",
+   "path": "/teacher/materials",
+   "title": "АИскра — тренажёр 112 / ДДС",
+   "ok": true
+  },
+  {
+   "user": "op1",
+   "path": "/student",
+   "title": "АИскра — тренажёр 112 / ДДС",
+   "ok": true
+  },
+  {
+   "user": "op1",
+   "path": "/arm/112/journal",
+   "title": "АИскра — тренажёр 112 / ДДС",
+   "ok": true
+  },
+  {
+   "user": "dds1",
+   "path": "/student",
+   "title": "АИскра — тренажёр 112 / ДДС",
+   "ok": true
+  },
+  {
+   "user": "dds1",
+   "path": "/arm/dds/S101",
+   "title": "АИскра — тренажёр 112 / ДДС",
+   "ok": true
+  }
+ ],
+ "steps": [
+  {
+   "step": "учебный вызов",
+   "ok": true
+  },
+  {
+   "step": "ответить",
+   "ok": true
+  },
+  {
+   "step": "реплика заявителю",
+   "ok": true
+  },
+  {
+   "step": "журнал ДДС: карточки",
+   "ok": true
+  },
+  {
+   "step": "открыть карточку ДДС",
+   "ok": true
+  }
+ ],
+ "errors": [
+  {
+   "user": "teacher",
+   "url": "http://localhost:5175/",
+   "console": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+  }
+ ],
+ "version": "152.0.7977.84"
+}

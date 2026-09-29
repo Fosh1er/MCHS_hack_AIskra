@@ -130,7 +130,7 @@ from aiskra.modules.system.application.commands.backups import (
 )
 from aiskra.modules.system.application.commands.probe_model import ProbeModelHandler
 from aiskra.modules.system.application.commands.settings import GetSettingsHandler, UpdateSettingsHandler
-from aiskra.modules.system.application.queries.admin import GetStatusHandler, RecentLogsHandler
+from aiskra.modules.system.application.queries.admin import GetAlertsHandler, GetStatusHandler, RecentLogsHandler
 from aiskra.modules.system.application.queries.get_ai_config import GetAIConfigHandler
 from aiskra.modules.system.infrastructure.settings import SqlSettingsStore
 from aiskra.modules.training.api import deps as training_deps
@@ -847,6 +847,7 @@ def _wire_admin(app: FastAPI, services: Services) -> None:
     ov[system_deps.provide_backup_file] = lambda: backups
     ov[system_deps.provide_status] = lambda: GetStatusHandler(status)
     ov[system_deps.provide_logs] = lambda: RecentLogsHandler(logs)
+    ov[system_deps.provide_alerts] = lambda: GetAlertsHandler(status, logs)  # п. 10.6
 
 
 async def daily_backup_loop(services: Services, period_s: float = 60.0) -> None:

@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppShell, Sidebar, TabBar, Topbar, type NavItem } from '@smena112/ui-kit';
 import { useLogout, useMe } from '../api/auth';
+import { useAlerts } from '../api/admin';
 import { TourCabinetButton } from '../onboarding/OnboardingProvider';
 
 export const NAV: Record<'teacher' | 'admin' | 'student', { role: string; items: NavItem[] }> = {
@@ -54,7 +55,11 @@ export function CabinetShell({ kind, active, title, subtitle, crumbs, actions, c
   const me = useMe().data!;
   const navigate = useNavigate();
   const logout = useLogout();
-  const nav = NAV[kind];
+  // п. 10.6: у администратора — счётчик оповещений о сбоях на пункте «Состояние»
+  const alerts = useAlerts(kind === 'admin').data ?? [];
+  const nav = kind === 'admin' && alerts.length
+    ? { ...NAV.admin, items: NAV.admin.items.map((n) => (n.id === 'status' ? { ...n, count: alerts.length, alert: alerts.some((a) => a.level === 'critical') } : n)) }
+    : NAV[kind];
   const go = (id: string) => { const it = nav.items.find((n) => n.id === id); if (it?.href) navigate(it.href); };
   return (
     <AppShell
