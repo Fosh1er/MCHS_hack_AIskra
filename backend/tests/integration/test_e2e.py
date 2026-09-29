@@ -76,6 +76,10 @@ def test_end_to_end_chain(app_client: Callable[[], TestClient]) -> None:
         r = operator.post(f"/api/v1/training/calls/{call['call_id']}/replicas", json={"text": q, "via": via})
         assert r.json()["text"]
     assert operator.get(f"/api/v1/training/calls/{call['call_id']}").json()["mode"] == "hands_free"
+    # п. 3.6: пока идёт разговор, преподаватель видит состояние заявителя на плитке мониторинга
+    live = teacher.get(f"/api/v1/training/sessions/{session_id}/monitor").json()
+    op_row = next(r["progress"] for r in live["rows"] if r["participant"]["role"] == "112")
+    assert op_row["caller_emotion"] and 0 <= op_row["caller_tension"] <= 10
 
     # E4: карточка сохранена, службы — по автоподбору (эталон)
     services = [{"code": s["code"], "is_main": s["main"], "added_by": "auto"} for s in ref["services"]]
@@ -128,6 +132,7 @@ def test_end_to_end_chain(app_client: Callable[[], TestClient]) -> None:
     assert op_card["card_number"] == dds_card["card_number"] == card["number"]
     assert op_card["score"] >= 90 and op_card["processing_s"] is not None
     assert op_card["call_mode"] == "hands_free" and dds_card["call_mode"] is None  # у ДДС разговора с заявителем нет
+    assert op_card["criteria"]["caller_care"] == 1.0  # вопросы по делу, без «успокойтесь» (информативно, вес 0)
     assert dds_card["score"] >= 70 and dds_card["passed"], dds_card["errors"]
     r = teacher.post(
         f"/api/v1/assessment/{dds_card['assessment_id']}/override",

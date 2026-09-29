@@ -8,7 +8,7 @@ from datetime import datetime
 from typing import Any, Protocol
 from uuid import UUID
 
-from aiskra.modules.assessment.domain.scoring import StatusStep
+from aiskra.modules.assessment.domain.scoring import CallerFacts, StatusStep
 
 
 @dataclass(frozen=True)
@@ -25,6 +25,7 @@ class Card112Attempt:
     asked_topics: set[str] | None  # темы вопросов оператора из разговора; None — разговора не было
     service_names: dict[str, str] = field(default_factory=dict)
     flag_names: dict[str, str] = field(default_factory=dict)
+    caller: CallerFacts | None = None  # как менялось состояние ИИ-заявителя (п. 3.6); None — без состояния
 
 
 @dataclass(frozen=True)

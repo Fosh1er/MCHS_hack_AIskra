@@ -21,6 +21,7 @@ from aiskra.modules.training.application.ports.sessions import ParticipantProgre
 from aiskra.modules.training.domain.call import ReplicaVia, call_mode
 from aiskra.modules.training.domain.scenario import Scenario
 from aiskra.modules.training.domain.session import TrainingSession
+from aiskra.modules.training.domain.tone import EMOTION_TITLES, CallerTone
 from aiskra.modules.training.infrastructure.models import (
     CallMessageModel,
     CallModel,
@@ -131,6 +132,18 @@ class SessionProgress:
                 latest[r.card_id] = {"score": r.score, "errors": d.get("errors", [])}
         return list(latest.values())
 
+    async def _caller(self, card_id: UUID) -> CallerTone | None:
+        """Состояние ИИ-заявителя в идущем звонке по карточке (п. 3.6)."""
+        raw = (
+            await self._s.execute(
+                select(CallModel.tone)
+                .where(CallModel.card_id == card_id, CallModel.status == "active", CallModel.party == "applicant")
+                .order_by(CallModel.started_at.desc())
+                .limit(1)
+            )
+        ).scalar_one_or_none()
+        return CallerTone.from_json(raw)
+
     async def progress(self, session: TrainingSession) -> list[ParticipantProgress]:
         cards = (
             (
@@ -153,6 +166,7 @@ class SessionProgress:
                 marks = await self._assessments([c.id for c in done], "112", None)
                 current = draft  # нет черновика — оператор ждёт следующий вызов
                 since = _timer_start(draft) if draft else None
+                caller = await self._caller(draft.id) if draft else None
             else:
                 svc = p.dds_service_code or ""
                 service_rows = (
@@ -183,6 +197,7 @@ class SessionProgress:
                 # п. 5.3: пауза на подсказки не входит в таймер ожидания решения
                 arrived = as_utc(current.saved_at) if current else None
                 since = arrived + timedelta(milliseconds=paused[current.id]) if current and arrived else arrived
+                caller = None
             if since is not None and since.tzinfo is None:
                 since = since.replace(tzinfo=UTC)
             scores = [m["score"] for m in marks if m["score"] is not None]
@@ -198,6 +213,8 @@ class SessionProgress:
                     avg_score=round(sum(scores) / len(scores), 1) if scores else None,
                     errors=len(errors),
                     last_errors=errors[-3:],
+                    caller_emotion=EMOTION_TITLES[caller.emotion] if caller else "",
+                    caller_tension=caller.tension if caller else None,
                 )
             )
         return out

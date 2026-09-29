@@ -63,6 +63,9 @@ class ParticipantProgress:
     avg_score: float | None = None
     errors: int = 0
     last_errors: list[str] = field(default_factory=list)
+    # оператор 112 разговаривает с ИИ-заявителем: его эмоция и напряжение 0–10 сейчас (п. 3.6)
+    caller_emotion: str = ""
+    caller_tension: int | None = None
 
 
 class SessionMonitorSource(Protocol):
