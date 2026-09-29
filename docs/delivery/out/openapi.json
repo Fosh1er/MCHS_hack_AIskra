@@ -4890,6 +4890,147 @@
     }
    }
   },
+  "/api/v1/assessment/sessions/{session_id}/students/{student_id}/feedback/draft": {
+   "post": {
+    "tags": [
+     "assessment"
+    ],
+    "summary": "Черновик отзыва обучающемуся по занятию: ИИ, без модели — по правилам; ничего не публикует",
+    "operationId": "feedback_draft_api_v1_assessment_sessions__session_id__students__student_id__feedback_draft_post",
+    "parameters": [
+     {
+      "name": "session_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Session Id"
+      }
+     },
+     {
+      "name": "student_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Student Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/FeedbackDraft"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/assessment/sessions/{session_id}/students/{student_id}/feedback": {
+   "put": {
+    "tags": [
+     "assessment"
+    ],
+    "summary": "Сохранить отзыв обучающемуся по занятию (заменяет прежний; в аудит)",
+    "operationId": "feedback_save_api_v1_assessment_sessions__session_id__students__student_id__feedback_put",
+    "parameters": [
+     {
+      "name": "session_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Session Id"
+      }
+     },
+     {
+      "name": "student_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Student Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/FeedbackIn"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/FeedbackOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/assessment/my/feedback": {
+   "get": {
+    "tags": [
+     "assessment"
+    ],
+    "summary": "Отзывы преподавателей по моим занятиям",
+    "operationId": "my_feedback_api_v1_assessment_my_feedback_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/FeedbackItem"
+         },
+         "type": "array",
+         "title": "Response My Feedback Api V1 Assessment My Feedback Get"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/assessment/analytics/norms": {
    "get": {
     "tags": [
@@ -6584,6 +6725,13 @@
        }
       ],
       "title": "Call Mode"
+     },
+     "critical": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Critical"
      }
     },
     "type": "object",
@@ -8014,6 +8162,225 @@
      "waiting"
     ],
     "title": "FeedResult"
+   },
+   "FeedbackDraft": {
+    "properties": {
+     "text": {
+      "type": "string",
+      "title": "Text"
+     },
+     "source": {
+      "type": "string",
+      "title": "Source"
+     },
+     "model": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Model"
+     },
+     "focus": {
+      "items": {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      "type": "array",
+      "title": "Focus"
+     },
+     "warnings": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Warnings"
+     },
+     "previous": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Previous"
+     }
+    },
+    "type": "object",
+    "required": [
+     "text",
+     "source",
+     "model",
+     "focus",
+     "warnings",
+     "previous"
+    ],
+    "title": "FeedbackDraft"
+   },
+   "FeedbackIn": {
+    "properties": {
+     "text": {
+      "type": "string",
+      "maxLength": 3000,
+      "minLength": 10,
+      "title": "Text",
+      "description": "Текст отзыва — его увидит обучающийся"
+     },
+     "draft_text": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 6000
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Draft Text",
+      "description": "С какого черновика начали"
+     },
+     "draft_source": {
+      "anyOf": [
+       {
+        "type": "string",
+        "enum": [
+         "ai",
+         "rules"
+        ]
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Draft Source"
+     },
+     "draft_model": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 200
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Draft Model"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "text"
+    ],
+    "title": "FeedbackIn"
+   },
+   "FeedbackItem": {
+    "properties": {
+     "session_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Session Id"
+     },
+     "session_title": {
+      "type": "string",
+      "title": "Session Title"
+     },
+     "text": {
+      "type": "string",
+      "title": "Text"
+     },
+     "updated_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Updated At"
+     }
+    },
+    "type": "object",
+    "required": [
+     "session_id",
+     "session_title",
+     "text",
+     "updated_at"
+    ],
+    "title": "FeedbackItem"
+   },
+   "FeedbackOut": {
+    "properties": {
+     "session_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Session Id"
+     },
+     "student_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Student Id"
+     },
+     "text": {
+      "type": "string",
+      "title": "Text"
+     },
+     "updated_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Updated At"
+     }
+    },
+    "type": "object",
+    "required": [
+     "session_id",
+     "student_id",
+     "text",
+     "updated_at"
+    ],
+    "title": "FeedbackOut"
+   },
+   "FeedbackView": {
+    "properties": {
+     "text": {
+      "type": "string",
+      "title": "Text"
+     },
+     "updated_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Updated At"
+     }
+    },
+    "type": "object",
+    "required": [
+     "text",
+     "updated_at"
+    ],
+    "title": "FeedbackView",
+    "description": "Отзыв преподавателя по занятию (п. 4.7): видят преподаватель и сам обучающийся."
    },
    "FlagsIn": {
     "properties": {
@@ -11873,6 +12240,16 @@
      "not_assessed": {
       "type": "integer",
       "title": "Not Assessed"
+     },
+     "feedback": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/FeedbackView"
+       },
+       {
+        "type": "null"
+       }
+      ]
      }
     },
     "type": "object",

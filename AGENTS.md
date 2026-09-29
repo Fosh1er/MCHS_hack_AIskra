@@ -140,6 +140,11 @@ cd backend && uv run python -m aiskra.cli create-user --login admin --full-name 
 - **Достоверность (п. 3.5)** — методика `assessment/domain/validation.py` (мутации, κ, согласие с экспертом), `GET /assessment/analytics/validation`, экран `/teacher/validation`, отчёт — `tools/validate_ai.py` → `docs/validation/`. Меняете правила автооценки — прогоните бенчмарк: `unit/test_validation.py` должен остаться зелёным.
 - **Допуск (п. 4.6)** — шкала `assessment/domain/readiness.py`, запрос `ReadinessHandler`, `GET /assessment/analytics/readiness`; экраны `/teacher/readiness` и `/teacher/readiness/protocol` (печать).
 
+## Отзыв преподавателя по занятию (п. 4.7) — что уже есть
+- **Черновик** — `POST /assessment/sessions/{sid}/students/{uid}/feedback/draft` (`DraftFeedbackHandler`): ИИ-задача `feedback_draft`, промпт `ai/prompts/feedback_draft/v1.md`. Без модели или при её ошибке черновик собирают правила `assessment/domain/feedback.py` (`summarize` → `rules_draft` → `compose`). В модель — `model_facts()`: без ФИО и без названия занятия, в нём бывает ФИО. Черновик ничего не сохраняет.
+- **Сохранение** — `PUT …/feedback` (`SaveFeedback`, право `lessons.conduct` и только своё занятие): таблица `teacher_feedback` (миграция 0017), одна запись на «занятие + обучающийся», событие аудита `assessment.feedback_saved`. В `details` — снимок `focus`/`criteria`: следующий черновик сравнивает с ним «было → стало». Там же `draft.similarity` — насколько преподаватель поправил черновик.
+- **Где видно:** отчёт — `StudentReport.feedback`, блок `pages/teacher/StudentFeedback.tsx` в раскрытой строке, колонка в CSV; обучающийся — `GET /assessment/my/feedback` (история в `StudentHomePage`) и `…/mine` (`MySessionPage`).
+
 ## Кабинеты обучающегося и администратора (п. 5.1, 5.2) — что уже есть
 - **Каркас** всех кабинетов — `shared/ui/CabinetShell.tsx` (разделы ролей в `NAV`); `TeacherShell` — обёртка над ним.
 - **Обучающийся:** `/student` (занятия, вход в эмулятор `armFor()`, история), `/student/sessions/:id` (`GET /assessment/sessions/{id}/mine`), `/student/progress`, `/student/reference`. Рекомендации — `assessment/domain/recommendations.py`. Комментарий возврата — `CardView.rework` (из аудита).
