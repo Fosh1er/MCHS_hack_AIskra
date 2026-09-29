@@ -55,6 +55,10 @@ export const useSaveGroup = () =>
     })), [['groups']]);
 export const useDeleteGroup = () => useInvalidate((id: string) => http<void>(`/api/v1/groups/${id}`, json('DELETE')), [['groups']]);
 
+export interface Alert { level: 'warn' | 'critical'; source: string; text: string; at: string | null }
+/** Оповещения о сбоях (п. 10.6): опрос раз в 30 с — баннер на «Состоянии» и счётчик в меню администратора. */
+export const useAlerts = (enabled = true) =>
+  useQuery({ queryKey: ['system', 'alerts'], queryFn: () => http<Alert[]>(`${S}/alerts`), refetchInterval: 30_000, enabled });
 export const useStatus = () => useQuery({ queryKey: ['system', 'status'], queryFn: () => http<ServiceState[]>(`${S}/status`), refetchInterval: 15_000 });
 export const useSettings = () => useQuery({ queryKey: ['system', 'settings'], queryFn: () => http<Settings>(`${S}/settings`) });
 export const useLimits = () => useQuery({ queryKey: ['system', 'limits'], queryFn: () => http<Limits>(`${S}/settings/limits`), staleTime: Infinity });

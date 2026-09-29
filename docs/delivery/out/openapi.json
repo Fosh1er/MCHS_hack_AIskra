@@ -1043,6 +1043,31 @@
     }
    }
   },
+  "/api/v1/system/alerts": {
+   "get": {
+    "tags": [
+     "system"
+    ],
+    "summary": "Оповещения о сбоях: сервисы не в норме, ошибки в логе",
+    "operationId": "alerts_api_v1_system_alerts_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/Alert"
+         },
+         "type": "array",
+         "title": "Response Alerts Api V1 System Alerts Get"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/system/logs": {
    "get": {
     "tags": [
@@ -5967,6 +5992,41 @@
     ],
     "title": "AddressSuggestion",
     "description": "Вариант подсказки: подпись, разобранные поля, район и координаты (выбор заполняет блок «Адрес»)."
+   },
+   "Alert": {
+    "properties": {
+     "level": {
+      "type": "string",
+      "title": "Level"
+     },
+     "source": {
+      "type": "string",
+      "title": "Source"
+     },
+     "text": {
+      "type": "string",
+      "title": "Text"
+     },
+     "at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "At"
+     }
+    },
+    "type": "object",
+    "required": [
+     "level",
+     "source",
+     "text"
+    ],
+    "title": "Alert"
    },
    "AnswerIn": {
     "properties": {
