@@ -375,7 +375,8 @@ def _sse(kind: str, data: dict[str, Any]) -> bytes:
     summary="Реплика оператора → ответ ИИ-собеседника потоком SSE (F1)",
     description=(
         "События: `accepted` → `state` (состояние заявителя до ответа) → `model` (ответ пишет модель; нет события — "
-        "ответ по правилам) → `token`* / `remark`* → `replace`? (ответ модели отклонён проверкой, итоговый текст — "
+        "ответ по правилам) → `offline`? (модель недоступна, ответ по правилам) → `token`* / `remark`* → `replace`? "
+        "(ответ модели отклонён проверкой, итоговый текст — "
         "в `final`) → `final` (как ответ `POST /replicas` + `metrics`) или `error`. Сохранение — после ответа "
         "целиком; обрыв соединения генерацию не отменяет, чтобы реплика не потерялась."
     ),
@@ -425,6 +426,8 @@ async def replica_stream(
             kind, data = item
             if kind == "model":
                 model = data
+            elif kind == "offline":  # модель недоступна до первого куска — ответ по правилам
+                model = None
             elif kind == "replace":
                 replaced = True
             elif kind == "token":

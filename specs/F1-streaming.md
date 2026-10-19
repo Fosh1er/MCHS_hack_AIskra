@@ -14,7 +14,7 @@
 | ID | Реализация | Проверка | Статус | Примечание |
 |---|---|---|---|---|
 | RF1-01 | `ai/ports.py:LLMStreamPort`; `adapters/openai_compatible.py:stream`, `parse_sse_delta`; `adapters/fake.py:stream`; `adapters/caching.py:stream`; `ai/router.py:TaskModel.stream` | `unit/test_streaming.py` (SSE, адаптер, ошибки, кеш, без потока) | ✅ | |
-| RF1-02 | `training/api/router.py:replica_stream` — события `accepted`, `state`, `model`, `token`, `remark`, `replace`, `final`, `error` | `integration/test_replica_stream.py` | ✅ | старый `POST /replicas` остался |
+| RF1-02 | `training/api/router.py:replica_stream` — события `accepted`, `state`, `model`, `offline`, `token`, `remark`, `replace`, `final`, `error` | `integration/test_replica_stream.py` | ✅ | старый `POST /replicas` остался |
 | RF1-03 | `calls.py:_reply` и `psy.py:PsyDirector.turn` — событие `state` до генерации | `test_psy_turn_reports_state_before_the_answer…`, `test_model_answer_streams_tokens…` | ✅ | |
 | RF1-04 | `domain/stream_text.py:RemarkFilter` | `test_remark_filter_keeps_remarks_out_of_the_text` | ✅ | |
 | RF1-05 | `psy.py`: `replace` при отказе `validate`; фронт показывает «заменяется», итог — из `final` | `test_psy_turn_reports_state…` | ✅ | |
@@ -27,7 +27,7 @@
 | RF1-12 | `CallPanel`: очередь голосовых реплик, отсев эха (`lastParty` копит озвученные фразы) | вручную | ✅ | |
 | RF1-13 | `voice_lab.py:stream_reply`, `voice_lab_chat` — настоящий поток модели | `integration/test_voice_lab.py` | ✅ | |
 | RF1-14 | заголовок `X-Accel-Buffering: no` у ответа | — | ✅ | nginx не копит поток; на стенде за cloudflared проверить |
-| RF1-15 | `Actors._ask`: сбой посреди потока → `replace` и офлайн-ответ | `test_model_failure_mid_stream_is_replaced…` | ✅ | |
+| RF1-15 | `Actors._ask`: сбой посреди потока → `replace` и офлайн-ответ; отказ до первого куска → `offline`, в метриках `source: rules` (подпись «ответ по правилам», найдено e2e F6.5) | `test_model_failure_mid_stream_is_replaced…`; `integration/test_replica_stream.py::test_model_down_answer_is_marked_rules_not_llm`; `e2e/test_failures.py::test_model_down_rules_reply` | ✅ | |
 
 ## 4. Решения
 См. ADR-0013. Шкала состояния заявителя ECCS в панели звонка (RF4-01) сделана здесь же: её источник — событие `state`.

@@ -106,7 +106,8 @@ export type StreamEvent =
   | { type: 'model'; model: string; provider: string }
   | { type: 'token'; text: string }
   | { type: 'remark'; text: string }
-  | { type: 'replace'; reason: string };
+  | { type: 'replace'; reason: string }
+  | { type: 'offline'; reason: string };
 
 /** Реплика оператора → ответ потоком SSE (`POST /calls/{id}/replicas/stream`). Сервер без потока (404/405) —
  *  `ApiError` со статусом, вызывающий отправит реплику обычным запросом. */
@@ -143,6 +144,7 @@ export async function streamReplica(
       else if (kind === 'model') onEvent({ type: 'model', model: data.model, provider: data.provider });
       else if (kind === 'token' || kind === 'remark') onEvent({ type: kind, text: data.text });
       else if (kind === 'replace') onEvent({ type: 'replace', reason: data.reason });
+      else if (kind === 'offline') onEvent({ type: 'offline', reason: data.reason });
     }
     if (done) throw new ApiError(502, 'stream_cut', 'Соединение прервалось до конца ответа');
   }

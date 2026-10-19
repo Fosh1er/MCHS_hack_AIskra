@@ -1,5 +1,5 @@
 # Частые команды. Бэкенд: uv (Python 3.12), фронтенд: npm workspaces (Node 22).
-.PHONY: up down logs be-install be-test be-lint be-check fe-install fe-dev fe-dev-lan dev-cert dev-tts dev-tts-say dev-stt fe-build check import-classifier demo-seed demo-seed-docker
+.PHONY: up down logs be-install be-test be-lint be-check e2e fe-install fe-dev fe-dev-lan dev-cert dev-tts dev-tts-say dev-stt fe-build check import-classifier demo-seed demo-seed-docker
 
 up:            ; AISKRA_VERSION=$${AISKRA_VERSION:-$$(git rev-parse --short HEAD 2>/dev/null || echo unknown)} docker compose up --build -d
 down:          ; docker compose down
@@ -8,6 +8,15 @@ be-install:    ; cd backend && uv sync
 be-test:       ; cd backend && uv run pytest -q
 be-lint:       ; cd backend && uv run ruff check . && uv run ruff format --check . && uv run mypy && uv run lint-imports
 be-check: be-lint be-test
+# F6.5: сквозные сценарии в браузере (Playwright). Стенд поднимается сам: SQLite, модель-заглушка (LLM, TTS, STT),
+# backend, собранный фронтенд за vite preview; внешней сети и ключей не нужно. Firefox: make e2e E2E_BROWSER=firefox.
+# При падении — снимки экрана и консоль в backend/tests/e2e/artifacts/.
+E2E_BROWSER ?= chromium
+PLAYWRIGHT := uv run --with 'playwright>=1.48'
+e2e:
+	npm run build
+	cd backend && $(PLAYWRIGHT) python -m playwright install $(E2E_BROWSER)
+	cd backend && E2E_BROWSER=$(E2E_BROWSER) $(PLAYWRIGHT) pytest tests/e2e -q
 # M6: стенд одной командой (справочники, адреса, сценарии, учётки ролей, группа). Пароль — AISKRA_DEMO_PASSWORD.
 demo-seed:     ; cd backend && uv run python -m aiskra.cli demo-seed $(if $(MATERIALS),--materials $(MATERIALS),)
 demo-seed-docker: ; docker compose exec -e AISKRA_DEMO_PASSWORD backend python -m aiskra.cli demo-seed
