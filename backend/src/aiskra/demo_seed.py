@@ -158,11 +158,10 @@ async def seed(
                 print(f"Сценарии: утверждено {have}")
 
         async with factory() as s:  # F5: по ветвящемуся сценарию на каждый шаблон — для показа «решение → итог»
-            branched = (
-                await s.execute(
-                    select(func.count()).select_from(ScenarioModel).where(ScenarioModel.branching.is_not(None))
-                )
-            ).scalar_one()
+            # Сценарий без ветвления хранит JSON `null`, а не SQL NULL: `IS NOT NULL` считал бы и его (F6.5) —
+            # считаем по значению.
+            snapshots: list[object] = list((await s.execute(select(ScenarioModel.branching))).scalars())
+            branched = len([b for b in snapshots if b])
             if not branched:
                 catalog = YamlBranchCatalog(settings.dictionaries_dir / "branch_templates.yaml")
                 made = 0
