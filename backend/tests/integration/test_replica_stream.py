@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Callable, Iterator
-from typing import Any
+from collections.abc import AsyncIterator, Callable, Iterator
+from typing import Any, NoReturn
 
 import pytest
 from fastapi.testclient import TestClient
@@ -14,6 +14,7 @@ from aiskra.ai.adapters.caching import CachingLLM
 from aiskra.ai.adapters.fake import FakeLLM
 from aiskra.ai.tasks import AITask
 from aiskra.shared.cache import InMemoryTTLCache
+from aiskra.shared.errors import ExternalServiceError
 from tests.integration.test_journal import app_client as journal_app_client  # noqa: F401
 from tests.integration.test_journal import as_user
 from tests.integration.test_speech_audio import RecordingTTS
@@ -71,6 +72,41 @@ def test_model_answer_streams_tokens_and_is_saved_whole(
     assert streamed.strip() == final["text"] == "Горит кухня, третий этаж!"
     m = final["metrics"]
     assert m["source"] == "llm" and m["model"] == "demo-m" and m["ttft_ms"] is not None and m["pieces"] >= 3
+    assert student.get(f"/api/v1/training/calls/{cid}").json()["messages"][-1]["text"] == final["text"]
+
+
+class DownLLM:
+    """Модель недоступна (порт закрыт): отказ до первого куска ответа."""
+
+    provider_name = "demo"
+    model_id = "demo-m"
+
+    async def complete(self, *args: object, **kwargs: object) -> NoReturn:
+        raise ExternalServiceError("demo: модель недоступна (ConnectError)")
+
+    async def stream(self, *args: object, **kwargs: object) -> AsyncIterator[str]:
+        raise ExternalServiceError("demo: модель недоступна (ConnectError)")
+        yield ""  # pragma: no cover — делает метод асинхронным генератором
+
+    async def aclose(self) -> None:
+        return None
+
+
+def test_model_down_answer_is_marked_rules_not_llm(
+    app_client: Callable[[], TestClient], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """F6.5 (e2e «модель остановлена»): ответ по правилам не подписывается «ИИ · модель» — событие `offline`."""
+    student = as_user(app_client, "student")
+    cid = _call(student)
+    router = student.app.state.services.model_router  # type: ignore[attr-defined]
+    monkeypatch.setitem(router._clients, "fake", DownLLM())
+
+    r = student.post(f"/api/v1/training/calls/{cid}/replicas/stream", json={"text": "Сколько людей в квартире?"})
+    ev = events(r.text)
+    kinds = [k for k, _ in ev]
+    assert kinds.index("model") < kinds.index("offline") < kinds.index("final") and "token" not in kinds
+    final = ev[-1][1]
+    assert final["text"] and final["metrics"]["source"] == "rules" and final["metrics"]["model"] is None
     assert student.get(f"/api/v1/training/calls/{cid}").json()["messages"][-1]["text"] == final["text"]
 
 

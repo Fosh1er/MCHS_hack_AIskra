@@ -123,6 +123,8 @@ class Actors:
             log.warning("ИИ-задача %s недоступна: %s", task, e)
             if streamed:
                 await emit(sink, "replace", {"reason": "модель прервала ответ"})
+            else:  # отказ до первого куска: ответ — по правилам, а подпись «ИИ · модель» была бы неправдой (F6.5)
+                await emit(sink, "offline", {"reason": "модель недоступна"})
             return None
 
     async def applicant(

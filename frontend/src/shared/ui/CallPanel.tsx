@@ -264,6 +264,7 @@ export function CallPanel({ callId, title, subtitle, partyName, initial, onEnded
             cur.tone = e.tone ?? cur.tone;
             if (e.psy) { const p = e.psy; setPsy(true); setPsyLevel({ level: p.level_after, title: p.level_title, last: p }); }
           } else if (e.type === 'model') cur.model = e.model;
+          else if (e.type === 'offline') cur.model = undefined; // модель не ответила — без подписи «ИИ думает»
           else if (e.type === 'token') {
             cur.text += e.text;
             cur.fresh = e.text;
