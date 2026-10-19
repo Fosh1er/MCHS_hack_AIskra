@@ -65,7 +65,8 @@ export const useLimits = () => useQuery({ queryKey: ['system', 'limits'], queryF
 export const useSaveSettings = () =>
   useInvalidate(({ key, values }: { key: string; values: Record<string, number> }) => http<Record<string, number>>(`${S}/settings/${key}`, json('PUT', { values })), [['system', 'settings']]);
 export const useBackups = () => useQuery({ queryKey: ['system', 'backups'], queryFn: () => http<BackupInfo[]>(`${S}/backups`) });
-export const useCreateBackup = () => useInvalidate(() => http<BackupInfo>(`${S}/backups`, json('POST')), [['system', 'backups'], ['system', 'status']]);
+// оповещение «копий ещё нет» уходит сразу, а не через 30 с (staleTime) — F6.5
+export const useCreateBackup = () => useInvalidate(() => http<BackupInfo>(`${S}/backups`, json('POST')), [['system', 'backups'], ['system', 'status'], ['system', 'alerts']]);
 export const restoreBackup = (name: string, confirm: string) => http<BackupInfo>(`${S}/backups/${name}/restore`, json('POST', { confirm }));
 export const backupUrl = (name: string) => `${S}/backups/${name}`;
 export const useLogs = (level: string, q: string) =>
