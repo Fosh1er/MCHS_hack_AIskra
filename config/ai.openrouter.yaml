@@ -51,6 +51,7 @@ ai:
     insights:            {provider: demo,       temperature: 0.3, cache: off}
     psy_acts:            {provider: demo_small, temperature: 0,   cache: exact, cache_ttl: 7d, max_tokens: 300}
     psy_judge:           {provider: demo, temperature: 0,   cache: exact, cache_ttl: 7d, max_tokens: 700}
+    branch_texts:        {provider: demo,       temperature: 0.7, cache: off, max_tokens: 700}
     feedback_draft:      {provider: demo,       temperature: 0.4, cache: off, max_tokens: 700}
   # Голос собеседника (п. 3.6): Gemini TTS через OpenRouter — эмоция передаётся стилем (speech_metadata.style), голос — по роли.
   # Синтез на OpenRouter ПЛАТНЫЙ (по символам; 29.09.2026 — доли цента за реплику): нужен пополненный счёт.

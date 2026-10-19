@@ -7,6 +7,7 @@ import { Banner, Button, Card, Icon, LineChart, StatTile, StatusPill } from '@sm
 import { reportCsvUrl, reportXlsxUrl, useEvaluateSession, useOverride, useSessionReport, type CardResult, type SessionReport } from '../../shared/api/assessment';
 import { CallReview } from '../../shared/ui/CallReview';
 import { SourceRefs } from '../../shared/ui/PsySources';
+import { OUTCOME_TITLE, type OutcomeCode } from '../../shared/api/training';
 import { TeacherShell } from '../../shared/ui/TeacherShell';
 import { StudentFeedback } from './StudentFeedback';
 import { useScreenTour } from '../../shared/onboarding/OnboardingProvider';
@@ -76,6 +77,11 @@ function StudentsTable({ r }: { r: SessionReport }) {
                           {Math.round(c.processing_s)} с (норматив {c.norm_s}, {c.deviation_s !== null && c.deviation_s > 0 ? '+' : ''}{c.deviation_s})
                         </span>
                       )}
+                      {c.branch_outcome && (
+                        <span title="Итог ветвящегося сценария: развитие ситуации по решениям оператора">
+                          <StatusPill status={OUTCOME_PILL[c.branch_outcome]}>ситуация: {OUTCOME_TITLE[c.branch_outcome]}</StatusPill>
+                        </span>
+                      )}
                       {c.call_mode && c.call_mode !== 'text' && (
                         <span title="В голосовом режиме во время заполнения входит речь заявителя">
                           <Icon name="mic" size="sm" /> {c.call_mode === 'hands_free' ? 'голосом без рук' : 'голосом'}
@@ -103,6 +109,24 @@ function StudentsTable({ r }: { r: SessionReport }) {
           ))}
         </tbody>
       </table>
+    </Card>
+  );
+}
+
+const OUTCOME_PILL: Record<OutcomeCode, 'ok' | 'warn' | 'critical'> = { favorable: 'ok', partial: 'warn', adverse: 'critical', tragic: 'critical' };
+
+/** F5: распределение итогов ветвящихся сценариев по группе — сколько звонков каким исходом закончились. */
+function BranchOutcomes({ r }: { r: SessionReport }) {
+  const counts = r.branch_outcomes ?? {};
+  const total = Object.values(counts).reduce((a, b) => a + (b ?? 0), 0);
+  if (!total) return null;
+  return (
+    <Card title="Развитие ситуаций" subtitle="Итоги ветвящихся сценариев: как решения операторов изменили исход">
+      <div className="tch-chips">
+        {(Object.keys(OUTCOME_TITLE) as OutcomeCode[]).map((code) => (
+          <StatusPill key={code} status={OUTCOME_PILL[code]}>{OUTCOME_TITLE[code]}: {counts[code] ?? 0}</StatusPill>
+        ))}
+      </div>
     </Card>
   );
 }
@@ -234,6 +258,7 @@ export function SessionReportPage() {
             <Banner>Карточки ещё не оценены — нажмите «оценить все карточки».</Banner>
           )}
           <StudentsTable r={r} />
+          <BranchOutcomes r={r} />
           <Heatmap r={r} />
           <StressErrors r={r} />
           <TimeHistogram r={r} />

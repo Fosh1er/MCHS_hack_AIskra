@@ -78,6 +78,7 @@ class Call:
     tone: CallerTone | None = None  # состояние заявителя (п. 3.6); у старшего группы и службы — нет
     psy: dict[str, Any] | None = None  # п. 3.7: снимок профиля заявителя и текущее состояние (ADR-0012)
     ended_by: str | None = None  # operator | party — кто завершил звонок
+    branch: dict[str, Any] | None = None  # F5: ход ветвления — что сказал оператор и когда, путь по узлам (ADR-0014)
     id: UUID = field(default_factory=uuid4)
 
     def answer(self, now: datetime) -> None:

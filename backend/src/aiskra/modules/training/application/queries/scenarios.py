@@ -68,6 +68,7 @@ class ScenarioView:
     reference_dds: dict[str, Any]
     psy_profile: str | None = None  # п. 3.7
     review: list[SectionReview] = field(default_factory=list)  # п. 3.3: решения по разделам эталона
+    branching: dict[str, Any] | None = None  # F5: граф ситуации (копия шаблона) — для просмотра преподавателем
 
 
 class GetScenarioHandler:
@@ -91,6 +92,7 @@ class GetScenarioHandler:
             reference_dds=s.reference_dds,
             psy_profile=s.psy_profile,
             review=review_state(s),
+            branching=s.branching,
         )
 
 

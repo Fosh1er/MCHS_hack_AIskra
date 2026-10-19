@@ -8,6 +8,7 @@ from datetime import datetime
 from typing import Any, Protocol
 from uuid import UUID
 
+from aiskra.modules.assessment.domain.branch_scoring import BranchAttempt
 from aiskra.modules.assessment.domain.psy_scoring import PsyAttempt
 from aiskra.modules.assessment.domain.scoring import CallerFacts, StatusStep
 
@@ -28,6 +29,7 @@ class Card112Attempt:
     flag_names: dict[str, str] = field(default_factory=dict)
     caller: CallerFacts | None = None  # как менялось состояние ИИ-заявителя (п. 3.6); None — без состояния
     psy: PsyAttempt | None = None  # п. 3.7: разговор с заявителем, у которого был психологический профиль
+    branch: BranchAttempt | None = None  # F5: итог ветвящегося сценария; None — сценарий без ветвления
 
 
 @dataclass(frozen=True)

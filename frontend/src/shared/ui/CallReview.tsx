@@ -2,12 +2,14 @@
  *  и какие слова оператора его изменили. Данные — снимки состояния у реплик заявителя (`GET /training/cards/{id}/calls`). */
 import { LineChart } from '@smena112/ui-kit';
 import { useCardCalls, useSpeechStatus, type CallMessage, type CallView, type ToneChange } from '../api/training';
+import { BranchOutcome } from './BranchOutcome';
 
 const REASON: Record<ToneChange['reason'], string> = {
   calming: 'успокоил',
   invalidating: 'обесценил',
   pressure: 'давил',
   on_topic: 'вопрос по делу',
+  situation: 'ситуация', // F5: узел ветвящегося сценария изменил состояние заявителя
 };
 const MODE: Record<string, string> = { text: 'текстом', voice: 'голосом', hands_free: 'голосом без рук' };
 
@@ -55,6 +57,7 @@ function Conversation({ call }: { call: CallView }) {
           </li>
         ))}
       </ol>
+      {call.branch && <BranchOutcome branch={call.branch} />}
     </div>
   );
 }

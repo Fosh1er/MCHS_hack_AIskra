@@ -9,6 +9,7 @@ from uuid import UUID, uuid4
 from aiskra.modules.assessment.application.judge import Judge, JudgeOut
 from aiskra.modules.assessment.application.ports.attempts import AssessmentRecord, AssessmentRepository, AttemptSource
 from aiskra.modules.assessment.application.psy_judge import PsyJudge
+from aiskra.modules.assessment.domain.branch_scoring import BranchAttempt, branch_details
 from aiskra.modules.assessment.domain.psy_scoring import PsyAttempt, assess_psy, basis_of, timeline
 from aiskra.modules.assessment.domain.scoring import (
     CARD_NORM_SECONDS,
@@ -156,6 +157,7 @@ class AssessCardHandler:
             result = finish("112", criteria, weights, a.reference is not None, s.threshold, stats)
             student, number, service = a.author_id, a.card_number, None
             psy_attempt = a.psy
+            branch_attempt: BranchAttempt | None = a.branch
         elif cmd.role == "dds":
             if not cmd.service_code:
                 raise DomainError("Укажите службу ДДС", code="service_required")
@@ -181,6 +183,7 @@ class AssessCardHandler:
             )
             student, number, service = actor, d.card_number, cmd.service_code
             psy_attempt = d.psy
+            branch_attempt = None
         else:
             raise DomainError("Роль — 112 или dds", code="bad_role")
 
@@ -192,6 +195,12 @@ class AssessCardHandler:
             if not block.get("paused"):
                 details["role_score"] = result.score
                 score, passed = combine(result.score, result.passed, block, s.threshold)
+        if branch_attempt is not None:  # F5: «Развитие ситуации»; вес по умолчанию 0 — информативно
+            branch = branch_details(branch_attempt)
+            details["branch"] = branch
+            if branch["final"] and float(branch["weight"]) > 0:
+                details.setdefault("role_score", result.score)
+                score, passed = combine(score, passed, branch, s.threshold)
         record = AssessmentRecord(
             id=uuid4(),
             card_id=cmd.card_id,

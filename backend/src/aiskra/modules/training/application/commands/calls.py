@@ -14,6 +14,14 @@ from typing import Any
 from uuid import UUID
 
 from aiskra.modules.training.application.actors import Actors
+from aiskra.modules.training.application.branching import (
+    BranchDirector,
+    BranchTurn,
+    shift_psy,
+    shift_tone,
+    situation_change,
+    start_branch,
+)
 from aiskra.modules.training.application.commands.scenarios import ScenarioGenerator
 from aiskra.modules.training.application.events import EventSink, emit
 from aiskra.modules.training.application.ports.scenarios import (
@@ -25,8 +33,8 @@ from aiskra.modules.training.application.ports.scenarios import (
 from aiskra.modules.training.application.ports.sessions import ServiceSwitches, SessionRepository
 from aiskra.modules.training.application.psy import PsyDirector, TurnSignals, start_psy
 from aiskra.modules.training.domain.actors import topic_of
-from aiskra.modules.training.domain.call import Call, CallMessage, CallParty, ReplicaVia, Speaker
-from aiskra.modules.training.domain.psy import choose_profile, psy_settings
+from aiskra.modules.training.domain.call import Call, CallMessage, CallParty, CallStatus, ReplicaVia, Speaker
+from aiskra.modules.training.domain.psy import PsyState, choose_profile, psy_settings, tone_from_psy
 from aiskra.modules.training.domain.scenario import Scenario
 from aiskra.modules.training.domain.tone import CallerTone, ToneSnapshot, tone_for_legend
 from aiskra.shared.application import Clock, Command, UnitOfWork
@@ -79,6 +87,7 @@ class _CallBase:
         *,
         psy: PsyDirector | None = None,
         sessions: SessionRepository | None = None,
+        branch: BranchDirector | None = None,
     ) -> None:
         self._calls = calls
         self._scenarios = scenarios
@@ -88,6 +97,7 @@ class _CallBase:
         self._clock = clock
         self._psy = psy
         self._sessions = sessions
+        self._branch = branch
 
     async def _assign_psy(self, call: Call, scenario: Scenario | None, rng: random.Random) -> str | None:
         """Психологический профиль заявителя по настройкам идущего занятия (п. 3.7). Возвращает предупреждение."""
@@ -109,6 +119,33 @@ class _CallBase:
             session_id=str(session.id),
         )
         return SENSITIVE_WARNING if profile.sensitive else None
+
+    async def _assign_branch(self, call: Call, scenario: Scenario | None) -> None:
+        """F5: ветвление сценария; вес блока «Развитие ситуации» — по настройкам идущего занятия (по умолчанию 0)."""
+        if self._branch is None or scenario is None or not scenario.branching:
+            return
+        weight = 0.0
+        if self._sessions is not None:
+            session = await self._sessions.running_for_student(call.student_id)
+            if session is not None:
+                weight = float((session.settings.get("branch") or {}).get("weight") or 0)
+        call.branch = start_branch(scenario.branching, weight)
+
+    async def _branch_step(self, call: Call, text: str | None) -> BranchTurn | None:
+        """F5: шаг ситуации до ответа заявителя (реплика оператора) или по таймеру (`text` — None)."""
+        if self._branch is None or call.branch is None or call.party is not CallParty.APPLICANT or not call.scenario_id:
+            return None
+        scenario = await self._scenarios.get(call.scenario_id)
+        if scenario is None or not scenario.branching:
+            return None
+        bt = await self._branch.advance(call, scenario.branching, scenario.legend, self._clock.now(), text)
+        if bt is not None:
+            call.branch = bt.branch
+        return bt
+
+    def _note_revealed(self, call: Call) -> None:
+        if self._branch is not None:
+            self._branch.note_revealed(call, self._clock.now())
 
     async def _own_call(self, call_id: UUID, actor: Principal) -> Call:
         call = await self._calls.get(call_id)
@@ -189,6 +226,7 @@ class StartIncomingCallHandler(_CallBase):
             tone=tone_for_legend(scenario.legend, scenario.incident_type_code),
         )
         warning = await self._assign_psy(call, scenario, rng)
+        await self._assign_branch(call, scenario)
         await self._calls.add(call)
         await self._commit()
         return CallStarted(call_id=call.id, scenario_id=scenario.id, aon=aon, channel="mts", warning=warning)
@@ -307,13 +345,20 @@ class SendReplicaHandler(_CallBase):
         call = await self._own_call(cmd.call_id, cmd.actor)
         call.ensure_active()
         history = await self._calls.messages(call.id)
+        bt = await self._branch_step(call, text)  # F5: ситуация меняется до ответа, рядом с шагом профиля
+        if bt is not None:
+            await emit(sink, "branch", _branch_event(bt))
+            if bt.events:  # F1: реплика-событие — первыми токенами, чтобы поток и озвучка по фразам совпали с итогом
+                await emit(sink, "token", {"text": " ".join(bt.events) + " "})
         if call.psy and self._psy and call.party is CallParty.APPLICANT:
-            psy_reply = await self._psy_reply(call, history, text, cmd.via, cmd.signals, sink)
+            psy_reply = await self._psy_reply(call, history, text, cmd.via, cmd.signals, sink, bt)
             if psy_reply is not None:
                 return psy_reply
-        await self._say(call, Speaker.OPERATOR, text, via=cmd.via)
-        reply, tone = await self._reply(call, history, text, sink)
-        msg = await self._say(call, Speaker.PARTY, reply, tone)
+        await self._say(call, Speaker.OPERATOR, text, via=cmd.via, meta=_operator_branch(bt) or None)
+        reply, tone = await self._reply(call, history, text, sink, bt)
+        reply = _with_events(bt, reply)
+        msg = await self._say(call, Speaker.PARTY, reply, tone, meta=_party_branch(bt) or None)
+        self._note_revealed(call)
         await self._calls.save(call)
         await self._commit()
         return Replica(speaker=Speaker.PARTY.value, text=reply, message_id=msg.id, tone=tone)
@@ -326,6 +371,7 @@ class SendReplicaHandler(_CallBase):
         via: ReplicaVia,
         signals: TurnSignals,
         sink: EventSink | None = None,
+        bt: BranchTurn | None = None,
     ) -> Replica | None:
         """Ход с психологическим профилем (п. 3.7): состояние, ворота, реплика и разметка — в `PsyDirector`;
         голосовое состояние `CallerTone` выводится из профиля, чтобы синтез озвучил то же состояние."""
@@ -335,23 +381,39 @@ class SendReplicaHandler(_CallBase):
             return None
         now = self._clock.now()
         elapsed = (now - (call.answered_at or call.started_at)).total_seconds()
+        if bt is not None and bt.escalate:  # F5: событие ситуации сдвигает уровень профиля до ответа
+            call.psy = shift_psy(call.psy, bt.escalate)
         turn = await self._psy.turn(
-            call.psy, scenario.legend, history, text, call.revealed, elapsed, signals, str(scenario.id), sink
+            call.psy,
+            bt.legend if bt else scenario.legend,
+            history,
+            text,
+            call.revealed,
+            elapsed,
+            signals,
+            str(scenario.id),
+            sink,
+            situation=bt.situation if bt else "",
+            extra_gates=bt.gates if bt else frozenset(),
         )
         if turn is None:
             return None
-        await self._say(call, Speaker.OPERATOR, text, via=via, meta=turn.operator_meta)
-        msg = await self._say(call, Speaker.PARTY, turn.text, turn.snapshot, meta=turn.party_meta)
+        spoken = _with_events(bt, turn.text)
+        await self._say(call, Speaker.OPERATOR, text, via=via, meta={**turn.operator_meta, **_operator_branch(bt)})
+        msg = await self._say(call, Speaker.PARTY, spoken, turn.snapshot, meta={**turn.party_meta, **_party_branch(bt)})
         call.revealed = turn.revealed
         call.psy = turn.psy
         call.tone = turn.tone
+        if self._branch is not None:
+            self._branch.note_acts(call, [a["code"] for a in turn.operator_meta.get("acts", [])], now)
+            self._note_revealed(call)
         if turn.hung_up:
             call.end(self._clock.now(), by="party")
         await self._calls.save(call)
         await self._commit()
         return Replica(
             speaker=Speaker.PARTY.value,
-            text=turn.text,
+            text=spoken,
             message_id=msg.id,
             tone=turn.snapshot,
             remarks=turn.remarks,
@@ -370,7 +432,12 @@ class SendReplicaHandler(_CallBase):
         }
 
     async def _reply(
-        self, call: Call, history: list[CallMessage], text: str, sink: EventSink | None = None
+        self,
+        call: Call,
+        history: list[CallMessage],
+        text: str,
+        sink: EventSink | None = None,
+        bt: BranchTurn | None = None,
     ) -> tuple[str, ToneSnapshot | None]:
         if call.party is CallParty.APPLICANT:
             legend: dict[str, Any] = {}
@@ -382,14 +449,24 @@ class SendReplicaHandler(_CallBase):
             if not legend and call.card_id and call.service_code:
                 ctx = await self._cards.dds_context(call.card_id, call.service_code)
                 legend = await self._legend_for_card(ctx) if ctx else {}
+            if bt is not None:  # F5: легенда с фактами текущего узла ситуации
+                legend = bt.legend
             # состояние меняется до ответа: на «успокойтесь!» заявитель отвечает уже взвинченным (п. 3.6)
             tone = await self._ensure_tone(call, legend, incident_code)
             assert tone is not None  # у заявителя состояние есть всегда
-            changes = tone.react(text, topic=topic_of(text), revealed=call.revealed)
+            changes = shift_tone(tone, bt.node, bt.escalate) if bt else []
+            changes += tone.react(text, topic=topic_of(text), revealed=call.revealed)
             snapshot = tone.snapshot(changes)
             await emit(sink, "state", {"tone": snapshot.to_json()})  # F1: состояние видно до ответа
             answer, revealed = await self._actors.applicant(
-                legend, history, text, call.revealed, str(call.scenario_id or call.card_id), tone, sink
+                legend,
+                history,
+                text,
+                call.revealed,
+                str(call.scenario_id or call.card_id),
+                tone,
+                sink,
+                situation=bt.situation if bt else None,
             )
             call.revealed = revealed
             return answer, snapshot
@@ -485,6 +562,64 @@ class PauseCallHandler(_CallBase):
         )
         await self._commit()
         return call.status.value
+
+
+@dataclass(frozen=True, kw_only=True)
+class TickCall(Command):
+    actor: Principal
+    call_id: UUID
+
+
+class TickCallHandler(_CallBase):
+    """F5: таймер ситуации. Пока звонок идёт, интерфейс раз в 5 с спрашивает, не изменилась ли ситуация сама
+    («Дым уже в коридоре!»): реплика-событие узла сохраняется и возвращается для показа и озвучки."""
+
+    async def __call__(self, cmd: TickCall) -> list[Replica]:
+        call = await self._own_call(cmd.call_id, cmd.actor)
+        if call.status is not CallStatus.ACTIVE:
+            return []
+        before = dict(call.branch) if call.branch is not None else None
+        bt = await self._branch_step(call, None)
+        if bt is None:
+            return []
+        out: list[Replica] = []
+        if bt.events:
+            snapshot: ToneSnapshot | None = None
+            p = self._psy.profile(call.psy) if self._psy and call.psy else None
+            if p is not None and call.psy is not None:
+                call.psy = shift_psy(call.psy, bt.escalate)
+                tone = tone_from_psy(p, PsyState.from_dict(call.psy["state"]))
+                call.tone = tone
+                snapshot = tone.snapshot([situation_change(bt.node, bt.escalate)] if bt.escalate else [])
+            else:
+                own = await self._ensure_tone(call)
+                snapshot = own.snapshot(shift_tone(own, bt.node, bt.escalate)) if own else None
+            text = " ".join(bt.events)
+            msg = await self._say(call, Speaker.PARTY, text, snapshot, meta={**_party_branch(bt), "branch_event": True})
+            out.append(Replica(speaker=Speaker.PARTY.value, text=text, message_id=msg.id, tone=snapshot))
+        if out or call.branch != before:
+            await self._calls.save(call)
+            await self._commit()
+        return out
+
+
+def _with_events(bt: BranchTurn | None, text: str) -> str:
+    """Реплика-событие узла звучит один раз — в начале ответа заявителя («Дым уже в коридоре! …»)."""
+    return " ".join([*bt.events, text]) if bt is not None and bt.events else text
+
+
+def _operator_branch(bt: BranchTurn | None) -> dict[str, Any]:
+    return {"branch": {"said": bt.said, "node": bt.node.id}} if bt is not None else {}
+
+
+def _party_branch(bt: BranchTurn | None) -> dict[str, Any]:
+    if bt is None:
+        return {}
+    return {"branch": {"node": bt.node.id, "entered": [n.id for n in bt.entered]}}
+
+
+def _branch_event(bt: BranchTurn) -> dict[str, Any]:
+    return {"node": bt.node.id, "title": bt.node.title, "entered": [n.title for n in bt.entered], "events": bt.events}
 
 
 StreamReplicaFactory = Callable[[], AbstractAsyncContextManager[SendReplicaHandler]]

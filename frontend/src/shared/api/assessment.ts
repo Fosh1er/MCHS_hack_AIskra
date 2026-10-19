@@ -1,6 +1,7 @@
 /** Модуль assessment: автооценка по эталону (п. 3.4), отчёт по занятию, экспертная правка и прогресс (п. 4.3). */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, http } from './http';
+import type { BranchDebrief, OutcomeCode } from './training';
 
 export interface CriterionResult {
   key: string; title: string; score: number | null; errors: string[]; note: string;
@@ -16,6 +17,7 @@ export interface Assessment {
     expert?: { score: number; comment: string; teacher_id: string; auto_score: number };
     role_score?: number;
     psy?: PsyBlock;
+    branch?: BranchDebrief; // F5: «Развитие ситуации» — итог ветвящегося сценария
   };
 }
 /** Блок «Работа с заявителем» (п. 3.7): отдельный от балла роли, с лентой разбора. */
@@ -78,6 +80,7 @@ export interface CardResult {
   call_mode?: 'text' | 'voice' | 'hands_free' | null; // как вёл разговор оператор 112 (п. 3.6)
   assessment_id: string | null; score: number | null; passed: boolean | null; expert: boolean; expert_comment: string; errors: string[];
   criteria: Record<string, number | null>; critical?: string[];
+  branch_outcome?: OutcomeCode | null; // F5
 }
 /** Отзыв преподавателя по занятию (specs/4.7): видят преподаватель и сам обучающийся. */
 export interface FeedbackView { text: string; updated_at: string | null }
@@ -93,6 +96,7 @@ export interface SessionReport {
   time_buckets: { label: string; count: number }[];
   score_series: { t: string; v: number; who: string }[];
   psy_errors?: { calls: number; items: StressError[] }; // F4: типичные ошибки работы со стрессом
+  branch_outcomes?: Partial<Record<OutcomeCode, number>>; // F5: итоги ситуаций по группе
 }
 export interface StressError { code: string; title: string; count: number; calls: number; students: number; why: string; sources: Cite[] }
 export interface ProgressView {

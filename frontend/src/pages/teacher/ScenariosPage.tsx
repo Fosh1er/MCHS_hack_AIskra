@@ -4,13 +4,14 @@ import { useEffect, useState } from 'react';
 import { Banner, Button, Card, Segmented, StatusPill, Tag } from '@smena112/ui-kit';
 import { useCardTypes, useEnum, useIncidentGroups, useServices } from '../../shared/api/dictionaries';
 import {
-  useEditScenario, useGenerateScenarios, usePsyProfiles, useReviewScenario, useScenario, useScenarioPreview, useScenarios, useSetScenarioPsy,
+  useBranchTemplates, useEditScenario, useGenerateScenarios, usePsyProfiles, useReviewScenario, useScenario, useScenarioPreview, useScenarios, useSetScenarioPsy,
   type EditScenarioResult, type ScenarioFilter, type ScenarioRow, type ScenarioView,
 } from '../../shared/api/training';
 import { TeacherShell } from '../../shared/ui/TeacherShell';
 import { useScreenTour } from '../../shared/onboarding/OnboardingProvider';
 import { ReferenceReview, ReworkNotes } from './ReferenceReview';
 import { SourceRefs } from '../../shared/ui/PsySources';
+import { BranchGraphView } from './BranchGraphView';
 
 const STATUS: Record<ScenarioRow['status'], { label: string; pill: 'info' | 'ok' | 'neutral' }> = {
   draft: { label: 'на проверке', pill: 'info' },
@@ -26,6 +27,9 @@ function GenerateForm({ onDone }: { onDone: (n: number) => void }) {
   const [count, setCount] = useState(5);
   const [difficulty, setDifficulty] = useState(2);
   const [picked, setPicked] = useState<number[]>([]);
+  const templates = useBranchTemplates().data ?? [];
+  const [branching, setBranching] = useState(''); // F5: шаблон ветвления; пусто — без ветвления
+  const tpl = templates.find((t) => t.id === branching);
   return (
     <Card title="Сгенерировать сценарии" subtitle="Черновики попадут в банк на проверку" tour="t-generate">
       <div className="cab-filters">
@@ -35,11 +39,19 @@ function GenerateForm({ onDone }: { onDone: (n: number) => void }) {
             {[1, 2, 3, 4, 5].map((d) => <option key={d} value={d}>{d} — {DIFFICULTY[d]}</option>)}
           </select>
         </label>
+        <label className="cab-filters__label" title="Ситуация развивается по решениям оператора: инструкции заявителю и скорость карточки меняют итог">
+          Ветвление{' '}
+          <select className="cab-select" value={branching} onChange={(e) => setBranching(e.target.value)}>
+            <option value="">нет</option>
+            {templates.map((t) => <option key={t.id} value={t.id}>{t.title}</option>)}
+          </select>
+        </label>
         <Button variant="primary" icon="bolt" disabled={gen.isPending}
-          onClick={() => gen.mutate({ count, difficulty, groups: picked }, { onSuccess: (r) => onDone(r.ids.length) })}>
+          onClick={() => gen.mutate({ count, difficulty, groups: picked, branching: branching || null }, { onSuccess: (r) => onDone(r.ids.length) })}>
           {gen.isPending ? 'генерация…' : 'сгенерировать'}
         </Button>
       </div>
+      {tpl && <p className="c-slate" style={{ margin: '6px 0 0' }}>{tpl.description} Развилок: {tpl.forks}. Тип происшествия задаёт шаблон — категории ниже не учитываются.</p>}
       <details className="tch-details">
         <summary>категории событий: {picked.length ? `выбрано ${picked.length}` : 'любые'}</summary>
         <GroupPicker groups={groups.data ?? []} value={picked} onChange={setPicked} />
@@ -158,7 +170,7 @@ function PsyPick({ s }: { s: ScenarioView }) {
 function Detail({ id }: { id: string }) {
   const q = useScenario(id);
   const review = useReviewScenario();
-  const [mode, setMode] = useState<'view' | 'edit' | 'preview'>('view');
+  const [mode, setMode] = useState<'view' | 'edit' | 'preview' | 'branch'>('view');
   const preview = useScenarioPreview(id, mode === 'preview');
   useEffect(() => setMode('view'), [id]);
   const s = q.data;
@@ -166,7 +178,11 @@ function Detail({ id }: { id: string }) {
   return (
     <Card title={s.title} subtitle={`${STATUS[s.status].label} · сложность ${s.difficulty} · ${SOURCE[s.source] ?? s.source}`} tour="t-detail"
       actions={<Segmented ariaLabel="Режим" value={mode} onChange={setMode}
-        options={[{ value: 'view', label: 'легенда' }, { value: 'preview', label: 'прогон' }, { value: 'edit', label: 'правка' }]} />}>
+        options={[
+          { value: 'view', label: 'легенда' }, { value: 'preview', label: 'прогон' }, { value: 'edit', label: 'правка' },
+          ...(s.branching ? [{ value: 'branch' as const, label: 'ветвление' }] : []),
+        ]} />}>
+      {mode === 'branch' && s.branching && <BranchGraphView g={s.branching} />}
       {mode === 'view' && <Legend s={s} />}
       {mode === 'view' && <ReferenceReview s={s} />}
       {mode === 'view' && <PsyPick s={s} />}
@@ -244,6 +260,7 @@ export function ScenariosPage() {
                   <td>
                     {s.title}
                     {s.psy_profile && <> <span title="Психологический профиль заявителя (методика — раздел «Методика»)"><Tag variant="blue">{psyTitle.get(s.psy_profile) ?? s.psy_profile}</Tag></span></>}
+                    {s.branching ? <> <Tag variant="blue">ветвление</Tag></> : null}
                   </td>
                   <td>{s.card_type_code ? titles.get(s.card_type_code) ?? s.card_type_code : '—'}</td>
                   <td className="num">{s.difficulty}</td>
