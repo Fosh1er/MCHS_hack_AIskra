@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
-from typing import Literal, Protocol
+from typing import Literal, Protocol, runtime_checkable
 
 from pydantic import BaseModel
 
@@ -78,6 +79,14 @@ class LLMPort(Protocol):
     ) -> LLMResult: ...
 
     async def aclose(self) -> None: ...
+
+
+@runtime_checkable
+class LLMStreamPort(Protocol):
+    """Модель, которая умеет отдавать ответ по мере генерации (F1, ADR-0013). Необязательное расширение `LLMPort`:
+    адаптер без него отвечает целиком, а `TaskModel.stream` отдаёт этот ответ одним куском."""
+
+    def stream(self, messages: list[ChatMessage], *, params: LLMParams) -> AsyncIterator[str]: ...
 
 
 @dataclass(frozen=True)

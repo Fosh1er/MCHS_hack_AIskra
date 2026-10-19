@@ -2,16 +2,20 @@
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import binascii
 import json
+import logging
 import re
+import time
 from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Annotated, Any, Protocol
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Form, Response, UploadFile
+from fastapi import Query as QueryParam
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -47,6 +51,7 @@ from aiskra.modules.training.application.commands.calls import (
     StartDdsCallHandler,
     StartIncomingCall,
     StartIncomingCallHandler,
+    StreamReplicaFactory,
 )
 from aiskra.modules.training.application.commands.materials import (
     DeleteMaterial,
@@ -136,6 +141,8 @@ from aiskra.modules.training.application.speech import (
     GetCallRecording,
     GetReplicaAudio,
     ReplicaAudioHandler,
+    SpeakFragment,
+    SpeakFragmentHandler,
     SpeechStatus,
     Transcribe,
     TranscribeHandler,
@@ -143,7 +150,8 @@ from aiskra.modules.training.application.speech import (
 from aiskra.modules.training.application.voice_lab import LabMessage, VoiceLab
 from aiskra.modules.training.domain.material import MAX_BYTES, MaterialKind
 from aiskra.modules.training.domain.review import Decision
-from aiskra.shared.errors import DomainError, NotFoundError
+from aiskra.modules.training.domain.stream_text import RemarkFilter
+from aiskra.shared.errors import AppError, DomainError, NotFoundError
 from aiskra.shared.security import Permission, Principal
 from aiskra.shared.web import CurrentPrincipal, Meta, require
 
@@ -292,6 +300,129 @@ async def replica(
     return _replica_out(r)
 
 
+log = logging.getLogger(__name__)
+_CALL_LOCKS: dict[UUID, asyncio.Lock] = {}
+_STREAM_TASKS: set[asyncio.Task[None]] = set()
+
+
+def _sse(kind: str, data: dict[str, Any]) -> bytes:
+    return f"event: {kind}\ndata: {json.dumps(data, ensure_ascii=False, default=str)}\n\n".encode()
+
+
+@router.post(
+    "/calls/{call_id}/replicas/stream",
+    summary="Реплика оператора → ответ ИИ-собеседника потоком SSE (F1)",
+    description=(
+        "События: `accepted` → `state` (состояние заявителя до ответа) → `model` (ответ пишет модель; нет события — "
+        "ответ по правилам) → `token`* / `remark`* → `replace`? (ответ модели отклонён проверкой, итоговый текст — "
+        "в `final`) → `final` (как ответ `POST /replicas` + `metrics`) или `error`. Сохранение — после ответа "
+        "целиком; обрыв соединения генерацию не отменяет, чтобы реплика не потерялась."
+    ),
+)
+async def replica_stream(
+    call_id: UUID,
+    body: ReplicaIn,
+    actor: Trainee,
+    factory: Annotated[StreamReplicaFactory, Depends(deps.provide_replica_stream)],
+) -> StreamingResponse:
+    signals = TurnSignals(latency_ms=body.latency_ms, interrupted=body.interrupted)
+    cmd = SendReplica(actor=actor, call_id=call_id, text=body.text, via=body.via, signals=signals)
+    queue: asyncio.Queue[tuple[str, dict[str, Any]] | None] = asyncio.Queue()
+
+    async def sink(kind: str, data: dict[str, Any]) -> None:
+        await queue.put((kind, data))
+
+    async def run() -> None:
+        lock = _CALL_LOCKS.setdefault(call_id, asyncio.Lock())  # реплики одного звонка — строго по очереди
+        try:
+            async with lock, factory() as handler:
+                r = await handler(cmd, sink=sink)
+            await queue.put(("final", _replica_out(r).model_dump(mode="json")))
+        except AppError as e:
+            await queue.put(("error", {"code": e.code, "message": str(e)}))
+        except Exception:
+            log.exception("Потоковый ответ звонка %s не удался", call_id)
+            await queue.put(("error", {"code": "internal_error", "message": "Не удалось получить ответ собеседника"}))
+        finally:
+            if not lock.locked():
+                _CALL_LOCKS.pop(call_id, None)
+            await queue.put(None)
+
+    task = asyncio.create_task(run())
+    _STREAM_TASKS.add(task)  # ссылка на задачу: без неё её может собрать сборщик мусора
+    task.add_done_callback(_STREAM_TASKS.discard)
+
+    async def events() -> AsyncIterator[bytes]:
+        started = time.perf_counter()
+        first_token: float | None = None
+        pieces = 0
+        model: dict[str, Any] | None = None
+        replaced = False
+        remarks = RemarkFilter()
+        yield _sse("accepted", {})
+        while (item := await queue.get()) is not None:
+            kind, data = item
+            if kind == "model":
+                model = data
+            elif kind == "replace":
+                replaced = True
+            elif kind == "token":
+                text = remarks.feed(str(data.get("text", "")))
+                for r in remarks.take_remarks():
+                    yield _sse("remark", {"text": r})
+                if not text:
+                    continue
+                pieces += 1
+                if first_token is None:
+                    first_token = time.perf_counter()
+                data = {"text": text}
+            elif kind == "final":
+                total = time.perf_counter() - started
+                gen = total - (first_token - started) if first_token else 0.0
+                data = {
+                    **data,
+                    "metrics": {
+                        "source": "llm" if model and not replaced else "rules",
+                        "model": model.get("model") if model else None,
+                        "ttft_ms": round((first_token - started) * 1000) if first_token else None,
+                        "total_ms": round(total * 1000),
+                        "pieces": pieces,
+                        "pieces_per_s": round(pieces / gen, 1) if gen > 0.05 else None,
+                        "replaced": replaced,
+                    },
+                }
+            yield _sse(kind, data)
+
+    return StreamingResponse(
+        events(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"},  # nginx не копит поток
+    )
+
+
+@router.get(
+    "/calls/{call_id}/speak",
+    summary="Озвучить фразу потокового ответа голосом собеседника (F1)",
+    responses={200: {"content": {"audio/wav": {}, "audio/mpeg": {}}}},
+)
+async def speak_fragment(
+    call_id: UUID,
+    actor: Trainee,
+    handler: Annotated[SpeakFragmentHandler, Depends(deps.provide_speak_fragment)],
+    text: Annotated[str, QueryParam(min_length=1, max_length=400)],
+    emotion: Annotated[str | None, QueryParam(max_length=20)] = None,
+    pace: Annotated[str, QueryParam(max_length=12)] = "normal",
+    volume: Annotated[str, QueryParam(max_length=12)] = "normal",
+    breathing: Annotated[str, QueryParam(max_length=12)] = "calm",
+) -> Response:
+    audio = await handler(
+        SpeakFragment(
+            actor=actor, call_id=call_id, text=text, emotion=emotion, pace=pace, volume=volume, breathing=breathing
+        )
+    )
+    return Response(content=audio.content, media_type=audio.mime, headers={"Cache-Control": "private, max-age=600"})
+
+
 class SpeechOut(BaseModel):
     text: str
 
@@ -355,12 +486,22 @@ async def voice_lab_stt(
 async def voice_lab_chat(
     _: Trainee, lab: Annotated[VoiceLab, Depends(deps.provide_voice_lab)], body: VoiceLabChatIn
 ) -> StreamingResponse:
-    text = await lab.reply([LabMessage(role=m.role, content=m.content) for m in body.messages])
+    messages = [LabMessage(role=m.role, content=m.content) for m in body.messages]
+    pieces = lab.stream_reply(messages)
+    first = await anext(pieces, None)  # ошибка модели до первого куска — обычный ответ с ошибкой, а не обрыв потока
 
     async def events() -> AsyncIterator[bytes]:
-        # формат потока OpenRouter/OpenAI, который читает страница: фразами, затем [DONE]
-        for part in re.findall(r"[^.!?…\n]+[.!?…\n]*\s*", text) or [text]:
-            yield f"data: {json.dumps({'choices': [{'delta': {'content': part}}]}, ensure_ascii=False)}\n\n".encode()
+        # формат потока OpenRouter/OpenAI, который читает страница: куски по мере генерации, затем [DONE]
+        def chunk(part: str) -> bytes:
+            return f"data: {json.dumps({'choices': [{'delta': {'content': part}}]}, ensure_ascii=False)}\n\n".encode()
+
+        if first:
+            yield chunk(first)
+        try:
+            async for part in pieces:
+                yield chunk(part)
+        except AppError as e:
+            log.warning("Полигон: поток модели прерван: %s", e)
         yield b"data: [DONE]\n\n"
 
     return StreamingResponse(events(), media_type="text/event-stream", headers={"Cache-Control": "no-store"})

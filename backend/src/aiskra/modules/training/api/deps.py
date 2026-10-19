@@ -38,5 +38,7 @@ provide_material_files = provider_stub("training.MaterialFiles")
 provide_transcribe = provider_stub("training.TranscribeHandler")
 provide_speech_status = provider_stub("training.SpeechStatus")
 provide_voice_lab = provider_stub("training.VoiceLab")
+provide_replica_stream = provider_stub("training.StreamReplicaFactory")  # F1: фабрика обработчика со своей сессией
+provide_speak_fragment = provider_stub("training.SpeakFragmentHandler")
 provide_replica_audio = provider_stub("training.ReplicaAudioHandler")
 provide_call_recording = provider_stub("training.CallRecordingHandler")

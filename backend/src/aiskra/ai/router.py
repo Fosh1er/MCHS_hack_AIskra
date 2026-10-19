@@ -6,12 +6,12 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import AsyncIterator, Mapping
 from dataclasses import dataclass
 
 from pydantic import BaseModel
 
-from aiskra.ai.ports import CacheDirective, CacheMode, ChatMessage, LLMParams, LLMPort, LLMResult
+from aiskra.ai.ports import CacheDirective, CacheMode, ChatMessage, LLMParams, LLMPort, LLMResult, LLMStreamPort
 
 
 @dataclass(frozen=True)
@@ -43,6 +43,29 @@ class TaskModel:
     @property
     def model_id(self) -> str:
         return self._client.model_id
+
+    def _params(self, cache_scope: str | None, seed: int | None) -> LLMParams:
+        p = self.profile
+        return LLMParams(
+            task=p.task,
+            temperature=p.temperature,
+            max_tokens=p.max_tokens,
+            timeout_s=p.timeout_s,
+            seed=seed,
+            prompt_version=p.prompt_version,
+            cache=CacheDirective(mode=p.cache_mode, ttl_s=p.cache_ttl_s, scope=cache_scope),
+        )
+
+    async def stream(
+        self, messages: list[ChatMessage], *, cache_scope: str | None = None, seed: int | None = None
+    ) -> AsyncIterator[str]:
+        """Ответ по мере генерации (F1). Клиент без потока отвечает целиком — один кусок."""
+        params = self._params(cache_scope, seed)
+        if isinstance(self._client, LLMStreamPort):
+            async for piece in self._client.stream(messages, params=params):
+                yield piece
+            return
+        yield (await self._client.complete(messages, params=params)).text
 
     async def complete(
         self,

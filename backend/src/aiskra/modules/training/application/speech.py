@@ -21,7 +21,7 @@ from aiskra.modules.training.application.queries.calls import call_visible
 from aiskra.modules.training.domain.audio import join_call_audio
 from aiskra.modules.training.domain.call import Call, CallMessage, CallParty, Speaker
 from aiskra.modules.training.domain.scenario import legend_voice
-from aiskra.modules.training.domain.tone import STAFF_STYLE, speech_speed, speech_style
+from aiskra.modules.training.domain.tone import SPEED, STAFF_STYLE, ToneSnapshot, speech_speed, speech_style
 from aiskra.shared.application import Command, Query
 from aiskra.shared.errors import DomainError, ExternalServiceError, NotFoundError
 from aiskra.shared.security import Principal
@@ -156,6 +156,57 @@ class ReplicaAudioHandler(_Voices):
             blob = await self._tts.synthesize(clip_for_speech(msg.text), voice=profile)
         except ExternalServiceError as e:  # интерфейс озвучит реплику браузером — здесь только запись в журнал
             log.warning("Синтез речи (%s) недоступен: %s", self._tts.model_id, e)
+            raise
+        return ReplicaAudio(content=blob.content, mime=blob.mime)
+
+
+MAX_FRAGMENT_CHARS = 400  # фраза потокового ответа (F1): одна-две фразы, не целый монолог
+
+
+@dataclass(frozen=True, kw_only=True)
+class SpeakFragment(Query):
+    """Озвучить фразу ответа, который ещё генерируется (F1): голос — роль звонка, подача — состояние заявителя из
+    события `state`. Текст приходит от клиента, поэтому длина ограничена, а звонок должен быть виден ему."""
+
+    actor: Principal
+    call_id: UUID
+    text: str
+    emotion: str | None = None
+    pace: str = "normal"
+    volume: str = "normal"
+    breathing: str = "calm"
+
+
+class SpeakFragmentHandler(_Voices):
+    async def __call__(self, q: SpeakFragment) -> ReplicaAudio:
+        call = await self._calls.get(q.call_id)
+        if call is None or not call_visible(call, q.actor):
+            raise NotFoundError("Звонок не найден", code="call_not_found")
+        if not self._tts.enabled:
+            raise DomainError("Серверный синтез речи не настроен — озвучивает браузер", code="tts_disabled")
+        text = " ".join(q.text.split())[:MAX_FRAGMENT_CHARS]
+        if not text:
+            raise DomainError("Пустая фраза", code="empty_text")
+        voice = await self._voice(call.party, call.scenario_id)
+        if call.party is CallParty.APPLICANT and q.emotion:
+            tone = ToneSnapshot(
+                emotion=q.emotion,
+                emotion_title="",
+                tension=0,
+                trust=0,
+                readiness=0,
+                band="",
+                pace=q.pace if q.pace in SPEED else "normal",
+                volume=q.volume,
+                breathing=q.breathing,
+            )
+            profile = VoiceProfile(voice=voice, speed=speech_speed(tone), emotion=q.emotion, style=speech_style(tone))
+        else:
+            profile = VoiceProfile(voice=voice, style=STAFF_STYLE if call.party is not CallParty.APPLICANT else None)
+        try:
+            blob = await self._tts.synthesize(text, voice=profile)
+        except ExternalServiceError as e:
+            log.warning("Синтез фразы (%s) недоступен: %s", self._tts.model_id, e)
             raise
         return ReplicaAudio(content=blob.content, mime=blob.mime)
 

@@ -10,9 +10,11 @@ CachingLLM реализует тот же LLMPort и оборачивает лю
 
 from __future__ import annotations
 
+import asyncio
+import re
 import time
 from collections import OrderedDict
-from collections.abc import Callable
+from collections.abc import AsyncIterator, Callable
 
 from pydantic import BaseModel
 
@@ -22,6 +24,7 @@ from aiskra.ai.ports import (
     LLMParams,
     LLMPort,
     LLMResult,
+    LLMStreamPort,
     LLMUsage,
     TTSPort,
     VoiceProfile,
@@ -53,6 +56,13 @@ def cache_key(model: str, messages: list[ChatMessage], params: LLMParams, schema
         [(m.role, normalize_strict(m.content)) for m in messages],
         schema_name,
     )
+
+
+REPLAY_DELAY_S = 0.025  # темп ответа из кеша в потоке: ~40 слов/с, как у быстрой модели
+
+
+def _words(text: str) -> list[str]:
+    return re.findall(r"\S+\s*", text) or [text]
 
 
 class CachingLLM:
@@ -102,6 +112,36 @@ class CachingLLM:
                 parsed=result.parsed,
             )
         return result
+
+    async def stream(self, messages: list[ChatMessage], *, params: LLMParams) -> AsyncIterator[str]:
+        """Поток с кешем (F1): попадание — сохранённый ответ теми же кусками по словам с темпом живой генерации
+        (`REPLAY_DELAY_S`), промах — поток модели, а целиком собранный ответ кладётся в кеш. Оборванный поток
+        (ошибка, отмена) в кеш не попадает."""
+        key = cache_key(self._inner.model_id, messages, params, None)
+        if key is not None:
+            hit = await self._cache.get(key)
+            if hit is not None:
+                for piece in _words(str(hit["text"])):
+                    yield piece
+                    await asyncio.sleep(REPLAY_DELAY_S)
+                return
+        if not isinstance(self._inner, LLMStreamPort):
+            result = await self._inner.complete(messages, params=params)
+            if key is not None:
+                await self._cache.set(key, self._to_cache(result), ttl_s=params.cache.ttl_s)
+            yield result.text
+            return
+        parts: list[str] = []
+        async for piece in self._inner.stream(messages, params=params):
+            parts.append(piece)
+            yield piece
+        if key is not None and parts:
+            text = "".join(parts)
+            await self._cache.set(
+                key,
+                {"text": text, "provider": self._inner.provider_name, "model": self._inner.model_id},
+                ttl_s=params.cache.ttl_s,
+            )
 
     @staticmethod
     def _to_cache(r: LLMResult) -> dict[str, object]:

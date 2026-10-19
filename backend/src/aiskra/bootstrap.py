@@ -10,7 +10,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import Callable
+from collections.abc import AsyncIterator, Callable
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any
@@ -186,6 +187,7 @@ from aiskra.modules.training.application.queries.sessions import (
 from aiskra.modules.training.application.speech import (
     CallRecordingHandler,
     ReplicaAudioHandler,
+    SpeakFragmentHandler,
     SpeechStatus,
     TranscribeHandler,
 )
@@ -588,6 +590,19 @@ def _wire_training(app: FastAPI, services: Services) -> None:
     ov[training_deps.provide_answer] = answer
     ov[training_deps.provide_dds_call] = dds_call
     ov[training_deps.provide_replica] = replica
+
+    @asynccontextmanager
+    async def replica_in_own_session() -> AsyncIterator[SendReplicaHandler]:
+        """F1: потоковый ответ дольше запроса — у обработчика своя сессия БД на время генерации."""
+        async with services.session_factory() as own:
+            yield replica(own)
+
+    ov[training_deps.provide_replica_stream] = lambda: replica_in_own_session
+
+    def speak_fragment(session: Session) -> SpeakFragmentHandler:
+        return SpeakFragmentHandler(services.tts, SqlCallRepository(session), SqlScenarioRepository(session))
+
+    ov[training_deps.provide_speak_fragment] = speak_fragment
     ov[training_deps.provide_transcribe] = lambda: TranscribeHandler(services.stt)  # голосовой ввод (п. 1.4)
     voice_lab = VoiceLab(services.stt, services.tts, services.model_router)  # голосовой полигон (п. 3.6)
     ov[training_deps.provide_voice_lab] = lambda: voice_lab

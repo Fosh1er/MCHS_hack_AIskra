@@ -7,12 +7,15 @@
 from __future__ import annotations
 
 import random
+from collections.abc import Callable
+from contextlib import AbstractAsyncContextManager
 from dataclasses import dataclass, field
 from typing import Any
 from uuid import UUID
 
 from aiskra.modules.training.application.actors import Actors
 from aiskra.modules.training.application.commands.scenarios import ScenarioGenerator
+from aiskra.modules.training.application.events import EventSink, emit
 from aiskra.modules.training.application.ports.scenarios import (
     CallRepository,
     CardContextSource,
@@ -293,7 +296,9 @@ class SendReplica(Command):
 
 
 class SendReplicaHandler(_CallBase):
-    async def __call__(self, cmd: SendReplica) -> Replica:
+    async def __call__(self, cmd: SendReplica, sink: EventSink | None = None) -> Replica:
+        """Реплика оператора → ответ собеседника. `sink` (F1) получает ход ответа по мере генерации; сохранение —
+        одной транзакцией в конце, как и без потока."""
         text = " ".join(cmd.text.split())
         if not text:
             raise DomainError("Пустая реплика", code="empty_replica")
@@ -303,18 +308,24 @@ class SendReplicaHandler(_CallBase):
         call.ensure_active()
         history = await self._calls.messages(call.id)
         if call.psy and self._psy and call.party is CallParty.APPLICANT:
-            psy_reply = await self._psy_reply(call, history, text, cmd.via, cmd.signals)
+            psy_reply = await self._psy_reply(call, history, text, cmd.via, cmd.signals, sink)
             if psy_reply is not None:
                 return psy_reply
         await self._say(call, Speaker.OPERATOR, text, via=cmd.via)
-        reply, tone = await self._reply(call, history, text)
+        reply, tone = await self._reply(call, history, text, sink)
         msg = await self._say(call, Speaker.PARTY, reply, tone)
         await self._calls.save(call)
         await self._commit()
         return Replica(speaker=Speaker.PARTY.value, text=reply, message_id=msg.id, tone=tone)
 
     async def _psy_reply(
-        self, call: Call, history: list[CallMessage], text: str, via: ReplicaVia, signals: TurnSignals
+        self,
+        call: Call,
+        history: list[CallMessage],
+        text: str,
+        via: ReplicaVia,
+        signals: TurnSignals,
+        sink: EventSink | None = None,
     ) -> Replica | None:
         """Ход с психологическим профилем (п. 3.7): состояние, ворота, реплика и разметка — в `PsyDirector`;
         голосовое состояние `CallerTone` выводится из профиля, чтобы синтез озвучил то же состояние."""
@@ -325,7 +336,7 @@ class SendReplicaHandler(_CallBase):
         now = self._clock.now()
         elapsed = (now - (call.answered_at or call.started_at)).total_seconds()
         turn = await self._psy.turn(
-            call.psy, scenario.legend, history, text, call.revealed, elapsed, signals, str(scenario.id)
+            call.psy, scenario.legend, history, text, call.revealed, elapsed, signals, str(scenario.id), sink
         )
         if turn is None:
             return None
@@ -358,7 +369,9 @@ class SendReplicaHandler(_CallBase):
             "emotion": "спокойно",
         }
 
-    async def _reply(self, call: Call, history: list[CallMessage], text: str) -> tuple[str, ToneSnapshot | None]:
+    async def _reply(
+        self, call: Call, history: list[CallMessage], text: str, sink: EventSink | None = None
+    ) -> tuple[str, ToneSnapshot | None]:
         if call.party is CallParty.APPLICANT:
             legend: dict[str, Any] = {}
             incident_code: str | None = None
@@ -373,11 +386,13 @@ class SendReplicaHandler(_CallBase):
             tone = await self._ensure_tone(call, legend, incident_code)
             assert tone is not None  # у заявителя состояние есть всегда
             changes = tone.react(text, topic=topic_of(text), revealed=call.revealed)
+            snapshot = tone.snapshot(changes)
+            await emit(sink, "state", {"tone": snapshot.to_json()})  # F1: состояние видно до ответа
             answer, revealed = await self._actors.applicant(
-                legend, history, text, call.revealed, str(call.scenario_id or call.card_id), tone
+                legend, history, text, call.revealed, str(call.scenario_id or call.card_id), tone, sink
             )
             call.revealed = revealed
-            return answer, tone.snapshot(changes)
+            return answer, snapshot
         if call.card_id is None or call.service_code is None:
             raise DomainError("Звонок не связан с карточкой", code="call_without_card")
         ctx = await self._cards.dds_context(call.card_id, call.service_code)
@@ -385,8 +400,8 @@ class SendReplicaHandler(_CallBase):
             raise NotFoundError("Карточка не найдена", code="dds_card_not_found")
         if call.party is CallParty.BRIGADE:
             short = ctx.services.get(call.service_code, (call.service_code, ""))[0]
-            return await self._actors.brigade(ctx, short, history, text), None
-        return await self._actors.service(ctx, call.target_service or "", history, text), None
+            return await self._actors.brigade(ctx, short, history, text, sink), None
+        return await self._actors.service(ctx, call.target_service or "", history, text, sink), None
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -470,3 +485,8 @@ class PauseCallHandler(_CallBase):
         )
         await self._commit()
         return call.status.value
+
+
+StreamReplicaFactory = Callable[[], AbstractAsyncContextManager[SendReplicaHandler]]
+"""F1: обработчик реплики со своей сессией БД — потоковый ответ живёт дольше запроса, сессия запроса к концу
+потока уже закрыта."""
