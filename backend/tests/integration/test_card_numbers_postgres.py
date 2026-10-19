@@ -52,8 +52,11 @@ async def test_concurrent_cards_get_unique_sequential_numbers() -> None:
                 await s.commit()
                 return card.number
 
-        numbers = await asyncio.gather(*(open_card() for _ in range(OPERATORS)))
-
+        # все открытия доводим до конца (иначе незавершённые транзакции мешают очистке базы)
+        results = await asyncio.gather(*(open_card() for _ in range(OPERATORS)), return_exceptions=True)
+        failed = [repr(r) for r in results if isinstance(r, BaseException)]
+        assert not failed, f"не открылись {len(failed)} из {OPERATORS}: {failed[:3]}"
+        numbers = [r for r in results if isinstance(r, int)]
         assert sorted(numbers) == list(range(NUMBER_BASE + 1, NUMBER_BASE + OPERATORS + 1))
         async with factory() as s:
             stored = (await s.execute(select(IncidentCardModel.number))).scalars().all()

@@ -49,8 +49,11 @@ PROFILES = {
 DDS = {"dds1": "S101", "dds2": "S103"}
 
 
-def client(app: Any, login: str, password: str, arm: str) -> TestClient:
-    c = TestClient(app)
+def client(base: TestClient, login: str, password: str, arm: str) -> TestClient:
+    """Клиент со своей сессией (cookie) на цикле событий `base`. Без общего цикла каждый запрос шёл бы в новом цикле,
+    а пул соединений asyncpg привязан к циклу, в котором создан: на PostgreSQL — «attached to a different loop»."""
+    c = TestClient(base.app)
+    c.portal = base.portal
     r = c.post(f"{API}/auth/login", json={"login": login, "password": password, "arm_number": arm})
     if r.status_code != 200:
         raise SystemExit(f"Вход {login}: {r.status_code} {r.text} — сначала demo-seed с тем же AISKRA_DEMO_PASSWORD")
@@ -240,9 +243,9 @@ def main() -> None:
     rng = random.Random(args.seed)
     app = create_app(settings)
     began = datetime.now(UTC)
-    with TestClient(app):
-        teacher = client(app, "teacher", password, "")
-        users = {u: client(app, u, password, str(i + 1)) for i, u in enumerate(PROFILES)}
+    with TestClient(app) as base:
+        teacher = client(base, "teacher", password, "")
+        users = {u: client(base, u, password, str(i + 1)) for i, u in enumerate(PROFILES)}
         people = {s["login"]: s["id"] for s in teacher.get(f"{API}/training/students").json()}
         today = datetime.now(UTC).replace(hour=7, minute=0, second=0, microsecond=0)  # 10:00 МСК
         days = [round(14 - i * 12 / max(1, args.lessons - 1)) for i in range(args.lessons)]  # 14 … 2 дня назад

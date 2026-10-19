@@ -62,6 +62,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Стенд в docker compose
+        id: stand
         uses: ./.github/actions/compose-stand
         with:
           history-lessons: "2"
@@ -116,13 +117,14 @@ jobs:
         run: uv run --with playwright python -m playwright install --with-deps chromium firefox
 
       - name: Смоук в Chromium
+        id: chromium
         working-directory: backend
         run: >
           uv run --with playwright python tools/browser_smoke.py --browser chromium
           --web "$WEB" --insecure --strict --out ../artifacts/smoke/chromium
 
-      - name: Смоук в Firefox
-        if: success() || failure()
+      - name: Смоук в Firefox   # и после падения Chromium: видно, общий ли дефект
+        if: (success() || failure()) && steps.chromium.outcome != 'skipped'
         working-directory: backend
         run: >
           uv run --with playwright python tools/browser_smoke.py --browser firefox
