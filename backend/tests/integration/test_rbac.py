@@ -7,8 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from tests.integration.conftest import login
-
-PUBLIC = {("POST", "/api/v1/auth/login")}
+from tests.integration.test_security import PUBLIC  # единый список осознанно публичных маршрутов (п. 6.2, F2)
 
 
 def test_every_api_route_requires_session(client: TestClient) -> None:

@@ -23,6 +23,7 @@ class AuditEvent(StrEnum):
 
     LOGIN_SUCCEEDED = "auth.login_succeeded"
     LOGIN_FAILED = "auth.login_failed"
+    DEMO_LOGIN = "auth.demo_login"
     ACCOUNT_LOCKED = "auth.account_locked"
     LOGOUT = "auth.logout"
     ACCESS_DENIED = "auth.access_denied"
@@ -78,6 +79,7 @@ class AuditEvent(StrEnum):
 AUDIT_EVENT_TITLES: Mapping[AuditEvent, str] = {
     AuditEvent.LOGIN_SUCCEEDED: "Вход в систему",
     AuditEvent.LOGIN_FAILED: "Неудачная попытка входа",
+    AuditEvent.DEMO_LOGIN: "Вход на демо-стенде без пароля",
     AuditEvent.ACCOUNT_LOCKED: "Временная блокировка после неудачных попыток входа",
     AuditEvent.LOGOUT: "Выход из системы",
     AuditEvent.ACCESS_DENIED: "Отказ в доступе",

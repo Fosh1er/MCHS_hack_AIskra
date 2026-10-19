@@ -94,9 +94,19 @@ class LoginHandler:
                 )
             await self._reject(cmd, login, "Неверный пароль", AuthenticationError(INVALID_CREDENTIALS), user=user)
 
-        return await self._open_session(cmd, user, arm_number, now)
+        return await self.open_session(user, arm_number=arm_number, meta=cmd.meta, now=now)
 
-    async def _open_session(self, cmd: Login, user: User, arm_number: str | None, now: datetime) -> LoginResult:
+    async def open_session(
+        self,
+        user: User,
+        *,
+        arm_number: str | None,
+        meta: RequestMeta,
+        now: datetime,
+        event: AuditEvent = AuditEvent.LOGIN_SUCCEEDED,
+    ) -> LoginResult:
+        """Открыть сессию проверенному пользователю и записать вход в аудит (общий путь обычного
+        входа и демо-входа F2)."""
         user.register_login(now)
         token = self._tokens.issue()
         session = AuthSession(
@@ -105,8 +115,8 @@ class LoginHandler:
             created_at=now,
             expires_at=now + self._policy.session_ttl,
             arm_number=arm_number,
-            ip=cmd.meta.ip,
-            user_agent=cmd.meta.user_agent,
+            ip=meta.ip,
+            user_agent=meta.user_agent,
         )
         principal = Principal(
             user_id=user.id,
@@ -122,10 +132,10 @@ class LoginHandler:
             await self._sessions.add(session)
             await self._audit.record(
                 AuditEntry(
-                    event=AuditEvent.LOGIN_SUCCEEDED,
+                    event=event,
                     actor=principal,
                     description=f"АРМ {arm_number}" if arm_number else "",
-                    meta=cmd.meta,
+                    meta=meta,
                 )
             )
             await self._uow.commit()

@@ -3,17 +3,23 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Literal
 
-from pydantic import SecretStr
+from pydantic import SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _REPO_ROOT = Path(__file__).resolve().parents[4]
+
+AppEnv = Literal["prod", "demo", "dev"]
+DEMO_ENVS: frozenset[str] = frozenset({"demo", "dev"})
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="AISKRA_", env_file=".env", extra="ignore")
 
-    app_env: str = "dev"
+    # Режим окружения (ADR-0015, F6.3): prod — контур заказчика, demo — публичный стенд, dev — разработка.
+    # Демо-вход (F2) есть только в demo и dev. docker compose по умолчанию запускает prod.
+    app_env: AppEnv = "dev"
     log_level: str = "INFO"
     database_url: str = "postgresql+asyncpg://aiskra:aiskra@localhost:5432/aiskra"
     ai_config_path: str = str(_REPO_ROOT / "config" / "ai.yaml")
@@ -38,6 +44,20 @@ class Settings(BaseSettings):
     bootstrap_admin_login: str = "admin"
     bootstrap_admin_password: SecretStr | None = None
     bootstrap_admin_name: str = "Администратор системы"
+    # Демо-стенд (F2): пароль демо-учёток (тот же, что для `demo-seed`) и показ его на странице входа.
+    # Пароль уходит в API только при demo_show_password=true и только в режиме demo/dev.
+    demo_password: SecretStr | None = None
+    demo_show_password: bool = False
+
+    @field_validator("app_env", mode="before")
+    @classmethod
+    def _normalize_env(cls, value: object) -> object:
+        return value.strip().lower() if isinstance(value, str) else value
+
+    @property
+    def demo_enabled(self) -> bool:
+        """Демо-вход и демо-учётки на странице входа (F2): только в режимах demo и dev."""
+        return self.app_env in DEMO_ENVS
 
     @property
     def classifier_path(self) -> Path:

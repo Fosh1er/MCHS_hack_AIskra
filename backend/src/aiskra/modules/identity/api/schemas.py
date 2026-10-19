@@ -18,6 +18,26 @@ class LoginIn(BaseModel):
     arm_number: str | None = Field(default=None, max_length=16, description="Номер АРМ, как на экране входа АРМ-112")
 
 
+class DemoLoginIn(BaseModel):
+    login: str = Field(min_length=1, max_length=64)
+
+
+class DemoAccountOut(BaseModel):
+    login: str
+    role: Role
+    title: str = Field(description="Роль на стенде: «Оператор 112», «Диспетчер ДДС · пожарная»…")
+    full_name: str
+    hint: list[str] = Field(description="Что посмотреть под этой учёткой (1–2 строки)")
+    arm_number: str | None = Field(description="Номер АРМ, с которым откроется сессия")
+
+
+class DemoAccountsOut(BaseModel):
+    accounts: list[DemoAccountOut]
+    password: str | None = Field(
+        default=None, description="Пароль демо-учёток — только при AISKRA_DEMO_SHOW_PASSWORD=true"
+    )
+
+
 class MeOut(BaseModel):
     user_id: UUID
     login: str

@@ -704,11 +704,47 @@
 .arm-login__btn:disabled { opacity: .7; }
 .arm-login__error { margin-top: 14px; padding: 8px 10px; background: var(--c-wine-600); color: var(--text-inverse); font-size: var(--fs-sm); }
 .arm-login__hint { margin-top: 18px; font-size: var(--fs-xs); color: var(--text-inverse); opacity: .85; }
+
+/* ---- Вход: демо-стенд (F2) — лента и учётки одной кнопкой --------------- */
+.arm-login__side { padding: 24px 100px 24px 0; }
+.arm-login__side .arm-login__form { padding-right: 0; }
+.arm-login__ribbon {
+  margin-bottom: 28px; padding: 6px 10px;
+  background: var(--accent-112); color: var(--text-inverse);
+  font-size: var(--fs-sm); font-weight: var(--fw-bold); letter-spacing: .02em;
+}
+.arm-demo { margin-top: 32px; }
+.arm-demo__title { margin: 0 0 4px; font-size: var(--fs-lg); font-weight: var(--fw-medium); }
+.arm-demo__note { margin: 0 0 12px; font-size: var(--fs-xs); opacity: .85; }
+.arm-demo__note code { font-size: var(--fs-sm); user-select: all; }
+.arm-demo__list { display: grid; gap: var(--sp-2); margin: 0; padding: 0; list-style: none; }
+.arm-demo__card {
+  display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; gap: var(--sp-3); align-items: center;
+  padding: 10px 12px; background: var(--c-white); color: var(--text);
+}
+.arm-demo__card > .i { color: var(--accent); }
+.arm-demo__role { font-size: var(--fs-md); font-weight: var(--fw-bold); color: var(--text-strong); }
+.arm-demo__name { font-size: var(--fs-sm); color: var(--text-muted); }
+.arm-demo__hint { margin: 4px 0 0; padding: 0; list-style: none; font-size: var(--fs-xs); color: var(--text-muted); line-height: var(--lh-base); }
+.arm-demo__btn {
+  min-width: 84px; height: 32px; padding: 0 14px; border: 0;
+  background: var(--c-grey-600); color: var(--text-inverse);
+  font-size: var(--fs-sm); font-weight: var(--fw-bold); letter-spacing: .04em;
+}
+.arm-demo__btn:enabled { cursor: pointer; }
+.arm-demo__btn:enabled:hover { background: var(--c-orange-600); }
+.arm-demo__btn:disabled { opacity: .7; }
+
 @media (max-width: 900px) {
   .arm-login { grid-template-columns: 1fr; padding: 24px 16px; }
   .arm-login__form { padding-right: 0; }
+  .arm-login__side { padding: 0; }
   .arm-login__num { font-size: 64px; }
   .arm-login__caption { font-size: 22px; }
+}
+@media (max-width: 480px) {
+  .arm-demo__card { grid-template-columns: 24px minmax(0, 1fr); }
+  .arm-demo__btn { grid-column: 1 / -1; width: 100%; }
 }
 
 /* ---- Меню разделов АРМ (журнал, статистика, аудит…) ------------------- */

@@ -18,7 +18,7 @@ from aiskra.bootstrap import build_services, daily_backup_loop, wire
 from aiskra.modules.assessment.api.router import router as assessment_router
 from aiskra.modules.audit.api.router import router as audit_router
 from aiskra.modules.dictionaries.api.router import router as dictionaries_router
-from aiskra.modules.identity.api.router import auth_router, groups_router, users_router
+from aiskra.modules.identity.api.router import auth_router, demo_router, groups_router, users_router
 from aiskra.modules.incidents.api.router import router as incidents_router
 from aiskra.modules.system.api.router import router as system_router
 from aiskra.modules.training.api.router import router as training_router
@@ -112,10 +112,13 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
         return JSONResponse(status_code=status, content={"error": exc.code, "message": exc.message})
 
     # Запрет по умолчанию (ADR-0010): всё под /api/v1 требует сессии, кроме /auth (вход публичный,
-    # остальные эндпоинты /auth сами требуют пользователя). Права уточняются require(...) в роутерах.
+    # остальные эндпоинты /auth сами требуют пользователя; демо-вход F2 публичен только в demo и dev).
+    # Права уточняются require(...) в роутерах.
     signed_in = [Depends(provide_principal)]
     app.include_router(health_router)
     app.include_router(auth_router, prefix=settings.api_prefix)
+    if settings.demo_enabled:  # F2: демо-вход без пароля — только demo и dev; в prod маршрутов нет (404)
+        app.include_router(demo_router, prefix=settings.api_prefix)
     app.include_router(users_router, prefix=settings.api_prefix, dependencies=signed_in)
     app.include_router(groups_router, prefix=settings.api_prefix, dependencies=signed_in)
     app.include_router(audit_router, prefix=settings.api_prefix, dependencies=signed_in)

@@ -61,7 +61,7 @@ cd backend && uv run python -m aiskra.cli create-user --login admin --full-name 
 10. **Язык.** Интерфейс, сообщения об ошибках, докстринги и документация — по-русски. Идентификаторы в коде — по-английски.
 
 ## Безопасность (п. 0.3, ADR-0010) — обязательно для каждого эндпоинта
-- **Всё под `/api/v1` требует входа по умолчанию** (подключение роутеров в `main.py`). Публичен только `POST /auth/login`.
+- **Всё под `/api/v1` требует входа по умолчанию** (подключение роутеров в `main.py`). Публичен только `POST /auth/login` (и демо-вход F2 — только в режимах demo и dev).
 - **Право, а не роль:**
   - `Depends(require(Permission.X))` на роутере или эндпоинте;
   - нужен сам пользователь — `actor: Annotated[Principal, Depends(require(...))]` или `CurrentPrincipal`.
@@ -70,6 +70,7 @@ cd backend && uv run python -m aiskra.cli create-user --login admin --full-name 
 - **Команда от имени пользователя** несёт `actor: Principal` и `meta: RequestMeta` (в API — зависимость `Meta` из `shared/web.py`).
 - **Поиск по тексту** — только по ключам `shared/text.py:search_key`, сохранённым при записи. Не используйте `func.lower()`: он зависит от локали PostgreSQL.
 - **Проверено автотестом:** любой маршрут `/api/v1` без сессии отвечает 401 (`test_security.py`). Публичный маршрут — только осознанно, с добавлением в `PUBLIC` теста.
+- **Режимы окружения** — `AISKRA_APP_ENV = prod | demo | dev` (`settings.demo_enabled`, ADR-0015; docker compose по умолчанию — `prod`). Демо-вход без пароля (F2: `GET /auth/demo-accounts`, `POST /auth/demo-login`, `identity/api/router.py:demo_router`) подключается только в demo/dev, в prod маршрутов нет (404). Входят только учётки `demo_seed.py:DEMO_USERS`, админа там быть не должно; пароль в API — только при `AISKRA_DEMO_SHOW_PASSWORD=true`.
 - **Заголовки безопасности** ставит `platform/security_headers.py`; ответы API — `no-store`. Непредвиденная ошибка → единый 500 без подробностей.
 - **Журнал аудита** не редактируется; удаление — только очистка старше срока (не меньше 183 дней, `PurgeAudit`).
 - **Интеграционные тесты:** фикстуры `admin`, `client`, `app_client` и функция `login(client, "student")` в `tests/integration/conftest.py`. Пользователи трёх ролей создаются автоматически.
