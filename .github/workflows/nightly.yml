@@ -1,0 +1,139 @@
+# Ночной CI (F6.4, F6.6): повторы тестов ловят нестабильные (D4), уменьшенный нагрузочный тест на PostgreSQL (D3).
+name: nightly
+
+on:
+  schedule:
+    - cron: "0 1 * * *"   # 04:00 МСК
+  workflow_dispatch:
+    inputs:
+      runs:
+        description: сколько раз подряд прогнать pytest
+        default: "20"
+      duration:
+        description: секунд смешанной нагрузки
+        default: "60"
+
+concurrency:
+  group: nightly-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  repeat-tests:
+    name: pytest × ${{ inputs.runs || '20' }} (нестабильные тесты)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      RUNS: ${{ inputs.runs || '20' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+      - run: make be-install
+
+      - name: Прогоны pytest подряд
+        working-directory: backend
+        run: |
+          out=../artifacts/pytest
+          mkdir -p "$out"
+          for i in $(seq -w 1 "$RUNS"); do
+            start=$(date +%s)
+            if uv run pytest -q -p no:cacheprovider --junitxml="$out/run-$i.xml" > "$out/run-$i.log" 2>&1; then
+              status="зелёный"
+            else
+              status="ЕСТЬ ПАДЕНИЯ"
+            fi
+            echo "прогон $i: $status, $(( $(date +%s) - start )) с — $(tail -n 1 "$out/run-$i.log")"
+          done
+
+      - name: Отчёт о падениях
+        if: always()
+        run: python3 .github/scripts/pytest_repeat_report.py artifacts/pytest | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Результаты прогонов
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-repeat-${{ github.run_id }}
+          path: artifacts/pytest/
+          retention-days: 30
+
+  loadtest:
+    name: нагрузочный тест на PostgreSQL (compose)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      DURATION: ${{ inputs.duration || '60' }}
+      CARDS: "20000"     # ≈ 5 месяцев работы учебного центра (полный замер — 50 000 и 200 000 аудита)
+      AUDIT: "80000"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Стенд в docker compose (+100 нагрузочных учёток)
+        uses: ./.github/actions/compose-stand
+        with:
+          load-users: "100"
+
+      - name: Объём данных — bulk_seed
+        run: |
+          start=$(date +%s)
+          docker compose exec -T backend python tools/bulk_seed.py --cards "$CARDS" --audit "$AUDIT"
+          echo "bulk_seed: $(( $(date +%s) - start )) с"
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+
+      - name: Нагрузочный тест (пороги F6.6 — p95 ≤ 2 с, 5xx = 0)
+        working-directory: backend
+        run: |
+          mkdir -p ../artifacts/loadtest
+          uv run python tools/loadtest.py --base https://localhost:8443 --insecure \
+            --users 100 --sessions 20 --duration "$DURATION" --write-seconds 15 \
+            --max-p95-ms 2000 --max-5xx 0 \
+            --out ../artifacts/loadtest/loadtest-result.json --summary "$GITHUB_STEP_SUMMARY" \
+            2>&1 | tee ../artifacts/loadtest/loadtest.txt
+
+      - name: Ресурсы — память контейнеров и размер таблиц
+        if: success() || failure()
+        run: |
+          mkdir -p artifacts/loadtest
+          docker stats --no-stream --format 'table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}' | tee artifacts/loadtest/docker-stats.txt
+          docker compose exec -T db psql -U aiskra -d aiskra -c "
+            select relname as \"таблица\", n_live_tup as \"строк\",
+                   pg_size_pretty(pg_total_relation_size(relid)) as \"размер\"
+            from pg_stat_user_tables order by pg_total_relation_size(relid) desc limit 12" \
+            | tee artifacts/loadtest/table-sizes.txt
+          docker compose exec -T db psql -U aiskra -d aiskra -Atc \
+            "select pg_size_pretty(pg_database_size('aiskra'))" | sed 's/^/база: /' | tee -a artifacts/loadtest/table-sizes.txt
+          {
+            echo "#### Ресурсы после прогона"
+            echo '```'
+            cat artifacts/loadtest/docker-stats.txt
+            echo
+            cat artifacts/loadtest/table-sizes.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Журналы docker compose
+        if: always()
+        run: mkdir -p artifacts/loadtest && { docker compose logs --no-color --timestamps > artifacts/loadtest/compose-logs.txt 2>&1 || true; }
+
+      - name: Результат нагрузочного теста
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: loadtest-postgres-${{ github.run_id }}
+          path: artifacts/loadtest/
+          retention-days: 30
+
+      - name: Остановить стенд
+        if: always()
+        run: docker compose down -v

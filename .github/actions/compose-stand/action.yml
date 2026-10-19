@@ -1,0 +1,58 @@
+name: Стенд в docker compose
+description: >
+  .env с тестовыми паролями (генерируются здесь, не секреты репозитория), сборка и запуск docker compose
+  с PostgreSQL в режиме demo, миграции с нуля, справочники, адреса и demo-seed (F6.4).
+inputs:
+  load-users:
+    description: учётки load001…loadNNN для нагрузочного теста (0 — не создавать)
+    default: "0"
+outputs:
+  demo-password:
+    description: пароль демо-учёток (замаскирован в журнале)
+    value: ${{ steps.env.outputs.demo-password }}
+runs:
+  using: composite
+  steps:
+    - name: .env с тестовыми паролями
+      id: env
+      shell: bash
+      run: |
+        gen() { openssl rand -hex 16; }
+        db=$(gen); admin=$(gen); demo=$(gen)
+        echo "::add-mask::$db"; echo "::add-mask::$admin"; echo "::add-mask::$demo"
+        cat > .env <<EOF
+        AISKRA_APP_ENV=demo
+        POSTGRES_PASSWORD=$db
+        AISKRA_BOOTSTRAP_ADMIN_PASSWORD=$admin
+        AISKRA_DEMO_PASSWORD=$demo
+        EOF
+        echo "AISKRA_DEMO_PASSWORD=$demo" >> "$GITHUB_ENV"
+        echo "demo-password=$demo" >> "$GITHUB_OUTPUT"
+
+    - name: docker compose build
+      shell: bash
+      run: docker compose build
+
+    - name: docker compose up (PostgreSQL, backend, nginx)
+      shell: bash
+      run: |
+        docker compose up -d --wait --wait-timeout 240 || { docker compose ps; docker compose logs; exit 1; }
+        docker compose ps
+
+    - name: Миграции с нуля применены, схема совпадает с моделями
+      shell: bash
+      run: |
+        # alembic upgrade head выполняет команда запуска backend на пустой базе; проверяем, что база на head
+        docker compose exec -T backend alembic current | tee /tmp/alembic-current.txt
+        grep -q "(head)" /tmp/alembic-current.txt
+        # модели ORM и миграции не расходятся на PostgreSQL (новых операций autogenerate нет)
+        docker compose exec -T backend alembic check
+
+    - name: Справочники, адреса, demo-seed
+      shell: bash
+      run: |
+        docker compose exec -T backend python -m aiskra.cli import-dictionaries > /tmp/import-dictionaries.json
+        docker compose exec -T backend python -m aiskra.cli import-addresses > /tmp/import-addresses.json
+        args=()
+        [ "${{ inputs.load-users }}" != "0" ] && args=(--load-users "${{ inputs.load-users }}")
+        docker compose exec -T backend python -m aiskra.cli demo-seed "${args[@]}"
