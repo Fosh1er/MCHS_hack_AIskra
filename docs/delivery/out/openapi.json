@@ -164,6 +164,68 @@
     }
    }
   },
+  "/api/v1/auth/demo-accounts": {
+   "get": {
+    "tags": [
+     "auth"
+    ],
+    "summary": "Демо-учётки для страницы входа (публичный; только режимы demo и dev, F2)",
+    "operationId": "demo_accounts_api_v1_auth_demo_accounts_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/DemoAccountsOut"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/auth/demo-login": {
+   "post": {
+    "tags": [
+     "auth"
+    ],
+    "summary": "Демо-вход одной кнопкой без пароля (публичный; только режимы demo и dev, F2)",
+    "operationId": "demo_login_api_v1_auth_demo_login_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/DemoLoginIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/LoginOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/users": {
    "get": {
     "tags": [
@@ -3237,6 +3299,24 @@
       }
      },
      {
+      "name": "psy",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "any — с профилем, none — без, иначе id профиля (F4)",
+       "title": "Psy"
+      },
+      "description": "any — с профилем, none — без, иначе id профиля (F4)"
+     },
+     {
       "name": "page",
       "in": "query",
       "required": false,
@@ -3710,6 +3790,162 @@
     }
    }
   },
+  "/api/v1/training/calls/{call_id}/replicas/stream": {
+   "post": {
+    "tags": [
+     "training"
+    ],
+    "summary": "Реплика оператора → ответ ИИ-собеседника потоком SSE (F1)",
+    "description": "События: `accepted` → `state` (состояние заявителя до ответа) → `model` (ответ пишет модель; нет события — ответ по правилам) → `token`* / `remark`* → `replace`? (ответ модели отклонён проверкой, итоговый текст — в `final`) → `final` (как ответ `POST /replicas` + `metrics`) или `error`. Сохранение — после ответа целиком; обрыв соединения генерацию не отменяет, чтобы реплика не потерялась.",
+    "operationId": "replica_stream_api_v1_training_calls__call_id__replicas_stream_post",
+    "parameters": [
+     {
+      "name": "call_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Call Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ReplicaIn"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/training/calls/{call_id}/speak": {
+   "get": {
+    "tags": [
+     "training"
+    ],
+    "summary": "Озвучить фразу потокового ответа голосом собеседника (F1)",
+    "operationId": "speak_fragment_api_v1_training_calls__call_id__speak_get",
+    "parameters": [
+     {
+      "name": "call_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Call Id"
+      }
+     },
+     {
+      "name": "text",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 400,
+       "title": "Text"
+      }
+     },
+     {
+      "name": "emotion",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "maxLength": 20
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Emotion"
+      }
+     },
+     {
+      "name": "pace",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "maxLength": 12,
+       "default": "normal",
+       "title": "Pace"
+      }
+     },
+     {
+      "name": "volume",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "maxLength": 12,
+       "default": "normal",
+       "title": "Volume"
+      }
+     },
+     {
+      "name": "breathing",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "maxLength": 12,
+       "default": "calm",
+       "title": "Breathing"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       },
+       "audio/wav": {},
+       "audio/mpeg": {}
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/training/speech": {
    "get": {
     "tags": [
@@ -3997,6 +4233,27 @@
          },
          "type": "array",
          "title": "Response Psy Profiles Api V1 Training Psy Profiles Get"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/training/psy/methodology": {
+   "get": {
+    "tags": [
+     "training"
+    ],
+    "summary": "Методика модификатора: научно-методическая основа и профили карточками (F4)",
+    "operationId": "psy_methodology_api_v1_training_psy_methodology_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/MethodologyView"
         }
        }
       }
@@ -5089,6 +5346,27 @@
     }
    }
   },
+  "/api/v1/assessment/psy/basis": {
+   "get": {
+    "tags": [
+     "assessment"
+    ],
+    "summary": "Блок «Работа с заявителем»: почему важен каждый критерий и источники запретов (F4)",
+    "operationId": "psy_basis_api_v1_assessment_psy_basis_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/PsyBasisView"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/assessment/{assessment_id}/override": {
    "post": {
     "tags": [
@@ -5873,6 +6151,34 @@
     ],
     "title": "AIConfigOut"
    },
+   "ActItem": {
+    "properties": {
+     "code": {
+      "type": "string",
+      "title": "Code"
+     },
+     "title": {
+      "type": "string",
+      "title": "Title"
+     },
+     "key": {
+      "type": "boolean",
+      "title": "Key",
+      "default": false
+     },
+     "critical": {
+      "type": "boolean",
+      "title": "Critical",
+      "default": false
+     }
+    },
+    "type": "object",
+    "required": [
+     "code",
+     "title"
+    ],
+    "title": "ActItem"
+   },
    "AddressImportReport": {
     "properties": {
      "source_file": {
@@ -6603,6 +6909,57 @@
      "created_at"
     ],
     "title": "BackupInfo"
+   },
+   "BasisRow": {
+    "properties": {
+     "key": {
+      "type": "string",
+      "title": "Key"
+     },
+     "title": {
+      "type": "string",
+      "title": "Title"
+     },
+     "why": {
+      "type": "string",
+      "title": "Why"
+     },
+     "sources": {
+      "items": {
+       "additionalProperties": {
+        "type": "string"
+       },
+       "type": "object"
+      },
+      "type": "array",
+      "title": "Sources"
+     }
+    },
+    "type": "object",
+    "required": [
+     "key",
+     "title",
+     "why",
+     "sources"
+    ],
+    "title": "BasisRow"
+   },
+   "BasisView": {
+    "properties": {
+     "source": {
+      "$ref": "#/components/schemas/SourceView"
+     },
+     "use": {
+      "type": "string",
+      "title": "Use"
+     }
+    },
+    "type": "object",
+    "required": [
+     "source",
+     "use"
+    ],
+    "title": "BasisView"
    },
    "Benchmark": {
     "properties": {
@@ -8426,6 +8783,99 @@
     ],
     "title": "DebriefView"
    },
+   "DemoAccountOut": {
+    "properties": {
+     "login": {
+      "type": "string",
+      "title": "Login"
+     },
+     "role": {
+      "$ref": "#/components/schemas/Role"
+     },
+     "title": {
+      "type": "string",
+      "title": "Title",
+      "description": "Роль на стенде: «Оператор 112», «Диспетчер ДДС · пожарная»…"
+     },
+     "full_name": {
+      "type": "string",
+      "title": "Full Name"
+     },
+     "hint": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Hint",
+      "description": "Что посмотреть под этой учёткой (1–2 строки)"
+     },
+     "arm_number": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Arm Number",
+      "description": "Номер АРМ, с которым откроется сессия"
+     }
+    },
+    "type": "object",
+    "required": [
+     "login",
+     "role",
+     "title",
+     "full_name",
+     "hint",
+     "arm_number"
+    ],
+    "title": "DemoAccountOut"
+   },
+   "DemoAccountsOut": {
+    "properties": {
+     "accounts": {
+      "items": {
+       "$ref": "#/components/schemas/DemoAccountOut"
+      },
+      "type": "array",
+      "title": "Accounts"
+     },
+     "password": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Password",
+      "description": "Пароль демо-учёток — только при AISKRA_DEMO_SHOW_PASSWORD=true"
+     }
+    },
+    "type": "object",
+    "required": [
+     "accounts"
+    ],
+    "title": "DemoAccountsOut"
+   },
+   "DemoLoginIn": {
+    "properties": {
+     "login": {
+      "type": "string",
+      "maxLength": 64,
+      "minLength": 1,
+      "title": "Login"
+     }
+    },
+    "type": "object",
+    "required": [
+     "login"
+    ],
+    "title": "DemoLoginIn"
+   },
    "DistrictRow": {
     "properties": {
      "code": {
@@ -9955,6 +10405,29 @@
     "title": "JournalRow",
     "description": "Строка «Списка происшествий» (`image57`)."
    },
+   "LevelSign": {
+    "properties": {
+     "level": {
+      "type": "integer",
+      "title": "Level"
+     },
+     "title": {
+      "type": "string",
+      "title": "Title"
+     },
+     "text": {
+      "type": "string",
+      "title": "Text"
+     }
+    },
+    "type": "object",
+    "required": [
+     "level",
+     "title",
+     "text"
+    ],
+    "title": "LevelSign"
+   },
    "LogRecord": {
     "properties": {
      "at": {
@@ -10422,6 +10895,51 @@
      "at"
     ],
     "title": "MessageView"
+   },
+   "MethodologyView": {
+    "properties": {
+     "version": {
+      "type": "integer",
+      "title": "Version"
+     },
+     "scale": {
+      "items": {
+       "$ref": "#/components/schemas/ScaleLevel"
+      },
+      "type": "array",
+      "title": "Scale"
+     },
+     "basis": {
+      "items": {
+       "$ref": "#/components/schemas/BasisView"
+      },
+      "type": "array",
+      "title": "Basis"
+     },
+     "profiles": {
+      "items": {
+       "$ref": "#/components/schemas/ProfileCard"
+      },
+      "type": "array",
+      "title": "Profiles"
+     },
+     "sources": {
+      "additionalProperties": {
+       "$ref": "#/components/schemas/SourceView"
+      },
+      "type": "object",
+      "title": "Sources"
+     }
+    },
+    "type": "object",
+    "required": [
+     "version",
+     "scale",
+     "basis",
+     "profiles",
+     "sources"
+    ],
+    "title": "MethodologyView"
    },
    "MonitorRow": {
     "properties": {
@@ -11288,6 +11806,94 @@
     ],
     "title": "ProbeResponse"
    },
+   "ProfileCard": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "title": "Id"
+     },
+     "title": {
+      "type": "string",
+      "title": "Title"
+     },
+     "group": {
+      "type": "string",
+      "title": "Group"
+     },
+     "group_title": {
+      "type": "string",
+      "title": "Group Title"
+     },
+     "sensitive": {
+      "type": "boolean",
+      "title": "Sensitive"
+     },
+     "start": {
+      "type": "integer",
+      "title": "Start"
+     },
+     "floor": {
+      "type": "integer",
+      "title": "Floor"
+     },
+     "deescalates": {
+      "type": "boolean",
+      "title": "Deescalates"
+     },
+     "signs": {
+      "items": {
+       "$ref": "#/components/schemas/LevelSign"
+      },
+      "type": "array",
+      "title": "Signs"
+     },
+     "does": {
+      "items": {
+       "$ref": "#/components/schemas/ActItem"
+      },
+      "type": "array",
+      "title": "Does"
+     },
+     "donts": {
+      "items": {
+       "$ref": "#/components/schemas/ActItem"
+      },
+      "type": "array",
+      "title": "Donts"
+     },
+     "routing": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Routing"
+     },
+     "sources": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Sources"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "title",
+     "group",
+     "group_title",
+     "sensitive",
+     "start",
+     "floor",
+     "deescalates",
+     "signs",
+     "does",
+     "donts",
+     "routing",
+     "sources"
+    ],
+    "title": "ProfileCard"
+   },
    "ProgressView": {
     "properties": {
      "points": {
@@ -11349,6 +11955,30 @@
      "recent_errors"
     ],
     "title": "ProgressView"
+   },
+   "PsyBasisView": {
+    "properties": {
+     "criteria": {
+      "items": {
+       "$ref": "#/components/schemas/BasisRow"
+      },
+      "type": "array",
+      "title": "Criteria"
+     },
+     "acts": {
+      "items": {
+       "$ref": "#/components/schemas/BasisRow"
+      },
+      "type": "array",
+      "title": "Acts"
+     }
+    },
+    "type": "object",
+    "required": [
+     "criteria",
+     "acts"
+    ],
+    "title": "PsyBasisView"
    },
    "PsyProfileOut": {
     "properties": {
@@ -12168,6 +12798,24 @@
     ],
     "title": "SaveCardIn"
    },
+   "ScaleLevel": {
+    "properties": {
+     "level": {
+      "type": "integer",
+      "title": "Level"
+     },
+     "title": {
+      "type": "string",
+      "title": "Title"
+     }
+    },
+    "type": "object",
+    "required": [
+     "level",
+     "title"
+    ],
+    "title": "ScaleLevel"
+   },
    "ScenarioPage": {
     "properties": {
      "items": {
@@ -12784,6 +13432,9 @@
       },
       "type": "array",
       "title": "Score Series"
+     },
+     "psy_errors": {
+      "$ref": "#/components/schemas/StressErrors"
      }
     },
     "type": "object",
@@ -13011,6 +13662,56 @@
     ],
     "title": "SettingsIn"
    },
+   "SourceView": {
+    "properties": {
+     "code": {
+      "type": "string",
+      "title": "Code"
+     },
+     "short": {
+      "type": "string",
+      "title": "Short"
+     },
+     "title": {
+      "type": "string",
+      "title": "Title"
+     },
+     "url": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Url"
+     },
+     "official": {
+      "type": "boolean",
+      "title": "Official"
+     },
+     "doc": {
+      "type": "string",
+      "title": "Doc"
+     },
+     "section": {
+      "type": "string",
+      "title": "Section"
+     }
+    },
+    "type": "object",
+    "required": [
+     "code",
+     "short",
+     "title",
+     "url",
+     "official",
+     "doc",
+     "section"
+    ],
+    "title": "SourceView"
+   },
    "SpeechOut": {
     "properties": {
      "text": {
@@ -13137,6 +13838,77 @@
      "status"
     ],
     "title": "StatusOut"
+   },
+   "StressError": {
+    "properties": {
+     "code": {
+      "type": "string",
+      "title": "Code"
+     },
+     "title": {
+      "type": "string",
+      "title": "Title"
+     },
+     "count": {
+      "type": "integer",
+      "title": "Count"
+     },
+     "calls": {
+      "type": "integer",
+      "title": "Calls"
+     },
+     "students": {
+      "type": "integer",
+      "title": "Students"
+     },
+     "why": {
+      "type": "string",
+      "title": "Why"
+     },
+     "sources": {
+      "items": {
+       "additionalProperties": {
+        "type": "string"
+       },
+       "type": "object"
+      },
+      "type": "array",
+      "title": "Sources"
+     }
+    },
+    "type": "object",
+    "required": [
+     "code",
+     "title",
+     "count",
+     "calls",
+     "students",
+     "why",
+     "sources"
+    ],
+    "title": "StressError"
+   },
+   "StressErrors": {
+    "properties": {
+     "calls": {
+      "type": "integer",
+      "title": "Calls"
+     },
+     "items": {
+      "items": {
+       "$ref": "#/components/schemas/StressError"
+      },
+      "type": "array",
+      "title": "Items"
+     }
+    },
+    "type": "object",
+    "required": [
+     "calls",
+     "items"
+    ],
+    "title": "StressErrors",
+    "description": "Типичные ошибки работы со стрессом по группе: топ запрещённых действий из лент разбора `details.psy`."
    },
    "StudentProfileView": {
     "properties": {
