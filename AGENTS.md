@@ -72,6 +72,11 @@ make e2e                             # F6.5: сквозные сценарии �
 - **Поиск по тексту** — только по ключам `shared/text.py:search_key`, сохранённым при записи. Не используйте `func.lower()`: он зависит от локали PostgreSQL.
 - **Проверено автотестом:** любой маршрут `/api/v1` без сессии отвечает 401 (`test_security.py`). Публичный маршрут — только осознанно, с добавлением в `PUBLIC` теста.
 - **Режимы окружения** — `AISKRA_APP_ENV = prod | demo | dev` (`settings.demo_enabled`, ADR-0015; docker compose по умолчанию — `prod`). Демо-вход без пароля (F2: `GET /auth/demo-accounts`, `POST /auth/demo-login`, `identity/api/router.py:demo_router`) подключается только в demo/dev, в prod маршрутов нет (404). Входят только учётки `demo_seed.py:DEMO_USERS`, админа там быть не должно; пароль в API — только при `AISKRA_DEMO_SHOW_PASSWORD=true`.
+- **prod (F6.3, ADR-0015):**
+  - запуск отклоняется при небезопасных настройках — `platform/startup_checks.py:check_startup` (в `create_app` и `cli check-config`, коды `cookie_insecure`, `db_password`, `admin_password`, `external_ai`; переопределение одно — `AISKRA_PROD_ALLOW_HTTP`); в demo/dev — предупреждения;
+  - Swagger и `/openapi.json` — только `system.manage` (`platform/api_docs.py`); маршрутов `/dev` нет, «ИИ-модели» — `/admin/ai`;
+  - `/health` — `env`, `version` (`AISKRA_VERSION`, build-arg образа), `started_at`. Новая проверка настроек — код в `find_problems` и тест в `unit/test_startup_checks.py`;
+  - интеграционные тесты prod: `session_cookie_secure=True`, иначе `create_app` откажет.
 - **Заголовки безопасности** ставит `platform/security_headers.py`; ответы API — `no-store`. Непредвиденная ошибка → единый 500 без подробностей.
 - **Журнал аудита** не редактируется; удаление — только очистка старше срока (не меньше 183 дней, `PurgeAudit`).
 - **Интеграционные тесты:** фикстуры `admin`, `client`, `app_client` и функция `login(client, "student")` в `tests/integration/conftest.py`. Пользователи трёх ролей создаются автоматически.

@@ -44,6 +44,10 @@ def make_settings(db_path: Path) -> Settings:
         ai_config_path=str(REPO / "config" / "absent.yaml"),
         password_scrypt_n=1024,  # быстрее в тестах; в проде — 2**14
         login_max_attempts=3,
+        # D4: без фоновой ежедневной копии. Иначе приложение модуля, прожившее под нагрузкой больше минуты, в
+        # случайный момент выгружает всю базу и пишет «Создана резервная копия» в аудит (после 03:00 МСК) — исход
+        # теста зависел от времени и загрузки машины. Логику копии проверяет unit/test_daily_backup.py.
+        scheduler_enabled=False,
     )
 
 

@@ -90,9 +90,11 @@ flowchart LR
 
 ```bash
 cp .env.example .env
-# в .env задайте AISKRA_BOOTSTRAP_ADMIN_PASSWORD (от 8 символов) и POSTGRES_PASSWORD;
-# AISKRA_APP_ENV: prod — контур заказчика (по умолчанию), demo — публичный демо-стенд (вход в роль одной кнопкой)
-docker compose up --build -d
+# в .env задайте AISKRA_BOOTSTRAP_ADMIN_PASSWORD (от 12 символов, 3 вида символов из 4) и свой POSTGRES_PASSWORD;
+# AISKRA_APP_ENV: prod — контур заказчика (по умолчанию), demo — публичный демо-стенд (вход в роль одной кнопкой).
+# В prod с паролем БД по умолчанию, слабым паролем администратора или cookie без Secure backend не запустится
+# и напишет в лог, что исправить (ADR-0015); проверка заранее — docker compose run --rm backend python -m aiskra.cli check-config
+make up        # = docker compose up --build -d + версия (sha коммита) в /health
 ```
 
 Откройте `https://localhost:8443` (адрес `http://…:8080` перенаправляет на HTTPS). Сертификат самоподписанный, браузер предупредит один раз; свой сертификат кладётся в том `tls`. Имя или IP сервера для сертификата — переменная `TLS_SAN`, например `DNS:aiskra.local,IP:10.0.0.5`.

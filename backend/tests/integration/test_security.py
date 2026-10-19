@@ -38,7 +38,7 @@ def test_every_api_route_requires_session(settings: Settings) -> None:
 
 def test_demo_public_routes_absent_in_prod(settings: Settings) -> None:
     """RF2-08: в prod демо-маршрутов нет — 404 и в схеме API их нет; публичен только вход по паролю."""
-    app = create_app(settings.model_copy(update={"app_env": "prod"}))
+    app = create_app(settings.model_copy(update={"app_env": "prod", "session_cookie_secure": True}))
     paths = app.openapi()["paths"]
     routes = {(m.upper(), p) for p, ops in paths.items() if p.startswith("/api/") for m in ops}
     assert not routes & DEMO_ONLY and routes >= PUBLIC - DEMO_ONLY
@@ -47,6 +47,19 @@ def test_demo_public_routes_absent_in_prod(settings: Settings) -> None:
             assert c.request(method, path, json={"login": "teacher"}).status_code == 404, path
     dev = {(m.upper(), p) for p, ops in create_app(settings).openapi()["paths"].items() for m in ops}
     assert dev >= DEMO_ONLY  # в dev (и demo) маршруты есть и проверены первым тестом как публичные
+
+
+def test_prod_public_routes_outside_api(settings: Settings) -> None:
+    """F6.3: в prod вне /api без входа доступен только /health; /docs и /openapi.json — 401 (только администратору),
+    маршрутов /dev нет. Новый публичный маршрут вне /api — только осознанно, с правкой этого теста."""
+    app = create_app(settings.model_copy(update={"app_env": "prod", "session_cookie_secure": True}))
+    # роутеры подключаются лениво: маршруты схемы — из openapi(), служебные (/docs) — из app.routes
+    paths = set(app.openapi()["paths"]) | {p for r in app.routes if (p := getattr(r, "path", ""))}
+    outside = {p for p in paths if not p.startswith("/api/")}
+    assert outside == {"/health", "/docs", "/openapi.json"}
+    with TestClient(app) as c:
+        assert c.get("/health").status_code == 200
+        assert c.get("/docs").status_code == 401 and c.get("/openapi.json").status_code == 401
 
 
 def test_security_headers_and_hsts(settings: Settings) -> None:

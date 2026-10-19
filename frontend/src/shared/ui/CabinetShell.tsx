@@ -37,7 +37,7 @@ export const NAV: Record<'teacher' | 'admin' | 'student', { role: string; items:
       { id: 'materials', label: 'Учебные материалы', icon: 'library', href: '/teacher/materials' },
       { id: 'audit', label: 'Аудит', icon: 'eye', href: '/admin/audit', group: 'Журналы' },
       { id: 'logs', label: 'Логи', icon: 'description', href: '/admin/logs' },
-      { id: 'ai', label: 'ИИ-модели', icon: 'memory', href: '/dev/ai' },
+      { id: 'ai', label: 'ИИ-модели', icon: 'memory', href: '/admin/ai' },
     ],
   },
   student: {
