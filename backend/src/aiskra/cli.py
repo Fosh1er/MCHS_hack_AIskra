@@ -8,6 +8,8 @@ uv run python -m aiskra.cli create-user --login ivanov --role student --full-nam
                                                      # переменной окружения, указанной в --password-env
 uv run python -m aiskra.cli ensure-admin             # администратор из AISKRA_BOOTSTRAP_ADMIN_* (п. 0.3);
                                                      # без пароля в окружении ничего не делает
+uv run python -m aiskra.cli check-config             # проверка настроек режима (F6.3): в prod небезопасные —
+                                                     # код выхода 1 и список проблем; запускается до миграций
 uv run python -m aiskra.cli create-schema            # создать таблицы без Alembic (только для SQLite-демо)
 uv run python -m aiskra.cli demo-seed [--materials DIR]  # стенд одной командой (M6); пароль — AISKRA_DEMO_PASSWORD
 uv run python -m aiskra.cli purge-audit [--dry-run]   # журнал аудита старше срока хранения (≥183 дн., п. 6.2); для cron
@@ -25,6 +27,7 @@ import os
 import sys
 from dataclasses import asdict
 
+from aiskra.ai.config import load_ai_config
 from aiskra.bootstrap import (
     build_create_user_handler,
     build_generate_handler,
@@ -42,6 +45,7 @@ from aiskra.modules.training.application.commands.scenarios import GenerateScena
 from aiskra.platform.db import create_engine, create_session_factory
 from aiskra.platform.models_registry import metadata
 from aiskra.platform.settings import Settings
+from aiskra.platform.startup_checks import check_startup
 from aiskra.shared.errors import AppError
 from aiskra.shared.security import Role
 
@@ -188,6 +192,11 @@ async def ensure_admin(settings: Settings) -> None:
     )
 
 
+def check_config(settings: Settings) -> None:
+    """F6.3: те же проверки, что при запуске API. В prod проблема — исключение (выход с кодом 1 и сообщением)."""
+    check_startup(settings, load_ai_config(settings.ai_config_path))
+
+
 async def create_schema(settings: Settings) -> None:
     engine = create_engine(settings.database_url)
     async with engine.begin() as conn:
@@ -224,6 +233,7 @@ def main() -> None:
     user.add_argument("--operator-number")
     user.add_argument("--password-env", help="имя переменной окружения с паролем (иначе — интерактивный ввод)")
     sub.add_parser("ensure-admin", help="создать администратора из AISKRA_BOOTSTRAP_ADMIN_*, если его нет")
+    sub.add_parser("check-config", help="проверить настройки режима: в prod небезопасные — отказ (F6.3)")
     sub.add_parser("create-schema", help="создать таблицы напрямую (SQLite/демо; в PostgreSQL — alembic)")
     demo = sub.add_parser("demo-seed", help="подготовить стенд: справочники, сценарии, учётки ролей, группа (M6)")
     demo.add_argument("--scenarios", type=int, default=30, help="сколько утверждённых сценариев должно быть в банке")
@@ -263,7 +273,11 @@ def main() -> None:
                 )
             )
         elif args.cmd == "ensure-admin":
+            check_config(settings)  # в prod слабый пароль не должен попасть в БД раньше отказа запуска API
             asyncio.run(ensure_admin(settings))
+        elif args.cmd == "check-config":
+            check_config(settings)
+            print(f"Настройки режима {settings.app_env} проверены")
         elif args.cmd == "create-schema":
             asyncio.run(create_schema(settings))
         elif args.cmd == "demo-seed":

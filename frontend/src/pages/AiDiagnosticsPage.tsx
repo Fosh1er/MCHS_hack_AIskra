@@ -1,4 +1,5 @@
-/** Диагностика ИИ (эталонный вертикальный срез п. 0.1): запрос конфигурации + команда пробного вызова. */
+/** Диагностика ИИ (эталонный вертикальный срез п. 0.1): запрос конфигурации + команда пробного вызова.
+ *  Страница администратора «ИИ-модели» — /admin/ai во всех режимах (до F6.3 — /dev/ai, ADR-0015). */
 import { useState } from 'react';
 import { Button, Card, StatusPill } from '@smena112/ui-kit';
 import { useAIConfig, useHealth, useProbeModel } from '../shared/api/system';
@@ -19,6 +20,7 @@ export function AiDiagnosticsPage() {
             <StatusPill status={health.data.status === 'ok' ? 'ok' : 'warn'}>API: {health.data.status}</StatusPill>
             <StatusPill status={health.data.db === 'ok' ? 'ok' : 'critical'}>БД: {health.data.db}</StatusPill>
             <StatusPill status="info">кеш: {Math.round(health.data.ai.cache.hit_rate * 100)}% попаданий</StatusPill>
+            <StatusPill status="neutral">режим: {health.data.env} · версия: {health.data.version}</StatusPill>
           </div>
         ) : (
           <StatusPill status="neutral">{health.isError ? 'бэкенд недоступен' : 'загрузка…'}</StatusPill>

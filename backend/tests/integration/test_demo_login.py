@@ -100,12 +100,13 @@ def test_bad_body_is_422(demo: TestClient) -> None:
 
 @pytest.mark.parametrize("show", [False, True])
 def test_prod_has_no_demo_routes(demo_settings: Settings, show: bool) -> None:
-    with stand(demo_settings, app_env="prod", demo_show_password=show) as c:
+    with stand(demo_settings, app_env="prod", demo_show_password=show, session_cookie_secure=True) as c:
         assert c.get(ACCOUNTS).status_code == 404
         assert c.post(DEMO_LOGIN, json={"login": "op1"}).status_code == 404
         assert c.get("/api/v1/auth/me").status_code == 401
         assert c.get("/health").json()["env"] == "prod"
-        assert not [p for p in c.get("/openapi.json").json()["paths"] if "demo" in p]
+        assert c.get("/openapi.json").status_code == 401  # F6.3: схема API в prod — только администратору
+        assert not [p for p in c.app.openapi()["paths"] if "demo" in p]  # type: ignore[attr-defined]
 
 
 def test_dev_has_demo_routes(demo_settings: Settings) -> None:

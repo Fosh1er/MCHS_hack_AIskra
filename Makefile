@@ -1,7 +1,7 @@
 # Частые команды. Бэкенд: uv (Python 3.12), фронтенд: npm workspaces (Node 22).
 .PHONY: up down logs be-install be-test be-lint be-check fe-install fe-dev fe-dev-lan dev-cert dev-tts dev-tts-say dev-stt fe-build check import-classifier demo-seed demo-seed-docker
 
-up:            ; docker compose up --build -d
+up:            ; AISKRA_VERSION=$${AISKRA_VERSION:-$$(git rev-parse --short HEAD 2>/dev/null || echo unknown)} docker compose up --build -d
 down:          ; docker compose down
 logs:          ; docker compose logs -f backend
 be-install:    ; cd backend && uv sync
