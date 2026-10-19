@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Any
 from uuid import UUID
 
@@ -64,21 +65,27 @@ class SqlUserReader:
                 select(UserModel).where(*conditions).order_by(UserModel.login).limit(flt.limit).offset(flt.offset)
             )
         ).scalars()
-        items = [
-            UserListItem(
-                id=r.id,
-                login=r.login,
-                full_name=r.full_name,
-                role=r.role,
-                status=r.status,
-                operator_number=r.operator_number,
-                locked_until=as_utc(r.locked_until),
-                last_login_at=as_utc(r.last_login_at),
-                created_at=as_utc(r.created_at) or r.created_at,
-            )
-            for r in rows
-        ]
-        return items, total
+        return [_item(r) for r in rows], total
+
+    async def by_logins(self, logins: Sequence[str]) -> Sequence[UserListItem]:
+        if not logins:
+            return []
+        rows = (await self._s.execute(select(UserModel).where(UserModel.login.in_(list(logins))))).scalars()
+        return [_item(r) for r in rows]
+
+
+def _item(r: UserModel) -> UserListItem:
+    return UserListItem(
+        id=r.id,
+        login=r.login,
+        full_name=r.full_name,
+        role=r.role,
+        status=r.status,
+        operator_number=r.operator_number,
+        locked_until=as_utc(r.locked_until),
+        last_login_at=as_utc(r.last_login_at),
+        created_at=as_utc(r.created_at) or r.created_at,
+    )
 
 
 class SqlOnboardingReader:

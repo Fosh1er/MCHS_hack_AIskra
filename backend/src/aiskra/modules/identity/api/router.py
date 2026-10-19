@@ -1,4 +1,5 @@
-"""HTTP API identity: вход и выход (`/auth`), управление учётными записями (`/users`, только администратор)."""
+"""HTTP API identity: вход и выход (`/auth`), управление учётными записями (`/users`, только администратор),
+демо-вход (`demo_router`, F2: подключается в `main.py` только в режимах demo и dev)."""
 
 from __future__ import annotations
 
@@ -13,6 +14,9 @@ from aiskra.modules.identity.api import deps
 from aiskra.modules.identity.api.cookies import SessionCookie
 from aiskra.modules.identity.api.schemas import (
     BlockIn,
+    DemoAccountOut,
+    DemoAccountsOut,
+    DemoLoginIn,
     LoginIn,
     LoginOut,
     MeOut,
@@ -27,6 +31,7 @@ from aiskra.modules.identity.api.schemas import (
     UserUpdateIn,
 )
 from aiskra.modules.identity.application.commands.create_user import CreateUser, CreateUserHandler
+from aiskra.modules.identity.application.commands.demo_login import DemoLogin, DemoLoginHandler
 from aiskra.modules.identity.application.commands.groups import (
     DeleteGroup,
     DeleteGroupHandler,
@@ -42,7 +47,9 @@ from aiskra.modules.identity.application.commands.reset_password import ResetPas
 from aiskra.modules.identity.application.commands.set_user_blocked import SetUserBlocked, SetUserBlockedHandler
 from aiskra.modules.identity.application.commands.update_user import UpdateUser, UpdateUserHandler
 from aiskra.modules.identity.application.ports.auth import LoginThrottle
+from aiskra.modules.identity.application.ports.demo import RequestLimit
 from aiskra.modules.identity.application.ports.groups import GroupMember, GroupView
+from aiskra.modules.identity.application.queries.demo_accounts import ListDemoAccounts, ListDemoAccountsHandler
 from aiskra.modules.identity.application.queries.list_users import ListUsers, ListUsersHandler
 from aiskra.modules.identity.application.queries.onboarding import GetOnboarding, GetOnboardingHandler
 from aiskra.shared.errors import AuthenticationError
@@ -53,6 +60,7 @@ Cookie = Annotated[SessionCookie, Depends(deps.provide_session_cookie)]
 Admin = Annotated[Principal, Depends(require(Permission.USERS_MANAGE))]
 
 auth_router = APIRouter(prefix="/auth", tags=["auth"])
+demo_router = APIRouter(prefix="/auth", tags=["auth"])
 users_router = APIRouter(prefix="/users", tags=["users"])
 
 
@@ -73,6 +81,52 @@ async def login(
         throttle.failed(key)
         raise
     throttle.succeeded(key)
+    cookie.set(response, result.token, result.expires_at)
+    return LoginOut(**MeOut.of(result.principal).model_dump(), expires_at=result.expires_at)
+
+
+@demo_router.get(
+    "/demo-accounts",
+    response_model=DemoAccountsOut,
+    summary="Демо-учётки для страницы входа (публичный; только режимы demo и dev, F2)",
+)
+async def demo_accounts(
+    handler: Annotated[ListDemoAccountsHandler, Depends(deps.provide_demo_accounts)],
+) -> DemoAccountsOut:
+    result = await handler(ListDemoAccounts())
+    return DemoAccountsOut(
+        accounts=[
+            DemoAccountOut(
+                login=a.login,
+                role=a.role,
+                title=a.title,
+                full_name=a.full_name,
+                hint=list(a.hint),
+                arm_number=a.arm_number,
+            )
+            for a in result.accounts
+        ],
+        password=result.password,
+    )
+
+
+@demo_router.post(
+    "/demo-login",
+    response_model=LoginOut,
+    summary="Демо-вход одной кнопкой без пароля (публичный; только режимы demo и dev, F2)",
+)
+async def demo_login(
+    body: DemoLoginIn,
+    meta: Meta,
+    response: Response,
+    cookie: Cookie,
+    handler: Annotated[DemoLoginHandler, Depends(deps.provide_demo_login)],
+    limit: Annotated[RequestLimit, Depends(deps.provide_demo_limit)],
+) -> LoginOut:
+    key = meta.ip or "unknown"
+    limit.check(key)
+    limit.hit(key)  # RF2-07: считается каждый запрос, а не только неудачный
+    result = await handler(DemoLogin(login=body.login, meta=meta))
     cookie.set(response, result.token, result.expires_at)
     return LoginOut(**MeOut.of(result.principal).model_dump(), expires_at=result.expires_at)
 

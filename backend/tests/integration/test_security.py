@@ -13,7 +13,13 @@ from aiskra.platform.db import create_engine, create_session_factory
 from aiskra.platform.settings import Settings
 from tests.integration.conftest import PASSWORD, login
 
-PUBLIC = {("POST", "/api/v1/auth/login")}
+PUBLIC = {
+    ("POST", "/api/v1/auth/login"),
+    # F2: демо-вход одной кнопкой — публичен осознанно и только в режимах demo и dev (в prod — 404, тест ниже)
+    ("GET", "/api/v1/auth/demo-accounts"),
+    ("POST", "/api/v1/auth/demo-login"),
+}
+DEMO_ONLY = {("GET", "/api/v1/auth/demo-accounts"), ("POST", "/api/v1/auth/demo-login")}
 
 
 def test_every_api_route_requires_session(settings: Settings) -> None:
@@ -28,6 +34,19 @@ def test_every_api_route_requires_session(settings: Settings) -> None:
             url = re.sub(r"\{[^}]+\}", "00000000-0000-0000-0000-000000000000", path)
             r = c.request(method, url, json={})
             assert r.status_code == 401, f"{method} {path} → {r.status_code}"
+
+
+def test_demo_public_routes_absent_in_prod(settings: Settings) -> None:
+    """RF2-08: в prod демо-маршрутов нет — 404 и в схеме API их нет; публичен только вход по паролю."""
+    app = create_app(settings.model_copy(update={"app_env": "prod"}))
+    paths = app.openapi()["paths"]
+    routes = {(m.upper(), p) for p, ops in paths.items() if p.startswith("/api/") for m in ops}
+    assert not routes & DEMO_ONLY and routes >= PUBLIC - DEMO_ONLY
+    with TestClient(app) as c:
+        for method, path in DEMO_ONLY:
+            assert c.request(method, path, json={"login": "teacher"}).status_code == 404, path
+    dev = {(m.upper(), p) for p, ops in create_app(settings).openapi()["paths"].items() for m in ops}
+    assert dev >= DEMO_ONLY  # в dev (и demo) маршруты есть и проверены первым тестом как публичные
 
 
 def test_security_headers_and_hsts(settings: Settings) -> None:

@@ -85,6 +85,7 @@ from aiskra.modules.dictionaries.infrastructure.writer import SqlDictionaryWrite
 from aiskra.modules.identity.api import deps as identity_deps
 from aiskra.modules.identity.api.cookies import SessionCookie
 from aiskra.modules.identity.application.commands.create_user import CreateUserHandler
+from aiskra.modules.identity.application.commands.demo_login import DemoLoginHandler
 from aiskra.modules.identity.application.commands.groups import DeleteGroupHandler, SaveGroupHandler
 from aiskra.modules.identity.application.commands.groups import ListGroupsHandler as IdentityListGroupsHandler
 from aiskra.modules.identity.application.commands.login import LoginHandler
@@ -94,6 +95,8 @@ from aiskra.modules.identity.application.commands.reset_password import ResetPas
 from aiskra.modules.identity.application.commands.set_user_blocked import SetUserBlockedHandler
 from aiskra.modules.identity.application.commands.update_user import UpdateUserHandler
 from aiskra.modules.identity.application.ports.auth import AuthPolicy
+from aiskra.modules.identity.application.ports.demo import DemoAccountSpec, DemoPolicy
+from aiskra.modules.identity.application.queries.demo_accounts import ListDemoAccountsHandler
 from aiskra.modules.identity.application.queries.list_users import ListUsersHandler
 from aiskra.modules.identity.application.queries.onboarding import GetOnboardingHandler
 from aiskra.modules.identity.application.queries.resolve_session import ResolveSession, ResolveSessionHandler
@@ -212,7 +215,7 @@ from aiskra.platform.status import SystemStatus
 from aiskra.shared import web
 from aiskra.shared.application import SystemClock
 from aiskra.shared.cache import CachePort, InMemoryTTLCache, NullCache
-from aiskra.shared.security import Principal
+from aiskra.shared.security import Principal, Role
 
 
 def build_services(settings: Settings) -> Services:
@@ -297,6 +300,24 @@ def build_identity_adapters(settings: Settings) -> IdentityAdapters:
     )
 
 
+def build_demo_policy(settings: Settings) -> DemoPolicy:
+    """Демо-вход (F2): учётки `DEMO_USERS` без администратора, только в режимах demo и dev.
+    Пароль попадает в политику (и в API), только если его показ включён явно."""
+    # demo_seed сам импортирует bootstrap, поэтому импорт — здесь, а не в начале модуля
+    from aiskra.demo_seed import DEMO_USERS
+
+    password = settings.demo_password.get_secret_value() if settings.demo_password else None
+    return DemoPolicy(
+        enabled=settings.demo_enabled,
+        accounts=tuple(
+            DemoAccountSpec(login=u.login, title=u.title, hint=u.hint, arm_number=u.arm_number)
+            for u in DEMO_USERS
+            if u.role is not Role.ADMIN
+        ),
+        password=password if settings.demo_enabled and settings.demo_show_password else None,
+    )
+
+
 def build_create_user_handler(ida: IdentityAdapters, session: AsyncSession) -> CreateUserHandler:
     return CreateUserHandler(
         SqlUserRepository(session), ida.hasher, SqlAuditRecorder(session), SqlAlchemyUnitOfWork(session)
@@ -332,6 +353,21 @@ def _wire_identity_and_audit(app: FastAPI, services: Services) -> None:
             ida.clock,
             ida.policy,
         )
+
+    demo = build_demo_policy(services.settings)
+
+    def demo_login(session: Session) -> DemoLoginHandler:
+        return DemoLoginHandler(
+            login(session),
+            SqlUserRepository(session),
+            SqlAuditRecorder(session),
+            SqlAlchemyUnitOfWork(session),
+            ida.clock,
+            demo,
+        )
+
+    def demo_accounts(session: Session) -> ListDemoAccountsHandler:
+        return ListDemoAccountsHandler(SqlUserReader(session), demo)
 
     def logout(session: Session) -> LogoutHandler:
         return LogoutHandler(
@@ -384,6 +420,10 @@ def _wire_identity_and_audit(app: FastAPI, services: Services) -> None:
     throttle = SlidingWindowThrottle()
     ov[identity_deps.provide_login_throttle] = lambda: throttle
     ov[identity_deps.provide_login] = login
+    demo_limit = SlidingWindowThrottle(limit=10, window_s=60, message="Слишком много демо-входов с этого адреса")
+    ov[identity_deps.provide_demo_limit] = lambda: demo_limit
+    ov[identity_deps.provide_demo_login] = demo_login
+    ov[identity_deps.provide_demo_accounts] = demo_accounts
     ov[identity_deps.provide_logout] = logout
     ov[identity_deps.provide_create_user] = create_user
     ov[identity_deps.provide_update_user] = update_user

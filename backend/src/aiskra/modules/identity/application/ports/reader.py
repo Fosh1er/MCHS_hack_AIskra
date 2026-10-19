@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Protocol
@@ -52,6 +53,10 @@ class SessionReader(Protocol):
 
 class UserReader(Protocol):
     async def list(self, flt: UserFilter) -> tuple[list[UserListItem], int]: ...
+
+    async def by_logins(self, logins: Sequence[str]) -> Sequence[UserListItem]:
+        """Пользователи с данными логинами (кого нет — того нет в ответе)."""
+        ...
 
 
 class OnboardingReader(Protocol):
