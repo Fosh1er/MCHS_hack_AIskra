@@ -22,6 +22,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from aiskra.modules.training.api import deps
 from aiskra.modules.training.api.schemas import (
     AnswerIn,
+    BranchTemplateOut,
     CreatedOut,
     CreateSessionIn,
     DdsCallIn,
@@ -52,6 +53,8 @@ from aiskra.modules.training.application.commands.calls import (
     StartIncomingCall,
     StartIncomingCallHandler,
     StreamReplicaFactory,
+    TickCall,
+    TickCallHandler,
 )
 from aiskra.modules.training.application.commands.materials import (
     DeleteMaterial,
@@ -86,6 +89,7 @@ from aiskra.modules.training.application.commands.sessions import (
     FeedResult,
     ParticipantIn,
 )
+from aiskra.modules.training.application.ports.branching import BranchCatalog
 from aiskra.modules.training.application.ports.materials import MaterialRow
 from aiskra.modules.training.application.ports.psy import PsyCatalog
 from aiskra.modules.training.application.ports.sessions import StudentRow
@@ -176,9 +180,38 @@ async def generate(
     handler: Annotated[GenerateScenariosHandler, Depends(deps.provide_generate)],
 ) -> GeneratedOut:
     ids = await handler(
-        GenerateScenarios(actor=actor, count=body.count, groups=body.groups, difficulty=body.difficulty, meta=meta)
+        GenerateScenarios(
+            actor=actor,
+            count=body.count,
+            groups=body.groups,
+            difficulty=body.difficulty,
+            branching=body.branching,
+            meta=meta,
+        )
     )
     return GeneratedOut(ids=ids)
+
+
+@router.get(
+    "/branch-templates",
+    response_model=list[BranchTemplateOut],
+    summary="Шаблоны ветвящихся сценариев (F5): ситуация развивается по решениям оператора",
+)
+async def branch_templates(
+    _: Annotated[Principal, Depends(require(Permission.LESSONS_CONDUCT, Permission.SCENARIOS_MANAGE))],
+    catalog: Annotated[BranchCatalog, Depends(deps.provide_branch_catalog)],
+) -> list[BranchTemplateOut]:
+    return [
+        BranchTemplateOut(
+            id=t.id,
+            title=t.title,
+            description=t.description,
+            incident_codes=list(t.incident_codes),
+            forks=len(t.forks),
+            outcomes=sorted({n.outcome.code for n in t.terminals if n.outcome}),
+        )
+        for t in catalog.templates().values()
+    ]
 
 
 @router.get("/scenarios", response_model=ScenarioPage, summary="Банк сценариев")
@@ -310,6 +343,22 @@ async def replica(
     signals = TurnSignals(latency_ms=body.latency_ms, interrupted=body.interrupted)
     r = await handler(SendReplica(actor=actor, call_id=call_id, text=body.text, via=body.via, signals=signals))
     return _replica_out(r)
+
+
+@router.post(
+    "/calls/{call_id}/tick",
+    response_model=list[ReplicaOut],
+    summary="F5: таймер ситуации — реплики-события, если ситуация изменилась сама (раз в 5 с, пока звонок идёт)",
+)
+async def tick(
+    call_id: UUID,
+    actor: Trainee,
+    handler: Annotated[TickCallHandler, Depends(deps.provide_tick)],
+) -> list[ReplicaOut]:
+    lock = _CALL_LOCKS.get(call_id)
+    if lock is not None and lock.locked():  # идёт ответ на реплику — ситуацию продвинет он
+        return []
+    return [_replica_out(r) for r in await handler(TickCall(actor=actor, call_id=call_id))]
 
 
 log = logging.getLogger(__name__)

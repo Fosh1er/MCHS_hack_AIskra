@@ -14,6 +14,7 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass, field, replace
+from hashlib import sha1
 from typing import Any
 
 from aiskra.modules.training.application.actors import Actors, PsyPrompt
@@ -138,6 +139,8 @@ class PsyDirector:
         signals: TurnSignals,
         scope: str,
         sink: EventSink | None = None,
+        situation: str = "",
+        extra_gates: frozenset[str] = frozenset(),
     ) -> PsyTurn | None:
         p = self.profile(psy)
         if p is None:  # профиль убрали из каталога — звонок продолжается без модификатора
@@ -171,7 +174,7 @@ class PsyDirector:
 
         state, deltas = step(p, before, codes, elapsed_s, call_rng(int(psy["seed"]), before.turn + 1))
         state.persist = before.persist + 1 if "REPEAT_PERSIST" in codes else 0
-        allowed = gates(p, state)
+        allowed = gates(p, state) | set(extra_gates)  # F5: ворота модификатора ∪ ворота узла ситуации
         # F1/F4: изменение состояния известно до генерации — интерфейс показывает его сразу, с причинами
         await emit(
             sink,
@@ -208,8 +211,10 @@ class PsyDirector:
                 intensity=int(psy.get("intensity", 2)),
                 allowed=[t for t in TOPICS if t in allowed],
                 blocked=[t for t in TOPICS if t not in allowed],
+                situation=situation,
             )
-            cache_scope = f"{scope}:{p.id}:{state.level}:{state.stage}:{','.join(sorted(new_revealed))}"
+            node = f":{sha1(situation.encode()).hexdigest()[:10]}" if situation else ""
+            cache_scope = f"{scope}:{p.id}:{state.level}:{state.stage}:{','.join(sorted(new_revealed))}{node}"
             text = await self._actors.applicant_psy(legend, history, question, prompt, cache_scope, sink)
             if text:
                 reason = validate(text, legend=legend, allowed=allowed, intensity=prompt.intensity)

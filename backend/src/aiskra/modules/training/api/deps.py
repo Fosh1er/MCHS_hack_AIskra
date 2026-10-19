@@ -43,3 +43,5 @@ provide_replica_stream = provider_stub("training.StreamReplicaFactory")  # F1: �
 provide_speak_fragment = provider_stub("training.SpeakFragmentHandler")
 provide_replica_audio = provider_stub("training.ReplicaAudioHandler")
 provide_call_recording = provider_stub("training.CallRecordingHandler")
+provide_tick = provider_stub("training.TickCallHandler")  # F5: таймер ситуации ветвящегося сценария
+provide_branch_catalog = provider_stub("training.BranchCatalog")  # F5: каталог шаблонов ветвления

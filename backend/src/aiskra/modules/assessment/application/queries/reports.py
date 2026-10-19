@@ -23,6 +23,7 @@ from aiskra.modules.assessment.application.ports.reports import (
     SessionFacts,
     SessionFactsSource,
 )
+from aiskra.modules.assessment.domain.branch_scoring import outcome_counts
 from aiskra.modules.assessment.domain.psy_scoring import StressErrors, stress_errors
 from aiskra.modules.assessment.domain.recommendations import recommend
 from aiskra.modules.assessment.domain.scoring import CARD_NORM_SECONDS, DDS_NORM_SECONDS, TITLES
@@ -60,6 +61,7 @@ class CardResult:
     criteria: dict[str, float | None]
     call_mode: str | None = None  # text | voice | hands_free: в голосовом режиме во время входит речь собеседника
     critical: list[str] = field(default_factory=list)  # критерии с критической ошибкой: «не зачтено» при любом балле
+    branch_outcome: str | None = None  # F5: итог ветвящегося сценария (favorable | partial | adverse | tragic)
 
 
 @dataclass(frozen=True)
@@ -108,6 +110,7 @@ class SessionReport:
     score_series: list[dict[str, Any]] = field(default_factory=list)
     # F4: типичные ошибки работы со стрессом по группе (блок «Работа с заявителем»)
     psy_errors: StressErrors = field(default_factory=lambda: StressErrors(calls=0, items=[]))
+    branch_outcomes: dict[str, int] = field(default_factory=dict)  # F5: итоги ситуаций по группе (RF5-08)
 
 
 def _avg(values: list[float]) -> float | None:
@@ -132,6 +135,7 @@ def _result(card: ReportCard, rec: AssessmentRecord | None, norm: float, role: s
         criteria={c["key"]: c.get("score") for c in rec.details.get("criteria", [])} if rec else {},
         call_mode=card.call_mode if role == "112" else None,
         critical=[str(x) for x in rec.details.get("critical", [])] if rec else [],
+        branch_outcome=((rec.details.get("branch") or {}).get("outcome") or {}).get("code") if rec else None,
     )
 
 
@@ -234,6 +238,9 @@ async def build_report(
         time_buckets=buckets,
         score_series=sorted(series, key=lambda x: x["t"]),
         psy_errors=stress_errors(psy_blocks),
+        branch_outcomes=outcome_counts(
+            [{"outcome": {"code": c.branch_outcome}} for st in students for c in st.cards if c.branch_outcome]
+        ),
     )
 
 

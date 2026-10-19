@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import random
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any, Protocol
 from uuid import UUID
 
@@ -14,7 +15,11 @@ from aiskra.modules.training.domain.scenario import AddressFacts, IncidentFacts,
 class ScenarioFactsSource(Protocol):
     """Справочники (модуль dictionaries) для генерации — адаптер в composition root (ADR-0001)."""
 
-    async def pick_incident(self, rng: random.Random, groups: list[int] | None) -> IncidentFacts: ...
+    async def pick_incident(
+        self, rng: random.Random, groups: list[int] | None, codes: list[str] | None = None
+    ) -> IncidentFacts:
+        """Строка классификатора групп; `codes` (F5) — только из этих кодов (шаблон ветвления)."""
+        ...
 
     async def pick_address(self, rng: random.Random) -> AddressFacts: ...
 
@@ -37,6 +42,7 @@ class ScenarioRow:
     review_accepted: int = 0  # п. 3.3: принято разделов эталона (из review_total)
     review_rework: int = 0  # разделов на доработке
     review_total: int = 0
+    branching: str | None = None  # F5: шаблон ветвления
 
 
 class ScenarioRepository(Protocol):
@@ -94,9 +100,22 @@ class DdsCallContext:
     service_status: str
     order_no: str | None
     services: dict[str, tuple[str, str]]  # код → (короткое имя, текущий статус)
+    situation: str = ""  # F5: обстановка на месте по ветвящемуся сценарию звонка 112
+    branch_report: dict[str, str] | None = None  # F5: доклад старшего группы по статусу службы на этом пути
+
+
+@dataclass(frozen=True)
+class CardTimeline:
+    """Карточка 112 глазами ветвления (F5): когда сохранена, с какими службами, когда службы дошли до статусов."""
+
+    saved_at: datetime | None
+    services: frozenset[str]
+    statuses: dict[str, datetime]  # статус ДДС → когда первая из служб его поставила
 
 
 class CardContextSource(Protocol):
     async def dds_context(self, card_id: UUID, service_code: str) -> DdsCallContext | None: ...
+
+    async def card_timeline(self, card_id: UUID) -> CardTimeline | None: ...
 
     async def card_aon(self, card_id: UUID) -> str | None: ...

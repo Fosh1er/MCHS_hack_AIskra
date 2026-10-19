@@ -32,6 +32,7 @@ from aiskra.modules.identity.infrastructure.models import UserModel
 from aiskra.modules.training.application.commands.materials import UploadMaterial
 from aiskra.modules.training.application.commands.scenarios import GenerateScenarios
 from aiskra.modules.training.domain.material import MaterialKind
+from aiskra.modules.training.infrastructure.branch_catalog import YamlBranchCatalog
 from aiskra.modules.training.infrastructure.models import ScenarioModel
 from aiskra.platform.db import SqlAlchemyUnitOfWork, create_engine, create_session_factory
 from aiskra.platform.settings import Settings
@@ -155,6 +156,32 @@ async def seed(
                 print(f"Сценарии: добавлено и утверждено {len(new)} (всего {have + len(new)})")
             else:
                 print(f"Сценарии: утверждено {have}")
+
+        async with factory() as s:  # F5: по ветвящемуся сценарию на каждый шаблон — для показа «решение → итог»
+            branched = (
+                await s.execute(
+                    select(func.count()).select_from(ScenarioModel).where(ScenarioModel.branching.is_not(None))
+                )
+            ).scalar_one()
+            if not branched:
+                catalog = YamlBranchCatalog(settings.dictionaries_dir / "branch_templates.yaml")
+                made = 0
+                for tid in catalog.templates():
+                    made += len(
+                        await build_generate_handler(services.model_router, s, catalog)(
+                            GenerateScenarios(
+                                actor=None,
+                                count=1,
+                                difficulty=2,
+                                approve=True,
+                                seed=random.randrange(10**6),
+                                branching=tid,
+                            )
+                        )
+                    )
+                print(f"Ветвящиеся сценарии: добавлено и утверждено {made}")
+            else:
+                print(f"Ветвящиеся сценарии: уже есть ({branched})")
 
         async with factory() as s:  # п. 3.7: сценарии с психологическим профилем заявителя для показа модификатора
             pinned = (

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import random
+from datetime import UTC, datetime
+from typing import Any
 from uuid import UUID
 
 from sqlalchemy import func, select
@@ -22,8 +24,11 @@ from aiskra.modules.dictionaries.infrastructure.reader import SqlDictionaryReade
 from aiskra.modules.incidents.domain.dds import TITLES, ServiceStatus
 from aiskra.modules.incidents.infrastructure.models import IncidentCardModel
 from aiskra.modules.incidents.infrastructure.reader import SqlCardReader
-from aiskra.modules.training.application.ports.scenarios import DdsCallContext
+from aiskra.modules.training.application.branching import BranchDirector
+from aiskra.modules.training.application.ports.scenarios import CardTimeline, DdsCallContext
 from aiskra.modules.training.domain.scenario import AddressFacts, IncidentFacts, ServiceFacts
+from aiskra.modules.training.infrastructure.models import CallModel, ScenarioModel
+from aiskra.modules.training.infrastructure.repositories import SqlCallRepository
 from aiskra.shared.errors import DomainError
 
 # Адрес на случай, если адресный справочник (п. 1.2) ещё не загружен
@@ -45,7 +50,9 @@ class DictionaryScenarioFacts:
         self._s = session
         self._reader = SqlDictionaryReader(session)
 
-    async def pick_incident(self, rng: random.Random, groups: list[int] | None) -> IncidentFacts:
+    async def pick_incident(
+        self, rng: random.Random, groups: list[int] | None, codes: list[str] | None = None
+    ) -> IncidentFacts:
         card_types = (
             (
                 await self._s.execute(
@@ -60,6 +67,8 @@ class DictionaryScenarioFacts:
             assert c.group_id is not None
             by_group.setdefault(c.group_id, []).append(c)
         allowed = [g for g in by_group if not groups or g in groups]
+        if codes:  # F5: шаблон ветвления задаёт строки классификатора, группа — из них
+            allowed = list(by_group)
         if not allowed:
             raise DomainError("Нет типов «Что случилось?» для выбранных групп", code="no_incident_types")
         stmt = (
@@ -72,6 +81,8 @@ class DictionaryScenarioFacts:
                 IncidentTypeModel.sign1.is_not(None),
             )
         )
+        if codes:
+            stmt = stmt.where(IncidentTypeModel.code.in_(codes))
         rows = (await self._s.execute(stmt)).all()
         if not rows:
             raise DomainError("Классификатор не загружен: выполните import-dictionaries", code="no_incident_types")
@@ -168,7 +179,47 @@ class IncidentCardContext:
             service_status=own.status if own.status in ServiceStatus._value2member_map_ else "received",
             order_no=order_no,
             services={s.code: (s.short, title.get(s.status, s.status)) for s in card.services},
+            **await self._branch_context(card_id, scenario_id),
         )
+
+    async def _branch_context(self, card_id: UUID, scenario_id: UUID | None) -> dict[str, Any]:
+        """F5: что на месте по пути ситуации звонка 112 — доклад старшего группы зависит от решений оператора."""
+        if scenario_id is None:
+            return {}
+        snapshot = (
+            await self._s.execute(select(ScenarioModel.branching).where(ScenarioModel.id == scenario_id))
+        ).scalar_one_or_none()
+        if not snapshot:
+            return {}
+        rows = (
+            (
+                await self._s.execute(
+                    select(CallModel.id)
+                    .where(CallModel.card_id == card_id, CallModel.role == "112", CallModel.branch.is_not(None))
+                    .order_by(CallModel.started_at.desc())
+                )
+            )
+            .scalars()
+            .all()
+        )
+        call = await SqlCallRepository(self._s).get(rows[0]) if rows else None
+        if call is None:
+            return {}
+        view = await BranchDirector(self).view(call, dict(snapshot), datetime.now(UTC))
+        return {"situation": str(view.get("situation") or ""), "branch_report": dict(view.get("brigade") or {})}
+
+    async def card_timeline(self, card_id: UUID) -> CardTimeline | None:
+        """F5: когда карточка сохранена, с какими службами и когда службы дошли до статусов."""
+        card = await SqlCardReader(self._s).get(card_id)
+        if card is None:
+            return None
+        statuses: dict[str, datetime] = {}
+        for s in card.services:
+            for h in s.history:
+                if h.at is not None and (h.status not in statuses or h.at < statuses[h.status]):
+                    statuses[h.status] = h.at
+        saved = card.saved_at if card.status != "draft" else None
+        return CardTimeline(saved_at=saved, services=frozenset(s.code for s in card.services), statuses=statuses)
 
     async def card_aon(self, card_id: UUID) -> str | None:
         card = await SqlCardReader(self._s).get(card_id)

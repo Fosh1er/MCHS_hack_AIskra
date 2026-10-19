@@ -4,22 +4,26 @@ from __future__ import annotations
 
 import json
 from dataclasses import replace
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from aiskra.integration.training_sources import IncidentCardContext
 from aiskra.modules.assessment.application.ports.attempts import Card112Attempt, DdsAttempt
+from aiskra.modules.assessment.domain.branch_scoring import BranchAttempt
 from aiskra.modules.assessment.domain.psy_scoring import PsyAttempt, PsyTurn
 from aiskra.modules.assessment.domain.scoring import CallerFacts, StatusStep
 from aiskra.modules.dictionaries.infrastructure.models import EnumValueModel, ServiceModel
 from aiskra.modules.incidents.infrastructure.models import CardServiceModel, CardServiceStatusModel, IncidentCardModel
 from aiskra.modules.incidents.infrastructure.reader import SqlCardReader
+from aiskra.modules.training.application.branching import BranchDirector
 from aiskra.modules.training.domain.actors import topic_of
 from aiskra.modules.training.domain.tone import ToneSnapshot
 from aiskra.modules.training.infrastructure.models import CallMessageModel, CallModel, ScenarioModel
+from aiskra.modules.training.infrastructure.repositories import SqlCallRepository
 from aiskra.platform.types import as_utc
 
 
@@ -115,6 +119,33 @@ class IncidentAttempts:
             end_emotion=snaps[-1].emotion_title,
         )
 
+    async def _branch(self, card_id: UUID) -> BranchAttempt | None:
+        """F5: итог ветвящегося сценария по последнему разговору с заявителем по этой карточке."""
+        rows = (
+            (
+                await self._s.execute(
+                    select(CallModel)
+                    .where(CallModel.card_id == card_id, CallModel.role == "112", CallModel.party == "applicant")
+                    .order_by(CallModel.started_at)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        row = next((r for r in reversed(rows) if r.branch), None)
+        if row is None or row.scenario_id is None:
+            return None
+        snapshot = (
+            await self._s.execute(select(ScenarioModel.branching).where(ScenarioModel.id == row.scenario_id))
+        ).scalar_one_or_none()
+        call = await SqlCallRepository(self._s).get(row.id)
+        if not snapshot or call is None:
+            return None
+        view = await BranchDirector(IncidentCardContext(self._s)).view(call, dict(snapshot), datetime.now(UTC))
+        return BranchAttempt(
+            debrief=view, weight=float(view.get("weight") or 0), final=bool(view.get("final")), call_id=str(row.id)
+        )
+
     async def card_112(self, card_id: UUID) -> Card112Attempt | None:
         card = await SqlCardReader(self._s).get(card_id)
         if card is None:
@@ -177,6 +208,7 @@ class IncidentAttempts:
             flag_names={k: v.lower() for k, v in flags.items()},
             caller=await self._caller(list(calls)) if calls else None,
             psy=psy,
+            branch=await self._branch(card.id),
         )
 
     async def dds(self, card_id: UUID, service_code: str) -> DdsAttempt | None:

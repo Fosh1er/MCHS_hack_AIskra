@@ -30,7 +30,9 @@ ADDR = AddressFacts("Тверская улица", "7", "", "", "tverskoy", "Т�
 
 
 class Facts:
-    async def pick_incident(self, rng: random.Random, groups: list[int] | None) -> IncidentFacts:
+    async def pick_incident(
+        self, rng: random.Random, groups: list[int] | None, codes: list[str] | None = None
+    ) -> IncidentFacts:
         return FIRE
 
     async def pick_address(self, rng: random.Random) -> AddressFacts:

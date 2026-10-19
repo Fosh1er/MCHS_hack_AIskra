@@ -138,6 +138,35 @@ cd backend && uv run python -m aiskra.cli create-user --login admin --full-name 
 - **Фронт:** `SessionsPage.tsx:PsyForm`, `ScenariosPage.tsx:PsyPick`, `CallPanel` (ремарки, «пауза»), `shared/ui/PsyBlock.tsx` в `AssessmentPanel`.
 - **Источники (F4)** — реестр `psy_profiles.yaml: sources`/`basis` (код = раздел `docs/research/psychology/01–03`), основания критериев и ошибок — `psy_scoring.py:CRITERIA_BASIS`/`ACT_SOURCES`; «Методика» — `GET /training/psy/methodology` (`psy_methodology.py`), `/teacher/methodology` и вкладка справочной базы; сводка ошибок группы — `stress_errors` → `SessionReport.psy_errors`. Новый код ошибки или критерий — с источником, иначе упадёт `unit/test_psy_sources.py`. Только официальные источники, без упоминаний вузов.
 
+## Ветвящиеся сценарии (F5, ADR-0014) — что уже есть
+- **Шаблоны:**
+  - `data/dictionaries/branch_templates.yaml`: 4 шаблона, у каждого перехода и инструкции `source` из реестра `sources` (только официальные), контрольные ходы `checks`;
+  - проверка при старте — `YamlBranchCatalog`, правила графа — `training/domain/branching.py:validate_graph`;
+  - сценарий хранит снимок шаблона (`scenarios.branching`), звонок — факты и путь (`training_calls.branch`, миграция 0020).
+- **Путь — чистая функция фактов:**
+  - `resolve(tpl, facts, until, state)`, где факты — что и когда сказал оператор, что сообщил заявитель, когда сохранена карточка и с какими службами, статусы ДДС;
+  - ход звонка ведёт `training/application/branching.py:BranchDirector`: шаг до ответа заявителя в `SendReplica`, тик `POST /training/calls/{id}/tick` раз в 5 с из `CallPanel`;
+  - итог `view()` — тот же расчёт для оценки, разбора и доклада бригады.
+- **Новая инструкция или развилка:**
+  - фразы — в `instructions` шаблона (основы слов, у вредных — `harmful: true`, отрицание отсекается);
+  - переход — в `edges` узла;
+  - у неконечного узла обязателен переход только по времени (`note: didactic`, если это учебное упрощение);
+  - после правки прогоните `unit/test_branching.py`: проверку графа, контрольные ходы и бенчмарк мутаций.
+- **Заявитель:**
+  - узел даёт «что происходит сейчас» в `applicant_actor/v4` (у профиля — блок к `v3`), факты поверх легенды и ворота ∪ ворота профиля;
+  - `escalate` сдвигает `CallerTone` (причина `situation`) или уровень ECCS;
+  - реплика-событие звучит один раз;
+  - модель только переписывает реплики-события (`branch_texts`, проверка `check_event_text`).
+- **Оценка** — блок `details.branch` (`assessment/domain/branch_scoring.py`):
+  - итог 100 / 60 / 30 / 0 баллов;
+  - вес — `settings.branch.weight`, по умолчанию 0 (информативно), снимок в звонке;
+  - итог окончательный после конца звонка и сохранения карточки.
+- **Выключено — ничего не меняется:** все ветки только при `call.branch`.
+- **Фронт:**
+  - `shared/ui/BranchOutcome.tsx` («Развитие ситуации» в `AssessmentPanel` и `CallReview`);
+  - `pages/teacher/BranchGraphView.tsx` (вкладка «ветвление» в банке);
+  - выбор шаблона в форме генерации, вес в форме занятия, «Развитие ситуаций» в отчёте занятия.
+
 ## Автооценка (п. 3.4) — что уже есть
 - **Правила** — `modules/assessment/domain/scoring.py` (формулы и веса описаны в `specs/3.4-assessment.md`); ИИ-судья — `application/judge.py` (без модели критерии «не проверено»).
 - **Попытка** (карточка, сценарий, статусы, звонки) — `aiskra/integration/assessment_sources.py`.

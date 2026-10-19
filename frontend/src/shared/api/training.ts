@@ -11,7 +11,7 @@ export interface VoiceParams {
 export interface PsyAct { code: string; title: string; quote: string }
 export interface CallPsy { profile: string; title: string; sensitive: boolean; start: number; level: number; peak: number; stage: string; paused: boolean; hung_up: boolean }
 /** Что изменило состояние заявителя: код правила и сработавший фрагмент реплики оператора (п. 3.6). */
-export interface ToneChange { reason: 'calming' | 'invalidating' | 'pressure' | 'on_topic'; fragment: string; tension: number; trust: number; readiness: number }
+export interface ToneChange { reason: 'calming' | 'invalidating' | 'pressure' | 'on_topic' | 'situation'; fragment: string; tension: number; trust: number; readiness: number }
 /** Состояние ИИ-заявителя у его реплики (п. 3.6): шкалы 0–10 и подача голоса. Фактов легенды здесь нет. */
 export interface Tone {
   emotion: string; emotion_title: string; tension: number; trust: number; readiness: number; band: 'calm' | 'tense' | 'panic';
@@ -31,6 +31,35 @@ export interface CallView {
   started_at: string; answered_at: string | null; ended_at: string | null; messages: CallMessage[]; tone?: Tone | null;
   mode?: ReplicaVia; // как оператор вёл разговор: самый «голосовой» из способов его реплик
   ended_by?: string | null; psy?: CallPsy | null; // п. 3.7
+  branching?: boolean; branch?: BranchDebrief | null; // F5: ветвящийся сценарий — таймер /tick и «Итог ситуации»
+}
+
+// ------------------------------------------------------------------ F5: ветвящиеся сценарии (ADR-0014)
+export type OutcomeCode = 'favorable' | 'partial' | 'adverse' | 'tragic';
+export const OUTCOME_TITLE: Record<OutcomeCode, string> = {
+  favorable: 'благоприятный', partial: 'частично благоприятный', adverse: 'неблагоприятный', tragic: 'трагический',
+};
+export interface BranchChoice { label: string; effect: string; to: string; to_title: string; source: string; didactic: boolean; outcome: OutcomeCode | null }
+export interface BranchFork { node: string; title: string; at_s: number; decided_s: number | null; taken: BranchChoice | null; others: BranchChoice[] }
+/** «Итог ситуации»: итог, путь по узлам, развилки «что сделали / что было бы», источники. `final` — окончательный. */
+export interface BranchDebrief {
+  template: string; title: string; node: string; node_title: string; situation?: string;
+  outcome: { code: OutcomeCode; title: string; text: string; sources: string[] } | null;
+  path: { node: string; title: string; at_s: number }[];
+  forks: BranchFork[];
+  decisions: Record<string, number>;
+  instructions: { id: string; title: string; harmful: boolean; said_s: number | null; source: string }[];
+  sources: Record<string, { title: string; url: string }>;
+  final: boolean; weight?: number; score?: number | null;
+}
+export interface BranchTemplate { id: string; title: string; description: string; incident_codes: string[]; forks: number; outcomes: OutcomeCode[] }
+interface BranchEdgeRaw { to: string; when: Record<string, string | number | boolean>; label: string; effect: string; source: string; note?: string }
+/** Граф ситуации в сценарии (копия шаблона) — для просмотра преподавателем. */
+export interface BranchGraph {
+  id: string; title: string; description?: string; start: string; horizon_s: number;
+  nodes: Record<string, { title: string; situation?: string; event?: string; edges?: BranchEdgeRaw[]; outcome?: { code: OutcomeCode; text: string; sources: string[] } }>;
+  instructions: Record<string, { title: string; stems: string[]; source: string; harmful?: boolean }>;
+  sources: Record<string, { title: string; url: string }>;
 }
 
 const T = '/api/v1/training';
@@ -49,6 +78,10 @@ export const endCall = (id: string) => post<{ status: string }>(`/calls/${id}/en
 export const startDdsCall = (b: { card_id: string; service_code: string; party: CallView['party']; target_service?: string | null; incoming?: boolean }) =>
   post<CallStarted>('/calls/dds', b);
 export const getCall = (id: string) => http<CallView>(`${T}/calls/${id}`);
+/** F5: таймер ситуации — пока звонок идёт, раз в 5 с; ответ — реплики-события, если ситуация изменилась сама. */
+export const tickCall = (id: string) => post<Replica[]>(`/calls/${id}/tick`);
+export const useBranchTemplates = () =>
+  useQuery({ queryKey: ['branch-templates'], queryFn: () => http<BranchTemplate[]>(`${T}/branch-templates`), staleTime: 300_000 });
 
 // ------------------------------------------------------------------ речь: голосовой ввод (п. 1.4) и голос собеседника (п. 3.6)
 /** `enabled` — распознавание (кнопка «говорить»); `tts` — серверный синтез, иначе озвучивает браузер. */
@@ -139,6 +172,7 @@ export interface ScenarioRow {
   card_type_code: string | null; incident_type_code: string | null; source: string; created_at: string | null;
   psy_profile?: string | null;
   review_accepted?: number; review_rework?: number; review_total?: number; // п. 3.3: разделы эталона
+  branching?: string | null; // F5: шаблон ветвления
 }
 /** Решение преподавателя по разделу эталона (п. 3.3); `stale` — раздел изменили после решения. */
 export interface SectionReview { key: string; title: string; decision: 'accepted' | 'rework' | null; comment: string; stale: boolean; at: string | null }
@@ -150,6 +184,7 @@ export interface ScenarioView {
   reference_dds: Record<string, unknown>;
   psy_profile?: string | null;
   review?: SectionReview[];
+  branching?: BranchGraph | null; // F5: граф ситуации
 }
 export interface PreviewItem { question: string; answer: string; reference: string }
 export interface ScenarioFilter { status?: string; difficulty?: number; card_type?: string; source?: string; psy?: string; page: number; page_size: number }
@@ -169,7 +204,7 @@ function useInvalidating<V, R>(fn: (v: V) => Promise<R>, keys: string[][]) {
   return useMutation({ mutationFn: fn, onSuccess: () => keys.forEach((k) => qc.invalidateQueries({ queryKey: k })) });
 }
 export const useGenerateScenarios = () =>
-  useInvalidating((b: { count: number; groups: number[]; difficulty: number }) => post<{ ids: string[] }>('/scenarios/generate', b), [['scenarios']]);
+  useInvalidating((b: { count: number; groups: number[]; difficulty: number; branching?: string | null }) => post<{ ids: string[] }>('/scenarios/generate', b), [['scenarios']]);
 export const useReviewScenario = () =>
   useInvalidating(({ id, approve }: { id: string; approve: boolean }) => post<{ status: string }>(`/scenarios/${id}/${approve ? 'approve' : 'archive'}`), [['scenarios'], ['scenario']]);
 export type SectionDecision = { decision: 'accepted' | 'rework'; comment?: string };
@@ -221,6 +256,7 @@ export interface SessionSettings {
   norm_112: number; norm_dds: number; threshold: number; difficulty: number;
   call_interval_s: number; feed_interval_s: number; max_waiting: number;
   psy?: PsySettings;
+  branch?: { weight: number }; // F5: вес блока «Развитие ситуации»; 0 — информативно
 }
 export interface Participant { student_id: string; full_name: string; login: string; role: '112' | 'dds'; dds_service_code: string | null }
 export interface SessionView {
