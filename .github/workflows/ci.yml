@@ -70,7 +70,7 @@ jobs:
       - name: nginx — /health по https (8443)
         run: |
           curl -fsS --insecure "$WEB/health" | tee /tmp/health.json; echo
-          jq -e '.status == "ok" and .db == "ok" and .env == "demo"' /tmp/health.json
+          jq -e --arg v "${GITHUB_SHA::7}" '.status == "ok" and .db == "ok" and .env == "demo" and .version == $v' /tmp/health.json
           # http :8080 перенаправляет на https :8443, /health по http — для проверок без TLS
           curl -sS -o /dev/null -w '%{http_code} %{redirect_url}\n' http://localhost:8080/ | tee /tmp/redirect.txt
           grep -q "^301 https://localhost:8443/" /tmp/redirect.txt

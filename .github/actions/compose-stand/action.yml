@@ -20,7 +20,8 @@ runs:
       id: env
       shell: bash
       run: |
-        gen() { openssl rand -hex 16; }
+        # сильные пароли по правилам prod (F6.3): от 12 символов, 4 вида; без @ : / ? # — БД подставляется в адрес
+        gen() { echo "Ci-$(openssl rand -hex 12)Q"; }
         db=$(gen); admin=$(gen); demo=$(gen)
         echo "::add-mask::$db"; echo "::add-mask::$admin"; echo "::add-mask::$demo"
         cat > .env <<EOF
@@ -28,13 +29,18 @@ runs:
         POSTGRES_PASSWORD=$db
         AISKRA_BOOTSTRAP_ADMIN_PASSWORD=$admin
         AISKRA_DEMO_PASSWORD=$demo
+        AISKRA_VERSION=${GITHUB_SHA::7}
         EOF
         echo "AISKRA_DEMO_PASSWORD=$demo" >> "$GITHUB_ENV"
         echo "demo-password=$demo" >> "$GITHUB_OUTPUT"
 
     - name: docker compose build
       shell: bash
-      run: docker compose build
+      run: AISKRA_VERSION="${GITHUB_SHA::7}" docker compose build
+
+    - name: Настройки стенда годятся и для prod (check-config, F6.3)
+      shell: bash
+      run: docker compose run --rm --no-deps -e AISKRA_APP_ENV=prod backend python -m aiskra.cli check-config
 
     - name: docker compose up (PostgreSQL, backend, nginx)
       shell: bash
