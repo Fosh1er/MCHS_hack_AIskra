@@ -9,7 +9,7 @@ from uuid import UUID, uuid4
 from aiskra.modules.assessment.application.judge import Judge, JudgeOut
 from aiskra.modules.assessment.application.ports.attempts import AssessmentRecord, AssessmentRepository, AttemptSource
 from aiskra.modules.assessment.application.psy_judge import PsyJudge
-from aiskra.modules.assessment.domain.psy_scoring import PsyAttempt, assess_psy, timeline
+from aiskra.modules.assessment.domain.psy_scoring import PsyAttempt, assess_psy, basis_of, timeline
 from aiskra.modules.assessment.domain.scoring import (
     CARD_NORM_SECONDS,
     DDS_NORM_SECONDS,
@@ -64,7 +64,8 @@ def psy_details(result: Result, attempt: PsyAttempt) -> dict[str, object]:
         "score": result.score,
         "passed": result.passed,
         "weight": float(attempt.profile.get("weight") or 0),
-        "criteria": [{**asdict(c), "title": c.title} for c in result.criteria],
+        # F4: у критерия — «почему это важно» и источники
+        "criteria": [{**asdict(c), "title": c.title, **basis_of(c.key)} for c in result.criteria],
         "errors": result.errors,
         "critical": [c.title for c in result.criteria if c.critical],
         "stats": result.stats,

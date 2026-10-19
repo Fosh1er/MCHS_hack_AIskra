@@ -1,11 +1,13 @@
 /** Справочная база (п. 5.1): классификатор происшествий с поиском по признакам и подсказками оператору,
- *  справочник служб и ДДС, учебные материалы преподавателя (п. 4.4). */
+ *  справочник служб и ДДС, учебные материалы преподавателя (п. 4.4), методика работы с заявителем в стрессе (F4). */
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Card, Segmented, Tag } from '@smena112/ui-kit';
 import { useIncidentGroups, useIncidentTypeSearch, useServices } from '../../shared/api/dictionaries';
 import { CabinetShell } from '../../shared/ui/CabinetShell';
 import { KIND_TITLE, useMaterials } from '../../shared/api/materials';
 import { MaterialViewer } from '../../shared/ui/MaterialViewer';
+import { PsyMethodologyView } from '../../shared/ui/PsyMethodology';
 
 function Classifier() {
   const groups = useIncidentGroups();
@@ -99,12 +101,18 @@ function Materials() {
   );
 }
 
+type Tab = 'materials' | 'classifier' | 'services' | 'methodology';
+const TABS: Tab[] = ['materials', 'classifier', 'services', 'methodology'];
+
 export function ReferencePage() {
-  const [tab, setTab] = useState<'materials' | 'classifier' | 'services'>('materials');
+  const [params, setParams] = useSearchParams(); // ?tab=methodology — ссылка из блока оценки «Работа с заявителем»
+  const asked = params.get('tab') as Tab | null;
+  const [tab, setTabState] = useState<Tab>(asked && TABS.includes(asked) ? asked : 'materials');
+  const setTab = (t: Tab) => { setTabState(t); setParams(t === 'materials' ? {} : { tab: t }, { replace: true }); };
   return (
     <CabinetShell kind="student" active="reference" title="Справочная база"
-      actions={<Segmented ariaLabel="Раздел" value={tab} onChange={setTab} options={[{ value: 'materials', label: 'материалы' }, { value: 'classifier', label: 'классификатор' }, { value: 'services', label: 'службы' }]} />}>
-      {tab === 'materials' ? <Materials /> : tab === 'classifier' ? <Classifier /> : <Services />}
+      actions={<Segmented ariaLabel="Раздел" value={tab} onChange={setTab} options={[{ value: 'materials', label: 'материалы' }, { value: 'classifier', label: 'классификатор' }, { value: 'services', label: 'службы' }, { value: 'methodology', label: 'методика' }]} />}>
+      {tab === 'materials' ? <Materials /> : tab === 'classifier' ? <Classifier /> : tab === 'services' ? <Services /> : <PsyMethodologyView />}
     </CabinetShell>
   );
 }

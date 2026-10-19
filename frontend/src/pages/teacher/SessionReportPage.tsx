@@ -6,6 +6,7 @@ import { Link, useParams } from 'react-router-dom';
 import { Banner, Button, Card, Icon, LineChart, StatTile, StatusPill } from '@smena112/ui-kit';
 import { reportCsvUrl, reportXlsxUrl, useEvaluateSession, useOverride, useSessionReport, type CardResult, type SessionReport } from '../../shared/api/assessment';
 import { CallReview } from '../../shared/ui/CallReview';
+import { SourceRefs } from '../../shared/ui/PsySources';
 import { TeacherShell } from '../../shared/ui/TeacherShell';
 import { StudentFeedback } from './StudentFeedback';
 import { useScreenTour } from '../../shared/onboarding/OnboardingProvider';
@@ -150,6 +151,36 @@ function Heatmap({ r }: { r: SessionReport }) {
   );
 }
 
+const capital = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+/** F4, RF4-05: типичные ошибки работы со стрессом по группе — топ запрещённых действий из лент разбора звонков. */
+function StressErrors({ r }: { r: SessionReport }) {
+  const e = r.psy_errors;
+  if (!e?.calls) return null;
+  return (
+    <Card title="Типичные ошибки работы со стрессом" subtitle={`Звонков с психологическим профилем: ${e.calls}`}>
+      {e.items.length === 0
+        ? <p className="mth-line">Запрещённых действий не было.</p>
+        : (
+          <table className="cab-table">
+            <thead><tr><th>Ошибка</th><th className="num">Раз</th><th className="num">Звонков</th><th className="num">Обучающихся</th><th>Почему нельзя</th></tr></thead>
+            <tbody>
+              {e.items.map((x) => (
+                <tr key={x.code}>
+                  <td><b>{x.title}</b></td>
+                  <td className="num">{x.count}</td>
+                  <td className="num">{x.calls}</td>
+                  <td className="num">{x.students}</td>
+                  <td>{capital(x.why.split(' (')[0])}. <SourceRefs cites={x.sources} /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+    </Card>
+  );
+}
+
 function TimeHistogram({ r }: { r: SessionReport }) {
   const max = Math.max(1, ...r.time_buckets.map((b) => b.count));
   const norm = r.settings.norm_112 ?? 75;
@@ -204,6 +235,7 @@ export function SessionReportPage() {
           )}
           <StudentsTable r={r} />
           <Heatmap r={r} />
+          <StressErrors r={r} />
           <TimeHistogram r={r} />
           {r.score_series.length >= 2 && (
             <Card title="Динамика баллов по ходу занятия">

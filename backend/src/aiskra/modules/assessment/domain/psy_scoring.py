@@ -15,7 +15,8 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections import defaultdict
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -73,6 +74,120 @@ WHY: dict[str, str] = {
     "INTERRUPT": "перебивать — только по необходимости и вежливо (APCO/NENA 1.107.2)",
     "HANGUP_FIRST": "оператор не кладёт трубку первым при кризисе (NENA-STA-001; ЦЭПП МЧС)",
 }
+
+
+# ------------------------------------------------------------------ источники (F4, RF4-02)
+
+
+@dataclass(frozen=True)
+class Cite:
+    """Ссылка на источник: код реестра (`data/dictionaries/psy_profiles.yaml: sources`, выжимка —
+    docs/research/psychology: РФ-N — файл 01, М-N.N — 02, О-X — 03) и место в нём — функция, пункт."""
+
+    source: str
+    at: str = ""
+
+
+@dataclass(frozen=True)
+class Basis:
+    why: str  # почему это важно — коротко, для обучающегося
+    cites: tuple[Cite, ...]
+
+
+# Основание каждого критерия блока: навыки К1–К11 и их источники — docs/research/psychology/05 §1–2, §4
+CRITERIA_BASIS: dict[str, Basis] = {
+    "psy_contact": Basis(
+        "Приветствие и обращение по имени устанавливают контакт: заявитель начинает слушать оператора.",
+        (Cite("М-1.1", "Telephone Skills: вежливость"), Cite("РФ-1", "называть по имени")),
+    ),
+    "psy_critical_info": Basis(
+        "В стрессе адрес путают первым. Повтор адреса вслух исключает выезд не туда.",
+        (Cite("М-1.3", "подтверждение адреса"), Cite("РФ-13", "умения ОТФ A")),
+    ),
+    "psy_emotion": Basis(
+        "Эмоция без ответа нарастает. Признать её и сразу дать дело — быстрее, чем уговаривать.",
+        (Cite("РФ-13", "оценивать и учитывать состояние заявителя"), Cite("РФ-1")),
+    ),
+    "psy_techniques": Basis(
+        "У каждого состояния свои приёмы: при панике — «я на линии», при агрессии — вопрос-выбор.",
+        (Cite("РФ-1"), Cite("РФ-4"), Cite("М-4.2")),
+    ),
+    "psy_forbidden": Basis(
+        "«Успокойтесь», упрёки, спор и угрозы усиливают реакцию и срывают разговор.",
+        (Cite("РФ-1", "недопустимые действия"), Cite("РФ-2"), Cite("О-C3")),
+    ),
+    "psy_speech": Basis(
+        "Короткую фразу без «не» и без слов «паника», «ужас» человек в стрессе понимает с первого раза.",
+        (Cite("РФ-6", "речевой стандарт"),),
+    ),
+    "psy_instructions": Basis(
+        "Простое действие снимает беспомощность и помогает дождаться бригады.",
+        (Cite("РФ-6"), Cite("РФ-1")),
+    ),
+    "psy_routing": Basis(
+        "Ступор, психоз и мысли о суициде оператор не решает один: нужен психолог или медики.",
+        (Cite("РФ-11", "«Основы психологии»"), Cite("РФ-13", "специалист — психолог"), Cite("М-1.4")),
+    ),
+    "psy_outcome": Basis(
+        "Итог разговора — состояние заявителя к концу звонка по шкале ECCS, а не число вежливых слов.",
+        (Cite("М-4.1", "шкала ECCS 1–5"), Cite("О-C4", "изменение от начала к концу звонка")),
+    ),
+    "psy_judge": Basis(
+        "Тон и уместность слов оценивает ИИ-судья по пунктам «да/нет» с цитатой из разговора.",
+        (Cite("РФ-13", "ТФ C/04.6: аудиоконтроль речи оператора"),),
+    ),
+    "psy_voice": Basis(
+        "Ровный голос и ответ без долгих пауз показывают заявителю, что ситуация под контролем.",
+        (Cite("М-1.1", "No dead time"), Cite("РФ-13", "невербальные атрибуты речи")),
+    ),
+}
+# Источник объяснения каждой ошибки из WHY — те же ссылки, что в скобках текста
+ACT_SOURCES: dict[str, tuple[Cite, ...]] = {
+    "CALM_DOWN": (Cite("РФ-1"), Cite("РФ-6")),
+    "DEVALUE": (Cite("РФ-1"), Cite("М-3.1")),
+    "BLAME": (Cite("РФ-1"), Cite("О-C3")),
+    "RUDE": (Cite("М-1.1"), Cite("М-6.3")),
+    "THREAT_HANGUP": (Cite("О-C3"), Cite("РФ-13")),
+    "ARGUE": (Cite("РФ-4"),),
+    "FALSE_PROMISE": (Cite("М-3.1"), Cite("РФ-1")),
+    "FALSE_ADVICE": (Cite("РФ-2"), Cite("РФ-1"), Cite("РФ-6")),
+    "REASK_KNOWN": (Cite("М-1.1"),),
+    "PERSIST_NO_REASON": (Cite("М-4.2"), Cite("М-1.2", "п. 7.2.1")),
+    "NEG_PARTICLE": (Cite("РФ-6"),),
+    "TRIGGER_WORD": (Cite("РФ-6"),),
+    "JARGON": (Cite("М-1.2", "п. 7.1.2"),),
+    "DEAD_AIR": (Cite("М-1.1", "No dead time"), Cite("РФ-1")),
+    "INTERRUPT": (Cite("М-1.1"),),
+    "HANGUP_FIRST": (Cite("М-1.4"), Cite("РФ-1")),
+}
+# Запрещённые действия оператора — коды training/domain/psy.py:BAD_ACTS (модули не импортируют друг друга,
+# совпадение проверяет unit/test_psy_sources.py) и их названия для отчёта
+FORBIDDEN_TITLES: dict[str, str] = {
+    "CALM_DOWN": "«успокойтесь», «возьмите себя в руки»",
+    "DEVALUE": "обесценивание",
+    "BLAME": "упрёк, морализаторство",
+    "RUDE": "грубость, сарказм",
+    "THREAT_HANGUP": "угроза прекратить разговор",
+    "ARGUE": "спор, переубеждение",
+    "FALSE_PROMISE": "ложное обещание",
+    "FALSE_ADVICE": "вредный совет (вода, пощёчина, трясти)",
+    "NEG_PARTICLE": "инструкция с «не»",
+    "TRIGGER_WORD": "слова «паника», «ужас», «катастрофа»",
+    "JARGON": "служебный жаргон",
+}
+FORBIDDEN_ACTS = frozenset(FORBIDDEN_TITLES)
+
+
+def cites(items: Sequence[Cite]) -> list[dict[str, str]]:
+    return [{"source": c.source, "at": c.at} for c in items]
+
+
+def basis_of(key: str) -> dict[str, Any]:
+    """«Почему это важно» и источники критерия — для details.psy и справки по критериям."""
+    b = CRITERIA_BASIS.get(key)
+    return {"why": b.why, "sources": cites(b.cites)} if b else {"why": "", "sources": []}
+
+
 ACT_TITLES_SHORT: dict[str, str] = {
     "GREET": "приветствие по регламенту",
     "NAME_USE": "обращение по имени",
@@ -360,6 +475,7 @@ def timeline(a: PsyAttempt) -> list[dict[str, Any]]:
                     "good": code in good,
                     "why": WHY.get(code, ""),
                     "title": ACT_TITLES_SHORT.get(code) or WHY.get(code, code).split(" (")[0],
+                    "sources": [] if code in good else cites(ACT_SOURCES.get(code, ())),
                 }
                 for code in t.acts
             ]
@@ -370,3 +486,66 @@ def timeline(a: PsyAttempt) -> list[dict[str, Any]]:
             item["blocked"] = t.blocked
         out.append(item)
     return out
+
+
+# ------------------------------------------------------------------ сводка по группе (F4, RF4-05)
+
+
+@dataclass(frozen=True)
+class StressError:
+    code: str
+    title: str
+    count: int  # сколько раз встретилось
+    calls: int  # в скольких звонках
+    students: int  # у скольких обучающихся
+    why: str
+    sources: list[dict[str, str]]
+
+
+@dataclass(frozen=True)
+class StressErrors:
+    """Типичные ошибки работы со стрессом по группе: топ запрещённых действий из лент разбора `details.psy`."""
+
+    calls: int  # звонков с оценённым блоком «Работа с заявителем»
+    items: list[StressError]
+
+
+def stress_errors(blocks: Sequence[tuple[str, Mapping[str, Any]]], top: int = 5) -> StressErrors:
+    """`blocks` — пары (обучающийся, `details.psy` оценки). Звонки на «паузе» не считаются: блок не оценивался.
+    Порядок — по частоте, затем по числу обучающихся (ошибка многих важнее ошибки одного), затем по коду."""
+    count: dict[str, int] = defaultdict(int)
+    calls: dict[str, int] = defaultdict(int)
+    who: dict[str, set[str]] = defaultdict(set)
+    assessed = 0
+    for student, block in blocks:
+        if block.get("paused") or "timeline" not in block:
+            continue
+        assessed += 1
+        seen: set[str] = set()
+        for turn in block.get("timeline") or []:
+            if turn.get("speaker") != "operator":
+                continue
+            for act in turn.get("acts") or []:
+                code = str(act.get("code"))
+                if code in FORBIDDEN_ACTS:
+                    count[code] += 1
+                    seen.add(code)
+        for code in seen:
+            calls[code] += 1
+            who[code].add(student)
+    ranked = sorted(count, key=lambda c: (-count[c], -len(who[c]), c))[:top]
+    return StressErrors(
+        calls=assessed,
+        items=[
+            StressError(
+                code=c,
+                title=FORBIDDEN_TITLES[c],
+                count=count[c],
+                calls=calls[c],
+                students=len(who[c]),
+                why=WHY.get(c, ""),
+                sources=cites(ACT_SOURCES.get(c, ())),
+            )
+            for c in ranked
+        ],
+    )

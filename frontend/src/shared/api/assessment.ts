@@ -2,7 +2,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, http } from './http';
 
-export interface CriterionResult { key: string; title: string; score: number | null; errors: string[]; note: string }
+export interface CriterionResult {
+  key: string; title: string; score: number | null; errors: string[]; note: string;
+  why?: string; sources?: Cite[]; // F4: у критериев блока «Работа с заявителем» — почему это важно и источники
+}
+/** Ссылка на источник методики (F4): код реестра `GET /training/psy/methodology` → `sources` и место в нём. */
+export interface Cite { source: string; at: string }
 export interface Assessment {
   id: string; card_id: string; student_id: string | null; role: '112' | 'dds'; service_code: string | null;
   score: number; passed: boolean; grader: string; created_at: string | null;
@@ -16,7 +21,7 @@ export interface Assessment {
 /** Блок «Работа с заявителем» (п. 3.7): отдельный от балла роли, с лентой разбора. */
 export interface PsyTimelineItem {
   at_s: number; speaker: 'operator' | 'party' | 'system'; text: string;
-  acts?: { code: string; good: boolean; title: string; why: string }[]; level_before?: number | null; level_after?: number | null;
+  acts?: { code: string; good: boolean; title: string; why: string; sources?: Cite[] }[]; level_before?: number | null; level_after?: number | null;
   remarks?: string[]; level?: number | null; blocked?: string | null;
 }
 export interface PsyBlock {
@@ -57,6 +62,13 @@ export function useEvaluate(cardId: string, role: '112' | 'dds', service?: strin
   });
 }
 
+/** Основания блока «Работа с заявителем» (F4): для оценок, сделанных до того, как источники стали писаться в details. */
+export interface PsyBasisRow { key: string; title: string; why: string; sources: Cite[] }
+export const usePsyBasis = (enabled = true) =>
+  useQuery({
+    queryKey: ['psy-basis'], enabled, staleTime: Infinity,
+    queryFn: () => http<{ criteria: PsyBasisRow[]; acts: PsyBasisRow[] }>(`${A}/psy/basis`),
+  });
 export const useInsights = (enabled: boolean) =>
   useQuery({ queryKey: ['assessment', 'insights'], queryFn: () => http<Insights>(`${A}/insights`), enabled, refetchInterval: 30_000 });
 
@@ -80,7 +92,9 @@ export interface SessionReport {
   heatmap: { criteria: { key: string; title: string }[]; rows: { student: string; role: string; values: Record<string, number> }[] };
   time_buckets: { label: string; count: number }[];
   score_series: { t: string; v: number; who: string }[];
+  psy_errors?: { calls: number; items: StressError[] }; // F4: типичные ошибки работы со стрессом
 }
+export interface StressError { code: string; title: string; count: number; calls: number; students: number; why: string; sources: Cite[] }
 export interface ProgressView {
   points: { t: string; v: number; role: string; card_number: number | null; passed: boolean }[];
   avg_score: number | null; weakest: { key: string; title: string; average: number }[]; recent_errors: string[];

@@ -27,6 +27,98 @@ defaults:
   needs_instructions: false
   pool: 3
 
+# Реестр источников (F4): код → короткая подпись, полное название, ссылка на первоисточник.
+# Код — как в docs/research/psychology: РФ-N — раздел N файла 01, М-N.N — раздел файла 02, О-X — раздел файла 03.
+# Там же — выжимка и статус проверки. На реестр ссылаются профили (sources), критерии блока оценки
+# (assessment/domain/psy_scoring.py:CRITERIA_BASIS) и запрещённые действия (ACT_SOURCES); тесты сверяют коды.
+# url не указан, если проверенная копия лежит не у ведомства-автора: текст ищут по названию.
+# official: true — официальный документ (ведомство, нормативный акт, отраслевой стандарт).
+sources:
+  РФ-1: {short: "ЦЭПП МЧС, 2023", title: "ЦЭПП МЧС России. «Психологическая поддержка». Практическое пособие, 2023", official: true,
+         url: "https://psi.mchs.gov.ru/uploads/resource/2023-12-19/psihologicheskaya-podderzhka-prakticheskoe-posobie-2023_17029772361068110276.pdf"}
+  РФ-2: {short: "ЦЭПП МЧС, 2012", title: "ЦЭПП МЧС России. «Экстренная допсихологическая помощь». Практическое пособие, 2012", official: true}
+  РФ-3: {short: "Шойгу (ред.), 2007", title: "Шойгу Ю.С. (ред.). «Психология экстремальных ситуаций для спасателей и пожарных», 2007",
+         url: "https://edu.dobro.ru/upload/uf/8c3/8c3bcbb3d9b64c3cf6252b1d69e8ea5d.pdf"}
+  РФ-4: {short: "ЦЭПП МЧС, Южный филиал", title: "ЦЭПП МЧС России, Южный филиал. «Возможные психические состояния и поведенческие реакции пострадавших»", official: true,
+         url: "https://iro23.ru/wp-content/uploads/2022/11/%D0%9E%D1%81%D1%82%D1%80%D1%8B%D0%B5-%D1%81%D1%82%D1%80%D0%B5%D1%81%D1%81%D0%BE%D0%B2%D1%8B%D0%B5-%D1%80%D0%B5%D0%B0%D0%BA%D1%86%D0%B8%D0%B8.pdf"}
+  РФ-6: {short: "Минздрав, «Первая помощь», 2025", title: "Минздрав России. «Первая помощь». Учебное пособие для преподавателей, 2025", official: true,
+         url: "https://psi.mchs.gov.ru/uploads/resource/2026-06-16/pervaya-pomoshch-i-psihologicheskaya-podderzhka_17816200231502776489.pdf"}
+  РФ-7: {short: "Служба экстренной психологической помощи МЧС", title: "Интернет-служба экстренной психологической помощи МЧС России: паническая атака, горевание и утрата", official: true,
+         url: "https://psi.mchs.gov.ru/deyatelnost/podgotovka-i-prosveschenie-naseleniya/krizis-i-emocii/chto-takoe-panicheskaya-ataka-i-kak-ee-preodolet"}
+  РФ-10: {short: "ПП РФ № 1931", title: "Постановление Правительства РФ от 12.11.2021 № 1931 (ред. от 28.07.2025)", official: true,
+          url: "https://www.garant.ru/products/ipo/prime/doc/402952132/"}
+  РФ-11: {short: "МР МЧС по обучению персонала 112, 2015", title: "МЧС России. Методические рекомендации по обучению персонала системы-112, 2015", official: true,
+          url: "https://www.consultant.ru/document/cons_doc_LAW_309403/"}
+  РФ-13: {short: "Профстандарт 12.002", title: "Профстандарт 12.002 «Специалист по приему и обработке экстренных вызовов» (приказ Минтруда России № 681н)", official: true,
+          url: "https://base.garant.ru/403004330/"}
+  РФ-14: {short: "Программа СПб УГПС МЧС, 2024", title: "Рабочая программа дисциплины «Экстренная психологическая помощь», СПб университет ГПС МЧС России, 2024", official: true,
+          url: "https://igps.ru/sveden/files/aiz/B1.O.33_Ekstrennaya_psixologicheskaya_pomoschy(1).pdf"}
+  РФ-15: {short: "Минпросвещения, 2025", title: "Письмо Минпросвещения России от 11.12.2025 № 07-6965: МР «Оказание допсихологической помощи»", official: true,
+          url: "https://rulaws.ru/acts/Pismo-Minprosvescheniya-Rossii-ot-11.12.2025-N-07-6965/"}
+  РФ-16: {short: "МР по кризисной помощи, 2024", title: "Ульянина О.А. и др. «Создание и обеспечение системы экстренной и кризисной психологической помощи», 2024",
+          url: "https://mgppu.ru/resources/files/fkc_metod/fkc_books/%D0%9C%D0%A0%20%D0%AD%D0%9F%D0%9F%20%D0%A4%D0%9A%D0%A6.pdf"}
+  РФ-18: {short: "Вихристюк, 2013", title: "Вихристюк О.В. «Оказание кризисной психологической помощи по телефону доверия подросткам с суицидальными намерениями», 2013",
+          url: "https://psyjournals.ru/journals/psyedu/archive/2013_n4/65713"}
+  РФ-19: {short: "Бурмистрова, 2006", title: "Бурмистрова Е.В. «Телефон доверия (типичные ситуации в работе службы экстренной психологической помощи)», 2006",
+          url: "https://psyjournals.ru/journals/cpp/archive/2006_n4/1777"}
+  РФ-20: {short: "Султанова, 2016", title: "Султанова И.В. «Экстренная психологическая помощь по телефону доверия», 2016",
+          url: "https://cyberleninka.ru/article/n/ekstrennaya-psihologicheskaya-pomosch-po-telefonu-doveriya"}
+  РФ-21: {short: "Детский телефон доверия", title: "Детский телефон доверия. «Факторы суицидального риска»",
+          url: "https://vdtd.ru/faktory-suitcidalnogo-riska/"}
+  РФ-22: {short: "Наумова, 2023", title: "Наумова Т.Е. «Психологическая поддержка операторов системы 112», 2023",
+          url: "https://cyberleninka.ru/article/n/psihologicheskaya-podderzhka-operatorov-sistemy-112"}
+  РФ-28: {short: "Практика Службы 112 Москвы", title: "Как обучают операторов Службы 112 Москвы (mos.ru, РИА Новости, 2024)",
+          url: "https://www.mos.ru/news/item/136579073/"}
+  М-0.1: {short: "Шкала ECCS IAED", title: "Шкала ECCS (Emotional Content and Cooperation Score), IAED", official: true,
+          url: "https://doi.org/10.1080/10903120190940290"}
+  М-1.1: {short: "APCO/NENA ANS 1.107.2-2025", title: "APCO/NENA ANS 1.107.2-2025: контроль и улучшение качества в центрах экстренной связи", official: true,
+          url: "https://cdn.ymaws.com/www.nena.org/resource/resmgr/standards/standards1/11072-2025-APCO-NENA-Standar.pdf"}
+  М-1.2: {short: "APCO ANS 3.103.3-2025", title: "APCO ANS 3.103.3-2025: минимальные стандарты обучения специалистов по приёму вызовов", official: true,
+          url: "https://www.apcointl.org/standards/3-103-3-2025-minimum-training-standards-for-public-safety-telecommunicators/"}
+  М-1.3: {short: "NENA-STA-020.1-2020", title: "NENA-STA-020.1-2020: стандарт обработки вызовов 9-1-1", official: true,
+          url: "https://cdn.ymaws.com/www.nena.org/resource/resmgr/standards/nena-sta-020.1-2020_911_call.pdf"}
+  М-1.4: {short: "NENA-STA-001", title: "NENA-STA-001: стандарт предотвращения суицидов, 2013", official: true,
+          url: "https://988lifeline.org/wp-content/uploads/2016/09/NENA-STA-001_Suicide_Prevention.pdf"}
+  М-1.5: {short: "NENA-STA-045.1-2025", title: "NENA-STA-045.1-2025: взаимодействие 9-1-1 и кризисной линии 988", official: true,
+          url: "https://kb.nena.org/wiki/988"}
+  М-2.2: {short: "EENA, ложные вызовы, 2020", title: "EENA. False Emergency Calls, v2.0, 2020", official: true,
+          url: "https://eena.org/wp-content/uploads/2020/09/2020_09_25_FalseCalls_Update-1.pdf"}
+  М-3.1: {short: "ВОЗ, «Первая психологическая помощь»", title: "ВОЗ. «Первая психологическая помощь: руководство для работников на местах», 2011", official: true,
+          url: "https://www.who.int/europe/ru/publications/i/item/9789241548205"}
+  М-4.1: {short: "Clawson & Sinclair, 2001", title: "Clawson J.J., Sinclair R. The emotional content and cooperation score in emergency medical dispatching, 2001",
+          url: "https://doi.org/10.1080/10903120190940290"}
+  М-4.2: {short: "IAED, повторная настойчивость", title: "IAED Journal. «Repetitive Persistence», 2021",
+          url: "https://www.iaedjournal.org/repetitive-persistence"}
+  М-6.1: {short: "Whalen & Zimmerman, 1998", title: "Whalen J., Zimmerman D.H. «Hysteria» in calls to 9-1-1, 1998",
+          url: "https://doi.org/10.2307/2787066"}
+  М-6.3: {short: "Tracy & Tracy, 1998", title: "Tracy K., Tracy S.J. Rudeness at 911: reconceptualizing face and face attack, 1998",
+          url: "https://doi.org/10.1111/j.1468-2958.1998.tb00444.x"}
+  М-6.10: {short: "Cromdal et al., 2012", title: "Cromdal J. et al. Дети, звонящие в экстренную службу, 2012",
+           url: "https://www.sciencedirect.com/science/article/abs/pii/S2211695812000475"}
+  О-C2: {short: "SIRI-2", title: "Neimeyer R.A., Bonnelle K. Suicide Intervention Response Inventory (SIRI-2), 1997",
+         url: "https://doi.org/10.1080/074811897202137"}
+  О-C3: {short: "Mishara et al., 2007", title: "Mishara B.L. et al. Поведение помощника и исходы кризисных звонков (тихий мониторинг), 2007",
+         url: "https://doi.org/10.1521/suli.2007.37.3.308"}
+  О-C4: {short: "Kalafat, Gould et al., 2007", title: "Kalafat J., Gould M.S. et al. An evaluation of crisis hotline outcomes, 2007",
+         url: "https://doi.org/10.1521/suli.2007.37.3.322"}
+  О-E1: {short: "ECCS как метод оценки", title: "Clawson J.J., Sinclair R. ECCS — шкала эмоционального состояния и сотрудничества заявителя, 2001",
+         url: "https://doi.org/10.1080/10903120190940290"}
+  О-E8: {short: "«Истерия» и грубость в звонках 911", title: "Whalen & Zimmerman, 1998; Tracy & Tracy, 1998: эмоции и грубость в звонках 911",
+         url: "https://doi.org/10.2307/2787066"}
+
+# Научно-методическая основа (страница «Методика»): официальные источники и что из них взято.
+basis:
+  - {source: РФ-1, use: "острые реакции на стресс: признаки, помощь, недопустимые действия"}
+  - {source: РФ-2, use: "та же методика; прямой запрет пощёчины, воды в лицо и тряски"}
+  - {source: РФ-13, use: "оценивать и учитывать психологическое состояние заявителя; ТФ C/04.6 — аудиоконтроль речи оператора"}
+  - {source: РФ-6, use: "речевой стандарт: короткие фразы, без частицы «не» и слов «паника», «ужас»"}
+  - {source: РФ-10, use: "нормативы: ответ до 20 с, психологическая поддержка до 30 мин"}
+  - {source: РФ-11, use: "«Основы психологии» и «Культура речевого общения» в подготовке операторов 112"}
+  - {source: М-0.1, use: "шкала состояния заявителя 1–5: от спокойного до неуправляемого"}
+  - {source: М-1.1, use: "контроль качества звонка: спокойствие, контроль разговора, без долгих пауз"}
+  - {source: М-1.2, use: "повторная настойчивость, понятная речь без служебных кодов"}
+  - {source: М-1.4, use: "суицидальные высказывания: спросить прямо, не класть трубку первым"}
+
 profiles:
   panic:
     title: Страх, паника

@@ -101,6 +101,7 @@ class SqlScenarioRepository:
         source: str | None,
         limit: int,
         offset: int,
+        psy: str | None = None,
     ) -> tuple[list[ScenarioRow], int]:
         stmt = select(ScenarioModel)
         stmt = stmt.where(ScenarioModel.status == status if status else ScenarioModel.status != "archived")
@@ -110,6 +111,12 @@ class SqlScenarioRepository:
             stmt = stmt.where(ScenarioModel.card_type_code == card_type)
         if source:
             stmt = stmt.where(ScenarioModel.source == source)
+        if psy == "any":  # F4: фильтр «с психологическим профилем»
+            stmt = stmt.where(ScenarioModel.psy_profile.is_not(None))
+        elif psy == "none":
+            stmt = stmt.where(ScenarioModel.psy_profile.is_(None))
+        elif psy:
+            stmt = stmt.where(ScenarioModel.psy_profile == psy)
         total = int((await self._s.execute(select(func.count()).select_from(stmt.subquery()))).scalar_one())
         rows = (
             await self._s.execute(stmt.order_by(ScenarioModel.created_at.desc()).limit(limit).offset(offset))

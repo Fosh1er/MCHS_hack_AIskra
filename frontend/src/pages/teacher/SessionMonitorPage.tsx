@@ -6,6 +6,7 @@ import { Banner, Button, Card, StatTile, StatusPill, StudentTile, normStatus, ty
 import { useIncidentGroups, useServices } from '../../shared/api/dictionaries';
 import { MODE_TITLE, SESSION_STATUS, SOURCE_TITLE, useMonitor, useSessionState, type MonitorView } from '../../shared/api/training';
 import { TeacherShell, initials } from '../../shared/ui/TeacherShell';
+import { PsyCounter } from '../../shared/ui/PsyCounter';
 import { useScreenTour } from '../../shared/onboarding/OnboardingProvider';
 
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -90,6 +91,7 @@ export function SessionMonitorPage() {
           <dt>Карточки для ДДС</dt><dd>{SOURCE_TITLE[s.card_source]}</dd>
           <dt>Нормативы</dt><dd>карточка 112 — {s.settings.norm_112} с, решение ДДС — {s.settings.norm_dds} с</dd>
           <dt>Темп</dt><dd>вызов 112 — раз в {s.settings.call_interval_s} с, карточка ДДС — раз в {s.settings.feed_interval_s} с, очередь до {s.settings.max_waiting}</dd>
+          <dt>Заявитель в стрессе</dt><dd><PsyCounter psy={s.settings.psy} detailed /></dd>
           <dt>Участники</dt>
           <dd>{s.participants.map((p) => <StatusPill key={p.student_id} status="info">{p.full_name} · {p.role === '112' ? '112' : p.dds_service_code}</StatusPill>)}</dd>
         </dl>

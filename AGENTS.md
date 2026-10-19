@@ -136,6 +136,7 @@ cd backend && uv run python -m aiskra.cli create-user --login admin --full-name 
 - **Оценка** — блок `details.psy` (`assess_psy`, `timeline`), вес в итоге — `settings.psy.weight` (снимок в звонке). ИИ-судья блока — `psy_judge`, без модели «не проверено».
 - **Голос** — эмоциональный голос п. 3.6: при профиле `CallerTone` выводится из состояния профиля (`psy.py:tone_from_psy`), так что синтез озвучивает то же состояние; модификатор отдаёт `ReplicaOut.voice`/`remarks`/`hung_up`, принимает `ReplicaIn.latency_ms`/`interrupted` (дуплекс-адаптер — `docs/ai/Психологический_модификатор.md` §11).
 - **Фронт:** `SessionsPage.tsx:PsyForm`, `ScenariosPage.tsx:PsyPick`, `CallPanel` (ремарки, «пауза»), `shared/ui/PsyBlock.tsx` в `AssessmentPanel`.
+- **Источники (F4)** — реестр `psy_profiles.yaml: sources`/`basis` (код = раздел `docs/research/psychology/01–03`), основания критериев и ошибок — `psy_scoring.py:CRITERIA_BASIS`/`ACT_SOURCES`; «Методика» — `GET /training/psy/methodology` (`psy_methodology.py`), `/teacher/methodology` и вкладка справочной базы; сводка ошибок группы — `stress_errors` → `SessionReport.psy_errors`. Новый код ошибки или критерий — с источником, иначе упадёт `unit/test_psy_sources.py`. Только официальные источники, без упоминаний вузов.
 
 ## Автооценка (п. 3.4) — что уже есть
 - **Правила** — `modules/assessment/domain/scoring.py` (формулы и веса описаны в `specs/3.4-assessment.md`); ИИ-судья — `application/judge.py` (без модели критерии «не проверено»).
