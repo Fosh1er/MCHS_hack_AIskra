@@ -7,7 +7,7 @@ import re
 from typing import Any
 
 import httpx
-from playwright.sync_api import Page, expect
+from playwright.sync_api import Locator, Page, expect
 
 from tests.e2e.conftest import Stand
 
@@ -27,6 +27,7 @@ def take_call(page: Page, stand: Stand) -> dict[str, Any]:
     page.get_by_role("button", name="Ответить").click()
     page.wait_for_url(CARD_URL)
     expect(page.get_by_placeholder(COMPOSER)).to_be_visible()
+    opened(page)
     call["card_id"] = page.url.split("/arm/112/")[1].split("?")[0]
     return call
 
@@ -37,9 +38,35 @@ def say(page: Page, text: str) -> None:
     box.press("Enter")
 
 
-def party_replies(page: Page) -> Any:
-    """Готовые реплики собеседника в панели разговора (без той, что ещё печатается)."""
-    return page.locator(".call-panel .arm-msg--them:not(.arm-msg--streaming)")
+def operator_lines(page: Page) -> Locator:
+    return page.locator(".call-panel .arm-msg--me")
+
+
+def last_line(page: Page) -> Locator:
+    return page.locator(".call-panel .arm-transcript > .arm-msg").last
+
+
+def wait_reply(page: Page, operator_lines_now: int, timeout: float = 30_000) -> Locator:
+    """Реплика оператора в разговоре, за ней — готовый ответ собеседника (не печатающийся и не «отвечает…»).
+    Ждём по последней строке разговора, а не по счётчику ответов: первая реплика заявителя приходит асинхронно."""
+    expect(operator_lines(page)).to_have_count(operator_lines_now)
+    reply = last_line(page)
+    expect(reply).to_have_class("arm-msg arm-msg--them", timeout=timeout)
+    return reply
+
+
+def opened(page: Page) -> None:
+    """Разговор загружен: первая реплика собеседника (приветствие, первая фраза заявителя) уже в панели —
+    панель получила звонок с сервера и не перезапишет то, что оператор скажет дальше."""
+    expect(page.locator(".call-panel .arm-msg--them").first).to_be_visible()
+
+
+def ask(page: Page, text: str, timeout: float = 30_000) -> Locator:
+    """Сказать в трубку и дождаться ответа собеседника. Возвращает строку ответа."""
+    opened(page)
+    n = operator_lines(page).count()
+    say(page, text)
+    return wait_reply(page, n + 1, timeout)
 
 
 def reference(stand: Stand, scenario_id: str) -> dict[str, Any]:
@@ -73,8 +100,11 @@ def fill_card(page: Page, ref: dict[str, Any]) -> None:
     option.wait_for()
     option.click()
     for answers in (ref.get("questionnaire") or {}).values():
-        for level in sorted(answers):
-            page.get_by_role("button", name=answers[level], exact=True).first.click()
+        form = page.locator("section.arm-q").first  # опросная карта: «ДТП» есть и среди выбранных типов выше
+        for i, level in enumerate(sorted(answers)):
+            row = form.locator(".arm-q__row").nth(i)
+            row.get_by_role("button", name=answers[level], exact=True).click()
+            expect(row.get_by_role("button", name=answers[level], exact=True)).to_have_attribute("aria-pressed", "true")
     if ref["victims"].get("has") and page.locator("#victims").get_attribute("aria-pressed") != "true":
         page.locator("#victims").click()
     page.locator("#description").fill(" ".join(ref["description_keywords"][:4]) + ", заявитель сообщает о происшествии")

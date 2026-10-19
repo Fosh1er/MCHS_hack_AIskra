@@ -9,7 +9,7 @@ import pytest
 from playwright.sync_api import Page, expect
 
 from tests.e2e.conftest import Session
-from tests.e2e.helpers import COMPOSER, api_card_with_call, party_replies
+from tests.e2e.helpers import COMPOSER, api_card_with_call, ask
 
 pytestmark = pytest.mark.e2e
 DISPATCHERS = {"S101": "dds1", "S103": "dds2"}  # демо-диспетчеры: пожарная и скорая
@@ -61,10 +61,7 @@ def test_dds_queue_statuses_brigade_call_recording(ui: Session) -> None:
     page.get_by_role("button", name="Старший группы").first.click()
     box = page.get_by_placeholder(COMPOSER)
     expect(box).to_be_visible()
-    before = party_replies(page).count()
-    box.fill("Доложите обстановку")
-    box.press("Enter")
-    expect(party_replies(page)).to_have_count(before + 1, timeout=30_000)
+    ask(page, "Доложите обстановку")
     page.locator(".call-panel__end").click()
     expect(page.get_by_label("IP-телефон")).to_contain_text("линия свободна")  # звонок завершён, линия свободна
 

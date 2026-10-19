@@ -10,7 +10,7 @@ import pytest
 from playwright.sync_api import Page, expect
 
 from tests.e2e.conftest import Session, Stand
-from tests.e2e.helpers import fill_card, finish_running_sessions, party_replies, reference, save_card, say, take_call
+from tests.e2e.helpers import ask, fill_card, finish_running_sessions, reference, save_card, take_call
 
 pytestmark = pytest.mark.e2e
 
@@ -124,9 +124,7 @@ def test_session_psy_branching_report_feedback_readiness(ui: Session) -> None:
         view = stand.client("op2").get(f"/training/calls/{call['call_id']}").json()
         assert view.get("psy") and view.get("branching"), view.keys()
         expect(op.locator(".call-psy")).to_contain_text("ECCS")
-        before = party_replies(op).count()
-        say(op, "Я на линии, помощь уже едет. Назовите точный адрес.")
-        expect(party_replies(op)).to_have_count(before + 1, timeout=30_000)
+        ask(op, "Я на линии, помощь уже едет. Назовите точный адрес.")
         op.locator(".call-panel__end").click()
         op.locator(".call-panel").get_by_role("button", name="закрыть").click()
         fill_card(op, reference(stand, call["scenario_id"]))
@@ -142,8 +140,10 @@ def test_session_psy_branching_report_feedback_readiness(ui: Session) -> None:
         tpage.get_by_role("button", name="отчёт").click()
         tpage.wait_for_url(re.compile(r"/report$"))
         tpage.get_by_role("button", name="оценить все карточки").click()
+        expect(tpage.get_by_text(re.compile(r"Оценено карточек: \d"))).to_be_visible()  # отчёт перечитан
         row = tpage.locator("tr", has_text="Волкова Ирина Андреевна").first
         row.click()
+        expect(row).to_have_attribute("aria-expanded", "true")
         sub = tpage.locator("tr.tch-subrow").first
         expect(sub).to_contain_text("ситуация:")  # итог ветвления в отчёте
         sub.get_by_role("button", name="разговор").click()

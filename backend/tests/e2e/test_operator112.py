@@ -14,12 +14,14 @@ from tests.e2e.helpers import (
     PSY_ALWAYS,
     fill_card,
     finish_running_sessions,
-    party_replies,
+    last_line,
+    operator_lines,
     reference,
     save_card,
     say,
     start_session,
     take_call,
+    wait_reply,
 )
 from tests.e2e.mock_llm import STT_TEXT
 
@@ -39,28 +41,28 @@ def test_operator_call_stream_card_assessment(ui: Session) -> None:
 
         call = take_call(page, stand)
         expect(page.locator(".call-psy")).to_contain_text("ECCS")  # шкала состояния заявителя с профилем (F4)
-        before = party_replies(page).count()
-
         # F1: ответ печатается — курсор у растущего текста, затем строка метрик модели
+        n = operator_lines(page).count()
         say(page, "Что у вас случилось? Назовите адрес.")
         streaming = page.locator(".call-panel .arm-msg--streaming")
         expect(streaming.locator(".arm-msg__caret")).to_be_visible()
         expect(streaming).to_contain_text("ИИ генерирует ответ")
-        expect(streaming).not_to_have_count(0)
-        expect(party_replies(page)).to_have_count(before + 1, timeout=30_000)
+        reply = wait_reply(page, n + 1)
         expect(streaming).to_have_count(0)
-        meta = party_replies(page).last.locator(".arm-msg__meta")
-        expect(meta).to_contain_text(re.compile(r"(ИИ · e2e-mock-small · первое слово|ответ по правилам)"))
+        # ответ модели; если проверка профиля его отклонила (RF1-05) — честная подпись о замене
+        expect(reply.locator(".arm-msg__meta")).to_contain_text(
+            re.compile("ИИ · e2e-mock-small · первое слово|ответ модели отклонён проверкой")
+        )
 
         # голосовая реплика: запись с синтетического микрофона → распознавание заглушкой → реплика в разговоре
-        talk = page.locator(".call-panel__talk")
-        if talk.count():
-            talk.click()
-            expect(talk).to_have_attribute("aria-pressed", "true")
-            page.wait_for_timeout(1200)
-            talk.click()
-            expect(page.locator(".call-panel .arm-msg--me").filter(has_text=STT_TEXT)).to_have_count(1)
-            expect(party_replies(page)).to_have_count(before + 2, timeout=30_000)
+        talk = page.locator(".call-panel__talk")  # кнопка есть: распознавание на сервере включено (заглушка)
+        talk.click()
+        expect(talk).to_have_attribute("aria-pressed", "true")
+        page.wait_for_timeout(1200)
+        talk.click()
+        wait_reply(page, n + 2)
+        expect(operator_lines(page).last).to_contain_text(STT_TEXT)
+        expect(last_line(page)).to_have_class("arm-msg arm-msg--them")
         page.locator(".call-panel__end").click()
         expect(page.locator(".call-panel__timer")).to_have_text("завершён")
         page.locator(".call-panel").get_by_role("button", name="закрыть").click()  # панель закрывает опросную карту
