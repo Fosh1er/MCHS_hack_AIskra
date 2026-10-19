@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -21,6 +21,8 @@ from aiskra.shared.text import search_key
 
 NUMBER_BASE = 36_900_000  # восьмизначные номера, как на стенде 2026 («Происшествие 36814851»)
 _NUMBER_ATTEMPTS = 5
+# ключ транзакционной advisory-блокировки PostgreSQL на выдачу номера карточки (любое постоянное число)
+NUMBER_LOCK_KEY = 112_036_900
 
 
 class SqlCardRepository:
@@ -28,7 +30,13 @@ class SqlCardRepository:
         self._s = session
 
     async def add(self, card: IncidentCard) -> None:
-        """Следующий номер = максимум + 1. Две карточки одновременно — повтор с новым номером (уникальный индекс)."""
+        """Следующий номер = максимум + 1. Две карточки одновременно — повтор с новым номером (уникальный индекс).
+
+        В PostgreSQL выдача номера сериализуется блокировкой до конца транзакции: без неё 20 одновременных операторов
+        получали один и тот же максимум, вставка ждала чужой commit, и после 5 повторов запрос падал с 500 (F6.6,
+        нагрузочный тест на PostgreSQL). Блокировка снимается при commit или rollback транзакции карточки."""
+        if self._s.get_bind().dialect.name == "postgresql":
+            await self._s.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": NUMBER_LOCK_KEY})
         for _ in range(_NUMBER_ATTEMPTS):
             current = (await self._s.execute(select(func.max(IncidentCardModel.number)))).scalar_one_or_none()
             card.number = max(current or 0, NUMBER_BASE) + 1
