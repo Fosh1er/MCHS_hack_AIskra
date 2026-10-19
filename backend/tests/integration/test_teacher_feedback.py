@@ -112,9 +112,16 @@ def test_feedback_access(app_client: Callable[[], TestClient], lesson: dict[str,
     assert TestClient(teacher.app).get(f"{A}/my/feedback").status_code == 401
 
 
+def _feedback_events(app_client: Callable[[], TestClient]) -> list[dict[str, Any]]:
+    items = as_user(app_client, "admin").get("/api/v1/audit", params={"page_size": 100}).json()["items"]
+    return [e for e in items if e["event"] == "assessment.feedback_saved"]
+
+
 def test_save_edit_and_student_history(app_client: Callable[[], TestClient], lesson: dict[str, Any]) -> None:
     teacher, student, petrov = (as_user(app_client, u) for u in ("teacher", "student", "petrov"))
     sid, uid = lesson["session_id"], lesson["people"]["student"]
+    # D4: база модуля общая — отзывы могли сохранить тесты, прошедшие раньше; считаем только события этого теста
+    before = len(_feedback_events(app_client))
     base = f"{A}/sessions/{sid}/students/{uid}/feedback"
     draft = teacher.post(f"{base}/draft").json()
     edited = draft["text"] + "\n\nОтдельно: хорошо держали разговор."
@@ -138,14 +145,9 @@ def test_save_edit_and_student_history(app_client: Callable[[], TestClient], les
     assert petrov.get(f"{A}/my/feedback").json() == []  # чужой отзыв не виден
     assert petrov.get(f"{A}/sessions/{sid}/mine").json()["report"]["students"][0]["feedback"] is None
 
-    admin = as_user(app_client, "admin")
-    events = [
-        e
-        for e in admin.get("/api/v1/audit", params={"page_size": 100}).json()["items"]
-        if e["event"] == "assessment.feedback_saved"
-    ]
+    events = _feedback_events(app_client)
     assert (
-        len(events) == 2
+        len(events) - before == 2
         and events[0]["actor_login"] == "teacher"
         and events[0]["event_title"] == "Отзыв преподавателя по занятию"
     )

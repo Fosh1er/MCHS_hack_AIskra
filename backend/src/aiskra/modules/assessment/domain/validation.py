@@ -441,6 +441,11 @@ def run_benchmark(cases: list[ScenarioCase]) -> Benchmark:
         clean112.append(score == 100 and not any(errs.values()))
         pairs.append((True, passed))
         for m in MUTATIONS_112:
+            if m.target not in before:
+                # Критерий для этого сценария не проверяется (например, «Описание»: ни одного ключевого факта
+                # эталона заявитель не произносит, п. 3.5) — ошибку в нём правила по замыслу не ищут, случай
+                # неприменим. Раньше он считался пропуском, и detection < 1 зависел от случайного сценария (D4).
+                continue
             mutated = m.apply(base, ref)
             if mutated is None:
                 continue

@@ -129,19 +129,17 @@ def test_session_with_modifier_call_and_block(app_client: Callable[[], TestClien
 
 def test_pause_and_sensitive_warning(app_client: Callable[[], TestClient]) -> None:
     teacher, student = as_user(app_client, "teacher"), as_user(app_client, "student")
-    sid = teacher.post("/api/v1/training/scenarios/generate", json={"count": 1, "groups": [1]}).json()["ids"][0]
+    # D4: сценарий с кризисным профилем — в своей группе классификатора (2, остальные тесты модуля — в группе 1).
+    # Раньше он лежал в общей группе 1: вызов выбирал его из банка случайно (12 попыток, ≈1 % промахов), а в другом
+    # порядке тестов закреплённый «suicidal» попадал в звонок соседнего теста и ломал его.
+    sid = teacher.post("/api/v1/training/scenarios/generate", json={"count": 1, "groups": [2]}).json()["ids"][0]
     teacher.post(f"/api/v1/training/scenarios/{sid}/approve")
     teacher.post(f"/api/v1/training/scenarios/{sid}/psy", json={"profile": "suicidal"})
     people = {s["login"]: s["id"] for s in teacher.get("/api/v1/training/students").json()}
     session_id = _session(teacher, people["student"], {"enabled": True, "share": 0, "sensitive": ["suicidal"]})
-    warned = None
-    for _ in range(12):  # банк случайный: ждём сценарий с закреплённым профилем
-        call = student.post("/api/v1/training/calls/incoming", json={"groups": [1]}).json()
-        if call["scenario_id"] == sid:
-            warned = call
-            break
-        student.post(f"/api/v1/training/calls/{call['call_id']}/end")
-    assert warned is not None and warned["warning"] and "отказаться" in warned["warning"]
+    warned = student.post("/api/v1/training/calls/incoming", json={"groups": [2]}).json()
+    assert warned["scenario_id"] == sid  # в группе 2 утверждённый сценарий один
+    assert warned["warning"] and "отказаться" in warned["warning"]
     paused = student.post(f"/api/v1/training/calls/{warned['call_id']}/pause")
     assert paused.status_code == 200 and paused.json()["status"] == "ended"
     view = student.get(f"/api/v1/training/calls/{warned['call_id']}").json()

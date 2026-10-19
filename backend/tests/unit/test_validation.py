@@ -46,6 +46,20 @@ def test_benchmark_on_handmade_reference() -> None:
     assert b.cases == len(b.mutations)  # по одной мутации каждого вида на сценарий
 
 
+def test_benchmark_skips_mutation_of_unchecked_criterion() -> None:
+    """D4: заявитель не произносит ни одного ключевого факта описания (офлайн-легенда «Горит мцк» при ключевых
+    словах «открытое пламя») — критерий «Описание» не проверяется (п. 3.5), и пустое описание не случай бенчмарка.
+    Раньше такой сценарий давал detection 0,975, и интеграционный тест падал в зависимости от случайного сценария."""
+    legend = {**LEGEND, "opening": "Алло! Срочно! Горит мцк!", "what": "Горит мцк. Есть угроза людям"}
+    ref = {**REF, "description_keywords": ["открытое", "пламя"]}
+    b = run_benchmark([ScenarioCase(legend, ref, DDS, {"S101", "S103"})])
+    assert "empty_description" not in {m["key"] for m in b.mutations}
+    assert b.detection == 1 and b.localization == 1 and b.critical_caught == 1
+    both = run_benchmark([ScenarioCase(legend, ref, DDS, None), ScenarioCase(LEGEND, REF, DDS, None)])
+    empty = next(m for m in both.mutations if m["key"] == "empty_description")
+    assert empty["cases"] == 1 and empty["detection"] == 1 and both.detection == 1
+
+
 def test_critical_error_fails_regardless_of_score() -> None:
     data, _ = perfect_card(REF)
     criteria = assess_card_112(data, ["S103"], 40, REF, {"address", "what", "victims"})
