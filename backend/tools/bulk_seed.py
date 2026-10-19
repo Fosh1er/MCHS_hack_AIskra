@@ -46,6 +46,7 @@ async def main() -> None:
         for i in range(args.cards):
             cid = uuid.uuid4()
             at = now - timedelta(minutes=rng.randint(0, 365 * 24 * 60))
+            saved = at + timedelta(seconds=rng.randint(40, 200))
             ct, it = rng.choice(TYPES)
             street = rng.choice(STREETS)
             batch_c.append(
@@ -68,7 +69,7 @@ async def main() -> None:
                     "victims_count": 0,
                     "payload": {},
                     "opened_at": at,
-                    "saved_at": at + timedelta(seconds=rng.randint(40, 200)),
+                    "saved_at": saved,
                     "processing_ms": rng.randint(40_000, 200_000),
                     "search_key": f"{start + i} {street.lower()}",
                 }
@@ -82,6 +83,10 @@ async def main() -> None:
                         "is_main": j == 0,
                         "added_by": "auto",
                         "current_status": steps[-1],
+                        # копия из карточки, как при сохранении (6.1): по ним журнал ДДС считает и сортирует;
+                        # без них строки нагрузки в PostgreSQL (NULLS FIRST при DESC) шли бы в начало журнала
+                        "card_saved_at": saved,
+                        "card_number": start + i,
                     }
                 )
                 for k, st in enumerate(steps):
