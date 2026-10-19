@@ -73,7 +73,7 @@ jobs:
     timeout-minutes: 60
     env:
       DURATION: ${{ inputs.duration || '60' }}
-      CARDS: "20000"     # ≈ 5 месяцев работы учебного центра (полный замер — 50 000 и 200 000 аудита)
+      CARDS: "20000"     # ≈ 3 месяца работы учебного центра (полный замер — 50 000 и 200 000 аудита)
       AUDIT: "80000"
     steps:
       - uses: actions/checkout@v4

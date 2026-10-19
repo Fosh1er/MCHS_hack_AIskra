@@ -1,0 +1,208 @@
+{
+  "users": 100,
+  "active_sessions": 20,
+  "duration_s": 63.2,
+  "login_all_s": 2.81,
+  "requests": 5648,
+  "rps": 89.4,
+  "p95_all_ms": 395,
+  "errors": 0,
+  "server_errors": 0,
+  "write_ops_per_s": 140.5,
+  "write_errors": 0,
+  "write_server_errors": 0,
+  "report": {
+    "evaluated": {
+      "assessed": 299,
+      "skipped": 0
+    },
+    "cards": 299,
+    "seconds": 5.22
+  },
+  "ops": [
+    {
+      "op": "GET /dictionaries/addresses/suggest",
+      "n": 136,
+      "errors": 0,
+      "p50_ms": 33,
+      "p95_ms": 398,
+      "p99_ms": 1154,
+      "max_ms": 1178,
+      "server_errors": 0
+    },
+    {
+      "op": "GET /dictionaries/card-types",
+      "n": 242,
+      "errors": 0,
+      "p50_ms": 31,
+      "p95_ms": 458,
+      "p99_ms": 1065,
+      "max_ms": 1226,
+      "server_errors": 0
+    },
+    {
+      "op": "GET /dictionaries/services",
+      "n": 184,
+      "errors": 0,
+      "p50_ms": 37,
+      "p95_ms": 454,
+      "p99_ms": 969,
+      "max_ms": 1202,
+      "server_errors": 0
+    },
+    {
+      "op": "GET /dictionaries/services/resolve",
+      "n": 299,
+      "errors": 0,
+      "p50_ms": 39,
+      "p95_ms": 354,
+      "p99_ms": 566,
+      "max_ms": 667,
+      "server_errors": 0
+    },
+    {
+      "op": "GET /incidents/cards/{id}",
+      "n": 317,
+      "errors": 0,
+      "p50_ms": 36,
+      "p95_ms": 367,
+      "p99_ms": 521,
+      "max_ms": 540,
+      "server_errors": 0
+    },
+    {
+      "op": "GET /incidents/dds/{svc}/journal",
+      "n": 487,
+      "errors": 0,
+      "p50_ms": 34,
+      "p95_ms": 515,
+      "p99_ms": 908,
+      "max_ms": 1142,
+      "server_errors": 0
+    },
+    {
+      "op": "GET /incidents/journal",
+      "n": 856,
+      "errors": 0,
+      "p50_ms": 26,
+      "p95_ms": 440,
+      "p99_ms": 942,
+      "max_ms": 1219,
+      "server_errors": 0
+    },
+    {
+      "op": "GET /training/sessions/my",
+      "n": 137,
+      "errors": 0,
+      "p50_ms": 22,
+      "p95_ms": 328,
+      "p99_ms": 1141,
+      "max_ms": 1144,
+      "server_errors": 0
+    },
+    {
+      "op": "POST /auth/login",
+      "n": 100,
+      "errors": 0,
+      "p50_ms": 442,
+      "p95_ms": 909,
+      "p99_ms": 1023,
+      "max_ms": 1024,
+      "server_errors": 0
+    },
+    {
+      "op": "POST /incidents/cards",
+      "n": 299,
+      "errors": 0,
+      "p50_ms": 40,
+      "p95_ms": 294,
+      "p99_ms": 533,
+      "max_ms": 568,
+      "server_errors": 0
+    },
+    {
+      "op": "POST /incidents/cards/{id}/save",
+      "n": 299,
+      "errors": 0,
+      "p50_ms": 45,
+      "p95_ms": 339,
+      "p99_ms": 597,
+      "max_ms": 707,
+      "server_errors": 0
+    },
+    {
+      "op": "POST /incidents/dds/.../received",
+      "n": 299,
+      "errors": 0,
+      "p50_ms": 29,
+      "p95_ms": 213,
+      "p99_ms": 477,
+      "max_ms": 531,
+      "server_errors": 0
+    },
+    {
+      "op": "POST /incidents/dds/.../status",
+      "n": 299,
+      "errors": 0,
+      "p50_ms": 30,
+      "p95_ms": 298,
+      "p99_ms": 543,
+      "max_ms": 614,
+      "server_errors": 0
+    },
+    {
+      "op": "POST /training/calls/incoming",
+      "n": 299,
+      "errors": 0,
+      "p50_ms": 41,
+      "p95_ms": 1114,
+      "p99_ms": 1264,
+      "max_ms": 1304,
+      "server_errors": 0
+    },
+    {
+      "op": "POST /training/calls/{id}/answer",
+      "n": 299,
+      "errors": 0,
+      "p50_ms": 28,
+      "p95_ms": 161,
+      "p99_ms": 273,
+      "max_ms": 499,
+      "server_errors": 0
+    },
+    {
+      "op": "POST /training/calls/{id}/end",
+      "n": 299,
+      "errors": 0,
+      "p50_ms": 32,
+      "p95_ms": 201,
+      "p99_ms": 416,
+      "max_ms": 460,
+      "server_errors": 0
+    },
+    {
+      "op": "POST /training/calls/{id}/replicas",
+      "n": 897,
+      "errors": 0,
+      "p50_ms": 31,
+      "p95_ms": 404,
+      "p99_ms": 570,
+      "max_ms": 667,
+      "server_errors": 0
+    }
+  ],
+  "thresholds": [
+    {
+      "name": "p95 отклика API, мс",
+      "limit": "≤ 2000",
+      "value": 395,
+      "ok": true
+    },
+    {
+      "name": "ответов 5xx и обрывов",
+      "limit": "≤ 0",
+      "value": 0,
+      "ok": true
+    }
+  ]
+}
