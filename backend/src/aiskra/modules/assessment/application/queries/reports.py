@@ -23,6 +23,7 @@ from aiskra.modules.assessment.application.ports.reports import (
     SessionFacts,
     SessionFactsSource,
 )
+from aiskra.modules.assessment.domain.psy_scoring import StressErrors, stress_errors
 from aiskra.modules.assessment.domain.recommendations import recommend
 from aiskra.modules.assessment.domain.scoring import CARD_NORM_SECONDS, DDS_NORM_SECONDS, TITLES
 from aiskra.shared.application import Query
@@ -105,6 +106,8 @@ class SessionReport:
     heatmap: Heatmap
     time_buckets: list[dict[str, Any]] = field(default_factory=list)
     score_series: list[dict[str, Any]] = field(default_factory=list)
+    # F4: типичные ошибки работы со стрессом по группе (блок «Работа с заявителем»)
+    psy_errors: StressErrors = field(default_factory=lambda: StressErrors(calls=0, items=[]))
 
 
 def _avg(values: list[float]) -> float | None:
@@ -169,11 +172,14 @@ async def build_report(
     norm_dds = float(facts.settings.get("norm_dds", DDS_NORM_SECONDS))
     students, heat_rows, all_scores, all_passed, times, series = [], [], [], [], [], []
     keys: dict[str, str] = {}
+    psy_blocks: list[tuple[str, dict[str, Any]]] = []
     for p in [x for x in facts.participants if only is None or x.student_id == only]:
         results = []
         for card in cards_of(p, facts.cards):
             rec = await repo.latest(card.card_id, p.role, p.service_code if p.role == "dds" else None)
             results.append(_result(card, rec, norm112 if p.role == "112" else norm_dds, p.role))
+            if rec and isinstance(rec.details.get("psy"), dict):
+                psy_blocks.append((str(p.student_id), rec.details["psy"]))
             if rec:
                 series.append(
                     {"t": card.saved_at.isoformat() if card.saved_at else "", "v": rec.score, "who": p.full_name}
@@ -227,6 +233,7 @@ async def build_report(
         heatmap=Heatmap(criteria=[{"key": k, "title": t} for k, t in keys.items()], rows=heat_rows),
         time_buckets=buckets,
         score_series=sorted(series, key=lambda x: x["t"]),
+        psy_errors=stress_errors(psy_blocks),
     )
 
 

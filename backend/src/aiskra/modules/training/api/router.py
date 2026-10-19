@@ -104,6 +104,11 @@ from aiskra.modules.training.application.queries.materials import (
     ListMaterialsHandler,
     MaterialView,
 )
+from aiskra.modules.training.application.queries.psy_methodology import (
+    GetPsyMethodology,
+    MethodologyView,
+    PsyMethodologyHandler,
+)
 from aiskra.modules.training.application.queries.scenarios import (
     GetScenario,
     GetScenarioHandler,
@@ -184,12 +189,19 @@ async def list_scenarios(
     difficulty: int | None = None,
     card_type: str | None = None,
     source: str | None = None,
+    psy: str | None = QueryParam(default=None, description="any — с профилем, none — без, иначе id профиля (F4)"),
     page: int = 1,
     page_size: int = 30,
 ) -> ScenarioPage:
     return await handler(
         ListScenarios(
-            status=status, difficulty=difficulty, card_type=card_type, source=source, page=page, page_size=page_size
+            status=status,
+            difficulty=difficulty,
+            card_type=card_type,
+            source=source,
+            psy=psy,
+            page=page,
+            page_size=page_size,
         )
     )
 
@@ -560,6 +572,18 @@ async def psy_profiles(
         )
         for p in catalog.profiles().values()
     ]
+
+
+@router.get(
+    "/psy/methodology",
+    response_model=MethodologyView,
+    summary="Методика модификатора: научно-методическая основа и профили карточками (F4)",
+)
+async def psy_methodology(
+    _: Annotated[Principal, Depends(require(Permission.DICTIONARIES_READ))],
+    handler: Annotated[PsyMethodologyHandler, Depends(deps.provide_psy_methodology)],
+) -> MethodologyView:
+    return await handler(GetPsyMethodology())
 
 
 @router.post(

@@ -152,7 +152,7 @@ export interface ScenarioView {
   review?: SectionReview[];
 }
 export interface PreviewItem { question: string; answer: string; reference: string }
-export interface ScenarioFilter { status?: string; difficulty?: number; card_type?: string; source?: string; page: number; page_size: number }
+export interface ScenarioFilter { status?: string; difficulty?: number; card_type?: string; source?: string; psy?: string; page: number; page_size: number }
 
 const qs = (o: Record<string, unknown>) =>
   new URLSearchParams(Object.entries(o).filter(([, v]) => v !== undefined && v !== '' && v !== null).map(([k, v]) => [k, String(v)]));
@@ -192,6 +192,19 @@ export interface PsySettings {
 export const PSY_DEFAULTS: PsySettings = { enabled: false, share: 0.3, profiles: 'auto', intensity: 2, weight: 0, sensitive: [], llm_acts: false };
 export const usePsyProfiles = () =>
   useQuery({ queryKey: ['psy-profiles'], queryFn: () => http<PsyProfile[]>(`${T}/psy/profiles`), staleTime: 300_000 });
+/** Методика модификатора (F4): основа, шкала ECCS, профили карточками и реестр источников — всё из каталога. */
+export interface PsySource { code: string; short: string; title: string; url: string | null; official: boolean; doc: string; section: string }
+export interface PsyActItem { code: string; title: string; key: boolean; critical: boolean }
+export interface PsyProfileCard {
+  id: string; title: string; group: PsyProfile['group']; group_title: string; sensitive: boolean; start: number; floor: number; deescalates: boolean;
+  signs: { level: number; title: string; text: string }[]; does: PsyActItem[]; donts: PsyActItem[]; routing: string[]; sources: string[];
+}
+export interface PsyMethodology {
+  version: number; scale: { level: number; title: string }[]; basis: { source: PsySource; use: string }[];
+  profiles: PsyProfileCard[]; sources: Record<string, PsySource>;
+}
+export const usePsyMethodology = () =>
+  useQuery({ queryKey: ['psy-methodology'], queryFn: () => http<PsyMethodology>(`${T}/psy/methodology`), staleTime: Infinity });
 export const useSetScenarioPsy = () =>
   useInvalidating(({ id, profile }: { id: string; profile: string | null }) => post<{ status: string }>(`/scenarios/${id}/psy`, { profile }),
     [['scenarios'], ['scenario']]);

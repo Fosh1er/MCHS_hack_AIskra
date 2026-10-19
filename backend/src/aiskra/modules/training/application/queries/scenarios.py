@@ -19,6 +19,7 @@ class ListScenarios(Query):
     difficulty: int | None = None
     card_type: str | None = None
     source: str | None = None
+    psy: str | None = None  # F4: any — с психологическим профилем, none — без, иначе id профиля
     page: int = 1
     page_size: int = 30
 
@@ -41,6 +42,7 @@ class ListScenariosHandler:
             difficulty=q.difficulty,
             card_type=q.card_type,
             source=q.source,
+            psy=q.psy,
             limit=q.page_size,
             offset=(q.page - 1) * q.page_size,
         )

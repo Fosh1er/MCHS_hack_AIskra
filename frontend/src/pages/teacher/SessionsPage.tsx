@@ -12,6 +12,7 @@ import {
 import { useGroups } from '../../shared/api/admin';
 import { fetchSuggestion, type AssignmentSuggestion } from '../../shared/api/assessment';
 import { TeacherShell } from '../../shared/ui/TeacherShell';
+import { PsyCounter } from '../../shared/ui/PsyCounter';
 import { useScreenTour } from '../../shared/onboarding/OnboardingProvider';
 import { GroupPicker } from './ScenariosPage';
 
@@ -218,7 +219,8 @@ function PsyForm({ value, onChange }: { value: PsySettings; onChange: (v: PsySet
             </label>
           </div>
           <p className="cab-filters__label" style={{ margin: '8px 0 4px' }}>
-            Профили {chosen.length ? `(выбрано ${chosen.length})` : '— не выбраны: подбираются по сложности сценария'}. 0 % веса — блок показывается рядом с баллом, в итог не входит.
+            Профили {chosen.length ? `(выбрано ${chosen.length} из ${profiles.length})` : `— не выбраны: подбираются из ${profiles.length} по сложности сценария`}. 0 % веса — блок показывается рядом с баллом, в итог не входит.
+            {' '}<a href="/teacher/methodology" target="_blank" rel="noreferrer">Методика и источники</a>
           </p>
           {groups.map(([g, list]) => list.length > 0 && (
             <div key={g} style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 6 }}>
@@ -262,19 +264,20 @@ export function SessionsPage() {
       {creating && <CreateForm assign={assign} onCreated={(id) => navigate(`/teacher/sessions/${id}`)} />}
       <Card flush tour="t-session-list">
         <table className="cab-table">
-          <thead><tr><th>Занятие</th><th>Тип</th><th className="num">Участников</th><th>Начало</th><th>Статус</th><th /></tr></thead>
+          <thead><tr><th>Занятие</th><th>Тип</th><th className="num">Участников</th><th>Заявитель в стрессе</th><th>Начало</th><th>Статус</th><th /></tr></thead>
           <tbody>
             {sessions.data?.items.map((s) => (
               <tr key={s.id}>
                 <td><a href={`/teacher/sessions/${s.id}`} onClick={(e) => { e.preventDefault(); navigate(`/teacher/sessions/${s.id}`); }}>{s.title}</a></td>
                 <td>{MODE_TITLE[s.mode]}</td>
                 <td className="num">{s.participants.length}</td>
+                <td><PsyCounter psy={s.settings.psy} /></td>
                 <td>{s.started_at ? new Date(s.started_at).toLocaleString('ru-RU') : '—'}</td>
                 <td><StatusPill status={s.status === 'running' ? 'ok' : s.status === 'planned' ? 'info' : 'neutral'}>{SESSION_STATUS[s.status]}</StatusPill></td>
                 <td>{s.status !== 'planned' && <Button size="sm" variant="ghost" icon="bar_chart" onClick={() => navigate(`/teacher/sessions/${s.id}/report`)}>отчёт</Button>}</td>
               </tr>
             ))}
-            {sessions.data && !sessions.data.total && <tr><td colSpan={6} className="c-slate">Занятий пока нет.</td></tr>}
+            {sessions.data && !sessions.data.total && <tr><td colSpan={7} className="c-slate">Занятий пока нет.</td></tr>}
           </tbody>
         </table>
       </Card>

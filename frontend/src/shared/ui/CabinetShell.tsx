@@ -21,6 +21,7 @@ export const NAV: Record<'teacher' | 'admin' | 'student', { role: string; items:
       { id: 'readiness', label: 'Допуск', icon: 'check_circle', href: '/teacher/readiness' },
       { id: 'validation', label: 'Достоверность', icon: 'shield', href: '/teacher/validation' },
       { id: 'materials', label: 'Учебные материалы', icon: 'description', href: '/teacher/materials' },
+      { id: 'methodology', label: 'Методика', icon: 'bookmark', href: '/teacher/methodology' }, // F4: основа модификатора
       { id: 'journal', label: 'Журнал 112', icon: 'table', href: '/arm/112/journal', group: 'АРМ' },
       { id: 'dds', label: 'АРМ ДДС', icon: 'headset', href: '/arm/dds' },
       { id: 'voice', label: 'Голосовой полигон', icon: 'headset', href: VOICE_LAB },

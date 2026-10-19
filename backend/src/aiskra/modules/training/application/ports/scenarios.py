@@ -55,6 +55,7 @@ class ScenarioRepository(Protocol):
         source: str | None,
         limit: int,
         offset: int,
+        psy: str | None = None,
     ) -> tuple[list[ScenarioRow], int]: ...
 
     async def random_approved(

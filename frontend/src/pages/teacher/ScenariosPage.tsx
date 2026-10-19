@@ -10,6 +10,7 @@ import {
 import { TeacherShell } from '../../shared/ui/TeacherShell';
 import { useScreenTour } from '../../shared/onboarding/OnboardingProvider';
 import { ReferenceReview, ReworkNotes } from './ReferenceReview';
+import { SourceRefs } from '../../shared/ui/PsySources';
 
 const STATUS: Record<ScenarioRow['status'], { label: string; pill: 'info' | 'ok' | 'neutral' }> = {
   draft: { label: 'на проверке', pill: 'info' },
@@ -146,7 +147,7 @@ function PsyPick({ s }: { s: ScenarioView }) {
       {current && (
         <small className="c-slate">
           Старт: {current.speech[String(current.start)]} Работает, если в занятии включён модификатор
-          {current.sensitive ? ' и профиль явно разрешён' : ''}. Источники: {current.sources.join(', ')}.
+          {current.sensitive ? ' и профиль явно разрешён' : ''}. <SourceRefs codes={current.sources} label="Источники" />.
         </small>
       )}
       {setPsy.isError && <Banner status="critical">{setPsy.error.message}</Banner>}
@@ -198,6 +199,8 @@ export function ScenariosPage() {
   const [picked, setPicked] = useState<string | null>(null);
   const [info, setInfo] = useState('');
   const list = useScenarios(f);
+  const psyProfiles = usePsyProfiles().data ?? [];
+  const psyTitle = new Map(psyProfiles.map((p) => [p.id, p.title]));
   useScreenTour('teacher-scenarios', !!list.data);
   const titles = new Map((cardTypes.data ?? []).map((t) => [t.code, t.title]));
   const total = list.data?.total ?? 0;
@@ -223,6 +226,13 @@ export function ScenariosPage() {
         <select className="cab-select" aria-label="Источник" value={f.source ?? ''} onChange={(e) => set({ source: e.target.value || undefined })}>
           <option value="">любой источник</option><option value="ai">ИИ</option><option value="template">шаблон</option>
         </select>
+        {/* F4: сценарии с закреплённым психологическим профилем заявителя */}
+        <select className="cab-select" aria-label="Психологический профиль" value={f.psy ?? ''} onChange={(e) => set({ psy: e.target.value || undefined })}>
+          <option value="">с профилем и без</option>
+          <option value="any">с психологическим профилем</option>
+          <option value="none">без профиля</option>
+          {psyProfiles.map((p) => <option key={p.id} value={p.id}>профиль: {p.title}</option>)}
+        </select>
       </div>
       <div className="cab-grid cab-grid--main-aside">
         <Card flush tour="t-list">
@@ -231,7 +241,10 @@ export function ScenariosPage() {
             <tbody>
               {list.data?.items.map((s) => (
                 <tr key={s.id} onClick={() => setPicked(s.id)} className={picked === s.id ? 'is-picked' : ''} style={{ cursor: 'pointer' }}>
-                  <td>{s.title}</td>
+                  <td>
+                    {s.title}
+                    {s.psy_profile && <> <span title="Психологический профиль заявителя (методика — раздел «Методика»)"><Tag variant="blue">{psyTitle.get(s.psy_profile) ?? s.psy_profile}</Tag></span></>}
+                  </td>
                   <td>{s.card_type_code ? titles.get(s.card_type_code) ?? s.card_type_code : '—'}</td>
                   <td className="num">{s.difficulty}</td>
                   <td>{SOURCE[s.source] ?? s.source}</td>

@@ -43,6 +43,7 @@ from aiskra.modules.assessment.application.queries.analytics import (
 )
 from aiskra.modules.assessment.application.queries.assessments import GetAssessmentHandler, GroupInsightsHandler
 from aiskra.modules.assessment.application.queries.feedback import DraftFeedbackHandler, MyFeedbackHandler
+from aiskra.modules.assessment.application.queries.psy_basis import PsyBasisHandler
 from aiskra.modules.assessment.application.queries.reports import (
     GetMySessionReportHandler,
     GetSessionReportHandler,
@@ -173,6 +174,7 @@ from aiskra.modules.training.application.commands.sessions import (
 from aiskra.modules.training.application.psy import PsyDirector
 from aiskra.modules.training.application.queries.calls import CardCallsHandler, GetCallHandler
 from aiskra.modules.training.application.queries.materials import GetMaterialHandler, ListMaterialsHandler
+from aiskra.modules.training.application.queries.psy_methodology import PsyMethodologyHandler
 from aiskra.modules.training.application.queries.scenarios import (
     GetScenarioHandler,
     ListScenariosHandler,
@@ -652,6 +654,7 @@ def _wire_training(app: FastAPI, services: Services) -> None:
     ov[training_deps.provide_pause_call] = pause_call
     ov[training_deps.provide_set_scenario_psy] = set_scenario_psy
     ov[training_deps.provide_psy_catalog] = lambda: catalog
+    ov[training_deps.provide_psy_methodology] = lambda: PsyMethodologyHandler(catalog)  # F4
     ov[training_deps.provide_get_call] = get_call
     ov[training_deps.provide_replica_audio] = replica_audio
     ov[training_deps.provide_call_recording] = call_recording
@@ -825,6 +828,7 @@ def _wire_assessment(app: FastAPI, services: Services) -> None:
     ov[assessment_deps.provide_assess] = assess
     ov[assessment_deps.provide_get] = get
     ov[assessment_deps.provide_insights] = insights
+    ov[assessment_deps.provide_psy_basis] = PsyBasisHandler  # F4
     ov[assessment_deps.provide_override] = override
     ov[assessment_deps.provide_report] = report
     ov[assessment_deps.provide_my_report] = my_report

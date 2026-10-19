@@ -53,6 +53,7 @@ from aiskra.modules.assessment.application.queries.feedback import (
     MyFeedback,
     MyFeedbackHandler,
 )
+from aiskra.modules.assessment.application.queries.psy_basis import GetPsyBasis, PsyBasisHandler, PsyBasisView
 from aiskra.modules.assessment.application.queries.reports import (
     GetMySessionReport,
     GetMySessionReportHandler,
@@ -118,6 +119,18 @@ async def insights(
     handler: Annotated[GroupInsightsHandler, Depends(deps.provide_insights)],
 ) -> Insights:
     return await handler(GroupInsights())
+
+
+@router.get(
+    "/psy/basis",
+    response_model=PsyBasisView,
+    summary="Блок «Работа с заявителем»: почему важен каждый критерий и источники запретов (F4)",
+)
+async def psy_basis(
+    _: Annotated[Principal, Depends(require(Permission.RESULTS_READ_OWN, Permission.RESULTS_READ_ALL))],
+    handler: Annotated[PsyBasisHandler, Depends(deps.provide_psy_basis)],
+) -> PsyBasisView:
+    return await handler(GetPsyBasis())
 
 
 Teacher = Annotated[Principal, Depends(require(Permission.RESULTS_READ_ALL))]

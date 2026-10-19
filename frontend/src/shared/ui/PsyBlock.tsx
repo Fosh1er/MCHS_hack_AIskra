@@ -1,9 +1,14 @@
 /** Блок «Работа с заявителем» (п. 3.7): критерии и лента разбора «реплика → действия → состояние заявителя».
- *  Методика — docs/research/psychology/05; основания — профстандарт 12.002, пособия ЦЭПП МЧС, шкала ECCS IAED. */
+ *  Методика — docs/research/psychology/05; основания — профстандарт 12.002, пособия ЦЭПП МЧС, шкала ECCS IAED.
+ *  F4: у каждого критерия — «почему это важно» и источник, у каждой ошибки в ленте — источник (один клик до первоисточника).
+ *  Основания пишутся в details.psy оценки; у оценок до F4 их нет — берём из `GET /assessment/psy/basis`. */
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Icon } from '@smena112/ui-kit';
-import type { PsyBlock as Block, PsyTimelineItem } from '../api/assessment';
+import { usePsyBasis, type Cite, type PsyBlock as Block, type PsyTimelineItem } from '../api/assessment';
+import { usePsyMethodology } from '../api/training';
 import { num } from '../format';
+import { SourceRefs, useMethodologyHref } from './PsySources';
 
 const LEVEL = ['', 'спокоен', 'тревожен', 'расстроен', 'не сотрудничает', 'неуправляем'];
 
@@ -22,6 +27,9 @@ function mmss(s: number) {
 }
 
 export function PsyTimeline({ items }: { items: PsyTimelineItem[] }) {
+  const legacy = items.some((t) => t.acts?.some((a) => !a.good && !a.sources));
+  const basis = usePsyBasis(legacy).data;
+  const actSources = (code: string, own?: Cite[]) => own ?? basis?.acts.find((a) => a.key === code)?.sources;
   return (
     <ol className="psy-timeline" aria-label="Лента разбора звонка">
       {items.filter((t) => t.speaker !== 'system').map((t, i) => (
@@ -37,7 +45,10 @@ export function PsyTimeline({ items }: { items: PsyTimelineItem[] }) {
           {t.speaker === 'operator' && (t.acts?.length ?? 0) > 0 && (
             <span className="psy-timeline__acts">
               {t.acts!.map((a) => (
-                <span key={a.code} className={`psy-act${a.good ? '' : ' psy-act--bad'}`} title={a.why || a.title}>{a.good ? '✓' : '✗'} {a.title}</span>
+                <span key={a.code} className={`psy-act${a.good ? '' : ' psy-act--bad'}`} title={a.why || a.title}>
+                  {a.good ? '✓' : '✗'} {a.title}
+                  {!a.good && <> · <SourceRefs cites={actSources(a.code, a.sources)} label="" /></>}
+                </span>
               ))}
               {t.level_before != null && t.level_after != null && t.level_before !== t.level_after && (
                 <span className={`psy-act${t.level_after > t.level_before ? ' psy-act--bad' : ''}`}>
@@ -54,8 +65,13 @@ export function PsyTimeline({ items }: { items: PsyTimelineItem[] }) {
 
 export function PsyBlockView({ block }: { block: Block }) {
   const [showTimeline, setShowTimeline] = useState(false);
+  const legacy = !block.paused && (block.criteria ?? []).some((c) => c.why === undefined);
+  const basis = usePsyBasis(legacy).data;
+  const official = usePsyMethodology().data?.basis ?? [];
+  const methodology = useMethodologyHref();
   if (block.paused) return <div className="assess__psy"><p className="assess__note">Работа с заявителем: {block.note}</p></div>;
   const st = block.stats;
+  const why = (key: string) => basis?.criteria.find((b) => b.key === key);
   return (
     <div className="assess__psy" aria-label="Работа с заявителем">
       <div className="assess__psy-head">
@@ -79,6 +95,11 @@ export function PsyBlockView({ block }: { block: Block }) {
             {c.score == null
               ? <span className="assess__na" title={c.note}>{c.note || 'не проверено'}</span>
               : <span className="assess__bar" aria-label={`${Math.round(c.score * 100)} %`}><span style={{ width: `${Math.round(c.score * 100)}%` }} className={c.score >= 0.7 ? 'ok' : c.score >= 0.4 ? 'warn' : 'bad'} /></span>}
+            {(c.why ?? why(c.key)?.why) && (
+              <span className="assess__detail">
+                {c.why ?? why(c.key)?.why} <SourceRefs cites={c.sources ?? why(c.key)?.sources} />
+              </span>
+            )}
             {c.errors.length > 0 && <ul className="assess__errors">{c.errors.map((e) => <li key={e}>{e}</li>)}</ul>}
           </li>
         ))}
@@ -90,8 +111,9 @@ export function PsyBlockView({ block }: { block: Block }) {
       )}
       {showTimeline && block.timeline && <PsyTimeline items={block.timeline} />}
       <p className="assess__psy-sources">
-        Методика: профстандарт 12.002 (приказ Минтруда № 681н), пособия ЦЭПП МЧС России 2012 и 2023, «Первая помощь» Минздрава 2025,
-        шкала ECCS IAED, APCO/NENA ANS 1.107.2-2025.{st.sources?.length ? ` Источники профиля: ${st.sources.join(', ')}.` : ''}
+        <SourceRefs codes={official.map((b) => b.source.code)} label="Методика" />
+        {st.sources?.length ? <>. <SourceRefs codes={st.sources} label={`Состояние «${st.title}»`} /></> : null}
+        {'. '}<Link to={methodology}>Подробнее — «Методика»</Link>
       </p>
     </div>
   );

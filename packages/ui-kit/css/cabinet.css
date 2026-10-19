@@ -428,10 +428,11 @@
 @media (max-width: 600px) {
   .cab-select, .cab-filters input { max-width: 100%; min-width: 0; }
   .cab-filters { flex-direction: column; align-items: stretch; }
-  .cab-filters > .cab-seg { max-width: 100%; overflow-x: auto; display: flex; }
+  .cab-filters > .cab-seg, .cab-topbar__actions > .cab-seg { max-width: 100%; overflow-x: auto; display: flex; }
   .cab-seg button { flex: 0 0 auto; }
   .cab-topbar__main { flex-basis: 100%; }
-  .cab-topbar__actions > * { flex: 0 1 auto; }
+  .cab-topbar__actions { max-width: 100%; min-width: 0; }
+  .cab-topbar__actions > * { flex: 0 1 auto; min-width: 0; }
   .cab-card__head { flex-wrap: wrap; gap: 8px; }
   .cab-kpis { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   .tch-dl { grid-template-columns: minmax(0, 1fr); }
@@ -607,3 +608,17 @@
 
 /* Группа кнопок в шапке — цель подсказки обучения интерфейсу (п. 5.4) */
 .tch-tour-group { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+
+/* ---------- Методика психологического модификатора (F4): основа, профили карточками, ссылки на источники ---------- */
+.mth-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(340px, 100%), 1fr)); gap: var(--sp-3); align-items: start; }
+.mth-profile { display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-sm); }
+.mth-line { margin: 0; font-size: var(--fs-sm); color: var(--text-strong); overflow-wrap: anywhere; }
+.mth-sect { margin-top: 8px; font-size: var(--fs-sm); font-weight: var(--fw-bold); color: var(--text-strong); }
+.mth-list { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 2px; }
+.mth-basis { margin: 8px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-md); overflow-wrap: anywhere; }
+.mth-scale { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: var(--fs-sm); }
+.mth-levels { grid-template-columns: 130px minmax(0, 1fr); margin-top: 6px; font-size: var(--fs-sm); }
+.mth-sources { margin-top: 8px; padding-top: 6px; border-top: 1px solid var(--border-subtle); }
+.psy-src { color: var(--text-muted); overflow-wrap: anywhere; }
+.psy-act .psy-src, .psy-act .psy-src a { color: inherit; }
+@media (max-width: 600px) { .mth-levels { grid-template-columns: minmax(0, 1fr); } }
