@@ -28,3 +28,6 @@ var/
 
 # самоподписанный сертификат dev-сервера (make dev-cert)
 .cert/
+
+# e2e (F6.5): снимки экрана и консоль упавших тестов
+backend/tests/e2e/artifacts/

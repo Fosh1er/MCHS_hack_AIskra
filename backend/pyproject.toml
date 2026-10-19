@@ -42,8 +42,10 @@ packages = ["src/aiskra"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
-testpaths = ["tests"]
+# e2e (F6.5) — только явно: `make e2e` (pytest tests/e2e); в обычный прогон и `make be-test` не входят
+testpaths = ["tests/unit", "tests/integration"]
 pythonpath = ["src"]
+markers = ["e2e: сквозные сценарии в браузере (Playwright), стенд поднимается сам — make e2e"]
 
 # ---------------------------------------------------------------- ruff
 [tool.ruff]
