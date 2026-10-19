@@ -1,5 +1,6 @@
 /* Компоненты АРМ-скина: копия АРМ-112 / АРМ-ДДС + учебные надстройки (тренажёрная полоса, софтфон, очередь). */
 import type { CSSProperties, InputHTMLAttributes, ReactNode } from 'react';
+import { useEffect, useRef } from 'react';
 import { Icon, type IconName } from './Icon';
 import { StatusPill } from './primitives';
 import { cx, formatMmSs, formatTimer, normStatus } from './util';
@@ -386,17 +387,32 @@ export function LineKeys({ lines }: { lines: { label: string; state: LineState }
   );
 }
 
-export interface TranscriptMessage { from: 'me' | 'them' | 'sys'; who?: string; text: string; note?: string }
+/** Реплика разговора. `streaming` — ответ ещё генерируется: курсор и проявление последнего куска `fresh`
+ *  (хвост `text`); `meta` — мелкая строка под репликой (например, кто и как быстро написал ответ). */
+export interface TranscriptMessage {
+  from: 'me' | 'them' | 'sys'; who?: string; text: string; note?: string;
+  streaming?: boolean; fresh?: string; meta?: string; replaced?: boolean;
+}
 export function Transcript({ messages }: { messages: TranscriptMessage[] }) {
+  const box = useRef<HTMLDivElement>(null);
+  const last = messages[messages.length - 1];
+  // прокручиваем только сам разговор, не страницу: оператор в это время заполняет карточку
+  useEffect(() => { const el = box.current; if (el) el.scrollTop = el.scrollHeight; }, [messages.length, last?.text]);
   return (
-    <div className="arm-transcript u-scroll" aria-live="polite">
-      {messages.map((m, i) => (
-        <div key={i} className={cx('arm-msg', `arm-msg--${m.from}`)}>
-          {m.who && m.from !== 'sys' && <span className="arm-msg__who">{m.who}</span>}
-          {m.note && <em className="arm-msg__note">{m.note} </em>}
-          {m.text}
-        </div>
-      ))}
+    <div ref={box} className="arm-transcript u-scroll" aria-live="polite" aria-busy={messages.some((m) => m.streaming)}>
+      {messages.map((m, i) => {
+        const fresh = m.streaming && m.fresh && m.text.endsWith(m.fresh) ? m.fresh : '';
+        return (
+          <div key={i} className={cx('arm-msg', `arm-msg--${m.from}`, m.streaming && 'arm-msg--streaming', m.replaced && 'arm-msg--replaced')}>
+            {m.who && m.from !== 'sys' && <span className="arm-msg__who">{m.who}</span>}
+            {m.note && <em className="arm-msg__note">{m.note} </em>}
+            {fresh ? m.text.slice(0, m.text.length - fresh.length) : m.text}
+            {fresh && <span key={m.text.length} className="arm-msg__fresh">{fresh}</span>}
+            {m.streaming && <span className="arm-msg__caret" aria-hidden="true" />}
+            {m.meta && <span className="arm-msg__meta">{m.meta}</span>}
+          </div>
+        );
+      })}
     </div>
   );
 }

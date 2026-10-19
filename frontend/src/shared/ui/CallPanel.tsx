@@ -10,13 +10,51 @@
  *  распознаются и уходят собеседнику по очереди; оператор заговорил — собеседник замолкает (перебивание). */
 import { useEffect, useRef, useState } from 'react';
 import { Composer, Icon, Transcript, type TranscriptMessage } from '@smena112/ui-kit';
-import { endCall, getCall, pauseCall, replicaAudioUrl, sendReplica, transcribe, useSpeechStatus, type CallMessage, type ReplicaVia, type Tone } from '../api/training';
+import { ApiError } from '../api/http';
+import { endCall, getCall, pauseCall, replicaAudioUrl, sendReplica, speakUrl, streamReplica, transcribe, useSpeechStatus, type CallMessage, type PsyLive, type Replica, type ReplicaVia, type StreamMetrics, type Tone } from '../api/training';
 import { useActiveTour } from '../onboarding/OnboardingProvider';
 import { useHandsFree, type HandsFreeState } from '../voice/useHandsFree';
 import { VAD_PROFILES, isLikelyEcho, type VadProfileName } from '../voice/vad';
 
 /** Ремарки заявителя (п. 3.7): «плачет», «кричит» — показываются курсивом перед репликой, в озвучку не идут. */
 const note = (m: CallMessage) => (m.remarks && m.remarks.length ? `(${m.remarks.join(', ')})` : undefined);
+
+/** Реплика в панели: `aiLine` — кто и как быстро написал ответ (F1), `voiced` — уже озвучена по фразам во время потока. */
+type Msg = CallMessage & { aiLine?: string; voiced?: boolean };
+/** Ответ, который ещё генерируется (F1). */
+interface Live { text: string; fresh: string; tone?: Tone | null; model?: string; remarks: string[]; replaced: boolean }
+
+const sec = (ms: number) => `${(ms / 1000).toFixed(1).replace('.', ',')} с`;
+/** «ИИ · demo-m · первое слово 0,4 с · ответ 2,1 с» или «ответ по правилам» — честно, без имитации модели. */
+function metricsLine(m: StreamMetrics): string {
+  if (m.source === 'rules') return m.replaced ? 'ответ модели отклонён проверкой — ответ по правилам' : 'ответ по правилам (без модели)';
+  const parts = ['ИИ', m.model ?? 'модель'];
+  if (m.ttft_ms != null) parts.push(`первое слово ${sec(m.ttft_ms)}`);
+  parts.push(`ответ ${sec(m.total_ms)}`);
+  if (m.pieces_per_s) parts.push(`${String(m.pieces_per_s).replace('.', ',')} ток/с`);
+  return parts.join(' · ');
+}
+/** Граница фразы для озвучки по ходу генерации: знак конца предложения и пробел после него. */
+const SENTENCE = /^[\s\S]*?[.!?…]+(?=\s)/;
+
+const ECCS_TITLE: Record<number, string> = { 1: 'спокоен', 2: 'тревожен, сотрудничает', 3: 'расстроен, сотрудничает', 4: 'не сотрудничает', 5: 'неуправляем' };
+/** Шкала состояния заявителя с психологическим профилем (п. 3.7, F4): уровень ECCS 1–5 и что его изменило. */
+function PsyMeter({ level, title, last }: { level: number; title?: string; last?: PsyLive | null }) {
+  const change = last ? last.level_after - last.level_before : 0;
+  const why = last?.deltas.filter((d) => d.change !== 0).map((d) => last.acts.find((a) => a.code === d.cause)?.title ?? d.note ?? d.cause).filter(Boolean);
+  return (
+    <div className="call-psy" role="status" aria-live="polite" title="Шкала эмоционального состояния ECCS (IAED): 1 — спокоен, 5 — неуправляем">
+      <span className="call-psy__label">Состояние · ECCS {level}/5</span>
+      <span className="call-psy__bar" aria-hidden="true">
+        {[1, 2, 3, 4, 5].map((n) => <span key={n} className={`call-psy__seg${n <= level ? ` is-on is-l${level}` : ''}`} />)}
+      </span>
+      <span className="call-psy__title">{title ?? ECCS_TITLE[level]}</span>
+      {change !== 0 && why && why.length > 0 && (
+        <span className={`call-psy__why ${change > 0 ? 'is-up' : 'is-down'}`}>{change > 0 ? '▲' : '▼'} {why.join('; ')}</span>
+      )}
+    </div>
+  );
+}
 
 const pad = (n: number) => String(n).padStart(2, '0');
 const MAX_TALK_MS = 30_000; // реплика в трубку — не дольше 30 с, дальше запись останавливается сама
@@ -100,7 +138,9 @@ export function CallPanel({ callId, title, subtitle, partyName, initial, onEnded
   callId: string; title: string; subtitle?: string; partyName: string; initial?: CallMessage[];
   onEnded?: () => void; onClose?: () => void;
 }) {
-  const [messages, setMessages] = useState<CallMessage[]>(initial ?? []);
+  const [messages, setMessages] = useState<Msg[]>(initial ?? []);
+  const [live, setLive] = useState<Live | null>(null);
+  const [psyLevel, setPsyLevel] = useState<{ level: number; title?: string; last?: PsyLive | null } | null>(null);
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const [ended, setEnded] = useState(false);
@@ -115,7 +155,11 @@ export function CallPanel({ callId, title, subtitle, partyName, initial, onEnded
   const status = useSpeechStatus();
   const serverVoice = status.data?.tts ?? false;
 
+  const phrases = useRef<HTMLAudioElement[]>([]); // F1: фразы ответа, ждущие озвучки (звук уже грузится)
+  const spokenUpTo = useRef(0);
   const stopVoice = () => {
+    phrases.current.forEach((a) => { a.src = ''; });
+    phrases.current = [];
     audio.current?.pause();
     audio.current = null;
     try { window.speechSynthesis?.cancel(); } catch { /* нет синтеза */ }
@@ -139,19 +183,48 @@ export function CallPanel({ callId, title, subtitle, partyName, initial, onEnded
   };
   useEffect(() => () => stopVoice(), []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  /** F1: озвучка по фразам, пока ответ ещё пишется. Только серверный голос — браузерный говорит реплику целиком. */
+  const playPhrases = () => {
+    const a = audio.current ? undefined : phrases.current.shift();
+    if (!a) return;
+    audio.current = a;
+    const next = () => { if (audio.current === a) { audio.current = null; playPhrases(); } };
+    a.onended = next;
+    a.onerror = next;
+    a.play().catch(next);
+  };
+  const sayPhrase = (text: string, tone?: Tone | null) => {
+    const t = text.trim();
+    if (t.length < 2) return;
+    lastParty.current = { text: (lastParty.current?.text ?? '') + ' ' + t, at: Date.now() };
+    const a = new Audio(speakUrl(callId, t, tone)); // синтез начинается сразу, пока звучит предыдущая фраза
+    a.preload = 'auto';
+    phrases.current.push(a);
+    playPhrases();
+  };
+  const feedPhrases = (text: string, tone?: Tone | null) => {
+    for (let rest = text.slice(spokenUpTo.current), m = SENTENCE.exec(rest); m; m = SENTENCE.exec(rest)) {
+      sayPhrase(m[0], tone);
+      spokenUpTo.current += m[0].length;
+      rest = text.slice(spokenUpTo.current);
+    }
+  };
+
   useEffect(() => {
     getCall(callId).then((c) => {
       setMessages(c.messages);
       setStartedAt(new Date(c.answered_at ?? c.started_at).getTime());
       setEnded(c.status === 'ended');
       setPsy(!!c.psy);
+      if (c.psy) setPsyLevel({ level: c.psy.level });
     }).catch(() => undefined);
   }, [callId]);
   useEffect(() => { if (ended) return; const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, [ended]);
   useEffect(() => {
     if (status.isLoading) return; // сначала узнаём, есть ли серверный голос, — иначе первую реплику скажет браузер
     const party = messages.filter((m) => m.speaker === 'party');
-    if (voice && party.length > spoken.current) play(party[party.length - 1]);
+    const last = party[party.length - 1];
+    if (voice && party.length > spoken.current && !last.voiced) play(last);
     spoken.current = party.length;
   }, [messages, voice, status.isLoading]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -161,10 +234,37 @@ export function CallPanel({ callId, title, subtitle, partyName, initial, onEnded
     setBusy(true);
     setError('');
     setMessages((m) => [...m, { speaker: 'operator', text: t, at: new Date().toISOString() }]);
+    const phrased = voice && serverVoice; // озвучка по фразам — пока ответ пишется
+    const cur: Live = { text: '', fresh: '', remarks: [], replaced: false };
+    spokenUpTo.current = 0;
+    if (phrased) stopVoice();
     try {
-      const r = await sendReplica(callId, t, via);
+      let r: Replica & { metrics?: StreamMetrics };
+      try {
+        r = await streamReplica(callId, t, via, {}, (e) => {
+          if (e.type === 'state') {
+            cur.tone = e.tone ?? cur.tone;
+            if (e.psy) { const p = e.psy; setPsy(true); setPsyLevel({ level: p.level_after, title: p.level_title, last: p }); }
+          } else if (e.type === 'model') cur.model = e.model;
+          else if (e.type === 'token') {
+            cur.text += e.text;
+            cur.fresh = e.text;
+            if (phrased && !cur.replaced) feedPhrases(cur.text, cur.tone);
+          } else if (e.type === 'remark') cur.remarks.push(e.text);
+          else if (e.type === 'replace') { cur.replaced = true; if (phrased) stopVoice(); }
+          setLive({ ...cur });
+        });
+      } catch (e) {
+        if (!(e instanceof ApiError) || (e.status !== 404 && e.status !== 405)) throw e;
+        r = await sendReplica(callId, t, via); // сервер без потока — ответ целиком
+      }
+      const voiced = phrased && spokenUpTo.current > 0 && !cur.replaced;
+      if (voiced) sayPhrase(r.text.slice(spokenUpTo.current), r.tone ?? cur.tone); // хвост после последней фразы
       if (r.voice) setPsy(true);
-      setMessages((m) => [...m, { speaker: r.speaker, text: r.text, at: new Date().toISOString(), id: r.message_id, tone: r.tone, remarks: r.remarks }]);
+      setMessages((m) => [...m, {
+        speaker: r.speaker, text: r.text, at: new Date().toISOString(), id: r.message_id, tone: r.tone, remarks: r.remarks,
+        aiLine: r.metrics ? metricsLine(r.metrics) : undefined, voiced,
+      }]);
       if (r.hung_up) { // заявитель положил трубку — по ПП РФ № 1931 обратный вызов через 10 с
         setMessages((m) => [...m, { speaker: 'system', text: 'Заявитель положил трубку. Перезвоните ему по номеру АОН.', at: new Date().toISOString() }]);
         setEnded(true);
@@ -173,6 +273,7 @@ export function CallPanel({ callId, title, subtitle, partyName, initial, onEnded
     } catch (e) {
       setError((e as Error).message);
     } finally {
+      setLive(null);
       setBusy(false);
     }
   };
@@ -264,8 +365,18 @@ export function CallPanel({ callId, title, subtitle, partyName, initial, onEnded
     who: m.speaker === 'operator' ? 'Вы' : m.tone ? `${partyName} · ${m.tone.emotion_title}` : partyName,
     text: m.text,
     note: m.speaker === 'party' ? note(m) : undefined,
+    meta: m.aiLine,
   }));
-  if (busy) transcript.push({ from: 'sys', text: `${partyName} отвечает…` });
+  if (live && live.text) {
+    transcript.push({
+      from: 'them', who: live.tone ? `${partyName} · ${live.tone.emotion_title}` : partyName,
+      text: live.text, fresh: live.fresh, streaming: true, replaced: live.replaced,
+      note: live.remarks.length ? `(${live.remarks.join(', ')})` : undefined,
+      meta: live.replaced ? 'ответ модели не прошёл проверку — заменяется' : `ИИ генерирует ответ · ${live.model ?? 'модель'}`,
+    });
+  } else if (busy) {
+    transcript.push({ from: 'sys', text: live?.model ? `${partyName} отвечает · ИИ ${live.model} думает…` : `${partyName} отвечает…` });
+  }
 
   return (
     <aside className="call-panel arm-dock" aria-label={`Разговор: ${title}`}>
@@ -277,6 +388,7 @@ export function CallPanel({ callId, title, subtitle, partyName, initial, onEnded
         {subtitle && <div className="call-panel__sub">{subtitle}</div>}
       </div>
       <div className="arm-dock__section arm-dock__section--grow">
+        {psyLevel && <PsyMeter level={psyLevel.level} title={psyLevel.title} last={psyLevel.last} />}
         <Transcript messages={transcript} />
         {error && <div className="call-panel__err" role="alert">{error}</div>}
         {!ended && <Composer value={text} onChange={setText} onSend={() => { void send(); }} />}

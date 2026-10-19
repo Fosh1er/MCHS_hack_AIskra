@@ -6,7 +6,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
+from collections.abc import AsyncIterator, Callable, Mapping
 from typing import Any
 
 from pydantic import BaseModel
@@ -55,6 +55,13 @@ class FakeLLM:
             last_user = next((m.content for m in reversed(messages) if m.role == "user"), "")
             text = f"[fake:{params.task}] {last_user[:120]}"
         return LLMResult(text=text, provider=self._name, model=self._model, latency_ms=0, parsed=parsed)
+
+    async def stream(self, messages: list[ChatMessage], *, params: LLMParams) -> AsyncIterator[str]:
+        """Тот же ответ, что у `complete`, по словам — для тестов потока (F1)."""
+        result = await self.complete(messages, params=params)
+        words = result.text.split(" ")
+        for i, w in enumerate(words):
+            yield w if i == len(words) - 1 else w + " "
 
     async def aclose(self) -> None:
         return None

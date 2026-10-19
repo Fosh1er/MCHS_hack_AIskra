@@ -17,6 +17,7 @@ from dataclasses import dataclass, field, replace
 from typing import Any
 
 from aiskra.modules.training.application.actors import Actors, PsyPrompt
+from aiskra.modules.training.application.events import EventSink, emit
 from aiskra.modules.training.application.ports.psy import PsyCatalog
 from aiskra.modules.training.domain.actors import applicant_reply
 from aiskra.modules.training.domain.call import CallMessage, Speaker
@@ -136,6 +137,7 @@ class PsyDirector:
         elapsed_s: float,
         signals: TurnSignals,
         scope: str,
+        sink: EventSink | None = None,
     ) -> PsyTurn | None:
         p = self.profile(psy)
         if p is None:  # профиль убрали из каталога — звонок продолжается без модификатора
@@ -170,6 +172,20 @@ class PsyDirector:
         state, deltas = step(p, before, codes, elapsed_s, call_rng(int(psy["seed"]), before.turn + 1))
         state.persist = before.persist + 1 if "REPEAT_PERSIST" in codes else 0
         allowed = gates(p, state)
+        # F1/F4: изменение состояния известно до генерации — интерфейс показывает его сразу, с причинами
+        await emit(
+            sink,
+            "state",
+            {
+                "tone": tone_from_psy(p, state).snapshot(tone_changes(deltas)).to_json(),
+                "level_before": before.level,
+                "level_after": state.level,
+                "level_title": LEVEL_TITLES[state.level],
+                "stage": state.stage,
+                "acts": [{"code": a.code, "title": ACT_TITLES.get(a.code, a.code)} for a in acts],
+                "deltas": [{"cause": d.cause, "change": d.change, "note": d.note} for d in deltas],
+            },
+        )
         base = applicant_reply(legend, question, revealed)
         if codes & {"INSTRUCT", "BREATHING"} and not codes & {"ASK_CLOSED", "ASK_OPEN", "ASK_CHOICE", "ASK_SUICIDE"}:
             # инструкция без вопроса: заявитель выполняет или, если он в пике, не может (а не отвечает «про этаж»)
@@ -194,11 +210,12 @@ class PsyDirector:
                 blocked=[t for t in TOPICS if t not in allowed],
             )
             cache_scope = f"{scope}:{p.id}:{state.level}:{state.stage}:{','.join(sorted(new_revealed))}"
-            text = await self._actors.applicant_psy(legend, history, question, prompt, cache_scope)
+            text = await self._actors.applicant_psy(legend, history, question, prompt, cache_scope, sink)
             if text:
                 reason = validate(text, legend=legend, allowed=allowed, intensity=prompt.intensity)
                 if reason:
                     log.info("Реплика модели отклонена (%s) — офлайн-реплика профиля", reason)
+                    await emit(sink, "replace", {"reason": reason})
                     text = None
                 else:
                     source = "llm"

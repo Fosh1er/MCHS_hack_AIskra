@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import re
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
 
 from aiskra.ai.ports import AudioBlob, ChatMessage, STTPort, TTSPort, VoiceProfile
@@ -39,7 +40,7 @@ class VoiceLab:
             raise DomainError("Распознавание речи не настроено", code="stt_disabled")
         return (await self._stt.transcribe(audio, mime=mime)).text.strip()
 
-    async def reply(self, messages: list[LabMessage]) -> str:
+    def _chat(self, messages: list[LabMessage]) -> list[ChatMessage]:
         chat = [
             ChatMessage(role=m.role, content=m.content[:12000])  # type: ignore[arg-type]
             for m in messages
@@ -49,8 +50,16 @@ class VoiceLab:
         dialog = [m for m in chat if m.role != "system"][-MAX_TURNS:]
         if not dialog:
             raise DomainError("Нужна хотя бы одна реплика", code="empty_dialog")
-        result = await self._router.for_task(AITask.APPLICANT_ACTOR).complete(system + dialog)
+        return system + dialog
+
+    async def reply(self, messages: list[LabMessage]) -> str:
+        result = await self._router.for_task(AITask.APPLICANT_ACTOR).complete(self._chat(messages))
         return result.text.strip()
+
+    async def stream_reply(self, messages: list[LabMessage]) -> AsyncIterator[str]:
+        """Ответ по мере генерации модели (F1); без потока у адаптера — одним куском."""
+        async for piece in self._router.for_task(AITask.APPLICANT_ACTOR).stream(self._chat(messages)):
+            yield piece
 
     async def speak(self, text: str, *, voice: str = "applicant_female") -> AudioBlob:
         if not self._tts.enabled:

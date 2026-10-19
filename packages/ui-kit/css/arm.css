@@ -616,6 +616,14 @@
 .arm-msg--me { align-self: flex-end; background: var(--c-blue-700); }
 .arm-msg__note { color: var(--text-inverse-muted); }
 .arm-msg--sys { align-self: center; background: none; color: var(--text-inverse-muted); font-size: var(--fs-xs); padding: 0; }
+/* F1: ответ генерируется — курсор и проявление последнего куска; под репликой — кто и как быстро её написал */
+.arm-msg__caret { display: inline-block; width: 0.45em; height: 1em; margin-left: 2px; vertical-align: -0.15em; background: currentColor; opacity: 0.75; animation: arm-caret 1s steps(2, start) infinite; }
+.arm-msg__fresh { animation: arm-fresh 0.35s ease-out; }
+.arm-msg__meta { display: block; margin-top: 3px; font-size: var(--fs-2xs); color: var(--text-inverse-muted); }
+.arm-msg--replaced { animation: arm-fresh 0.5s ease-out; }
+@keyframes arm-caret { to { opacity: 0; } }
+@keyframes arm-fresh { from { opacity: 0.15; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .arm-msg__caret, .arm-msg__fresh, .arm-msg--replaced { animation: none; } }
 .arm-composer { display: flex; gap: 6px; margin-top: 8px; }
 .arm-composer input {
   flex: 1;
@@ -1208,3 +1216,16 @@ body:has(.dds-editor) .ipphone > .arm-dock__section:not(.ipphone__screen) { disp
 @media (max-width: 1180px) {
   .arm-newcard { height: auto; min-height: 26px; line-height: 1.2; padding-top: 3px; padding-bottom: 3px; }
 }
+
+/* п. 3.7 / F4: шкала состояния заявителя ECCS 1–5 в панели звонка */
+.call-psy { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin-bottom: 6px; font-size: var(--fs-xs); color: var(--text-inverse-muted); }
+.call-psy__label { color: var(--text-inverse); font-weight: 600; }
+.call-psy__bar { display: inline-flex; gap: 2px; }
+.call-psy__seg { width: 14px; height: 6px; background: var(--bg-dark-2); }
+.call-psy__seg.is-on.is-l1, .call-psy__seg.is-on.is-l2 { background: var(--s-ok); }
+.call-psy__seg.is-on.is-l3 { background: var(--c-orange-600); }
+.call-psy__seg.is-on.is-l4 { background: var(--c-orange-700); }
+.call-psy__seg.is-on.is-l5 { background: var(--c-red-700); }
+.call-psy__why { flex-basis: 100%; }
+.call-psy__why.is-up { color: var(--c-orange-600); }
+.call-psy__why.is-down { color: var(--s-ok); }

@@ -56,6 +56,71 @@ export const useSpeechStatus = () =>
   useQuery({ queryKey: ['speech-status'], queryFn: () => http<{ enabled: boolean; tts: boolean }>(`${T}/speech`), staleTime: 60_000 });
 /** Звук реплики собеседника — адрес своего сайта: CSP стенда не пускает `blob:` в медиа (п. 3.6). */
 export const replicaAudioUrl = (callId: string, messageId: string) => `${T}/calls/${callId}/messages/${messageId}/audio`;
+
+/** F1: ответ собеседника потоком. Что показано до `final` — черновик; сохранён в звонке именно `final`. */
+export interface StreamMetrics {
+  source: 'llm' | 'rules'; model: string | null; ttft_ms: number | null; total_ms: number;
+  pieces: number; pieces_per_s: number | null; replaced: boolean;
+}
+/** Состояние заявителя с профилем (п. 3.7) до ответа: уровень ECCS 1–5 и что его изменило. */
+export interface PsyLive {
+  level_before: number; level_after: number; level_title: string; stage: string;
+  acts: { code: string; title: string }[]; deltas: { cause: string; change: number; note: string }[];
+}
+export type StreamedReplica = Replica & { metrics: StreamMetrics };
+export type StreamEvent =
+  | { type: 'state'; tone?: Tone; psy?: PsyLive }
+  | { type: 'model'; model: string; provider: string }
+  | { type: 'token'; text: string }
+  | { type: 'remark'; text: string }
+  | { type: 'replace'; reason: string };
+
+/** Реплика оператора → ответ потоком SSE (`POST /calls/{id}/replicas/stream`). Сервер без потока (404/405) —
+ *  `ApiError` со статусом, вызывающий отправит реплику обычным запросом. */
+export async function streamReplica(
+  id: string, text: string, via: ReplicaVia, signals: { latency_ms?: number; interrupted?: boolean },
+  onEvent: (e: StreamEvent) => void,
+): Promise<StreamedReplica> {
+  const res = await fetch(`${T}/calls/${id}/replicas/stream`, {
+    method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text, via, ...signals }),
+  });
+  if (!res.ok || !res.body) {
+    const body = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, body.error ?? 'http_error', body.message ?? res.statusText);
+  }
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = '';
+  for (;;) {
+    const { done, value } = await reader.read();
+    buf += decoder.decode(value ?? new Uint8Array(), { stream: !done });
+    let cut = buf.indexOf('\n\n');
+    while (cut >= 0) {
+      const block = buf.slice(0, cut);
+      buf = buf.slice(cut + 2);
+      cut = buf.indexOf('\n\n');
+      const kind = /^event: (.*)$/m.exec(block)?.[1];
+      const raw = /^data: (.*)$/m.exec(block)?.[1];
+      if (!kind || raw === undefined) continue;
+      const data = JSON.parse(raw);
+      if (kind === 'final') return data as StreamedReplica;
+      if (kind === 'error') throw new ApiError(422, data.code ?? 'stream_error', data.message ?? 'Ответ не получен');
+      if (kind === 'state') onEvent({ type: 'state', tone: data.tone, psy: data.level_after ? data : undefined });
+      else if (kind === 'model') onEvent({ type: 'model', model: data.model, provider: data.provider });
+      else if (kind === 'token' || kind === 'remark') onEvent({ type: kind, text: data.text });
+      else if (kind === 'replace') onEvent({ type: 'replace', reason: data.reason });
+    }
+    if (done) throw new ApiError(502, 'stream_cut', 'Соединение прервалось до конца ответа');
+  }
+}
+
+/** Звук фразы ответа, который ещё генерируется (F1): голос роли звонка, подача — по состоянию заявителя. */
+export const speakUrl = (callId: string, text: string, tone?: Tone | null) => {
+  const q = new URLSearchParams({ text });
+  if (tone) { q.set('emotion', tone.emotion); q.set('pace', tone.pace); q.set('volume', tone.volume); q.set('breathing', tone.breathing); }
+  return `${T}/calls/${callId}/speak?${q}`;
+};
 export async function transcribe(audio: Blob): Promise<string> {
   const body = new FormData();
   body.append('audio', audio, audio.type.includes('wav') ? 'speech.wav' : audio.type.includes('ogg') ? 'speech.ogg' : 'speech.webm');

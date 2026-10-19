@@ -10,6 +10,7 @@ import asyncio
 import json
 import os
 import time
+from collections.abc import AsyncIterator
 from typing import Any, Literal
 
 import httpx
@@ -107,6 +108,39 @@ class OpenAICompatibleLLM:
             parsed=parsed,
         )
 
+    async def stream(self, messages: list[ChatMessage], *, params: LLMParams) -> AsyncIterator[str]:
+        """Ответ по мере генерации (F1): `stream: true`, события SSE `data: {choices[0].delta.content}` до `[DONE]`.
+        Сбой до или во время потока — `ExternalServiceError`, как у `complete`."""
+        body: dict[str, Any] = {
+            **self._extra,
+            "model": self._model,
+            "temperature": params.temperature,
+            "stream": True,
+            "messages": [{"role": m.role, "content": m.content} for m in messages],
+        }
+        if params.max_tokens:
+            body["max_tokens"] = params.max_tokens
+        if params.seed is not None:
+            body["seed"] = params.seed
+        async with self._sem:
+            try:
+                async with self._http.stream(
+                    "POST", "/chat/completions", json=body, timeout=params.timeout_s or self._timeout
+                ) as resp:
+                    resp.raise_for_status()
+                    async for line in resp.aiter_lines():
+                        delta = parse_sse_delta(line)
+                        if delta is None:
+                            continue
+                        if isinstance(delta, _Done):
+                            return
+                        if delta:
+                            yield delta
+            except httpx.HTTPError as exc:
+                raise ExternalServiceError(
+                    f"{self._name}: модель недоступна ({exc.__class__.__name__}: {exc})"
+                ) from exc
+
     def _apply_schema(self, body: dict[str, Any], msgs: list[dict[str, str]], schema: type[BaseModel]) -> None:
         json_schema = schema.model_json_schema()
         if self._structured == "json_schema":
@@ -148,3 +182,33 @@ class OpenAICompatibleLLM:
 
     async def aclose(self) -> None:
         await self._http.aclose()
+
+
+class _Done:
+    """Маркер конца потока `[DONE]`."""
+
+
+DONE = _Done()
+
+
+def parse_sse_delta(line: str) -> str | _Done | None:
+    """Строка SSE OpenAI-протокола → кусок текста; `DONE` — конец; None — строка без текста (комментарий, роль,
+    пустая строка). Ошибка шлюза внутри потока (`{"error": …}`) — `ExternalServiceError`."""
+    line = line.strip()
+    if not line.startswith("data:"):
+        return None
+    raw = line[5:].strip()
+    if raw == "[DONE]":
+        return DONE
+    try:
+        data = json.loads(raw)
+    except ValueError:
+        return None
+    if isinstance(data, dict) and data.get("error"):
+        reason = data["error"].get("message") if isinstance(data["error"], dict) else data["error"]
+        raise ExternalServiceError(f"модель прервала ответ: {str(reason)[:200]}")
+    try:
+        content = data["choices"][0]["delta"].get("content")
+    except (KeyError, IndexError, TypeError, AttributeError):
+        return None
+    return content if isinstance(content, str) else None

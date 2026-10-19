@@ -15,6 +15,7 @@ from aiskra.ai.ports import ChatMessage
 from aiskra.ai.prompts import load_prompt
 from aiskra.ai.router import ModelRouter
 from aiskra.ai.tasks import AITask
+from aiskra.modules.training.application.events import EventSink, emit
 from aiskra.modules.training.application.ports.scenarios import DdsCallContext
 from aiskra.modules.training.domain.actors import applicant_reply, brigade_reply, service_reply
 from aiskra.modules.training.domain.call import CallMessage, Speaker
@@ -88,22 +89,38 @@ class Actors:
         return self._router.for_task(task).provider_name != FAKE
 
     async def _ask(
-        self, task: AITask, system: str, history: list[CallMessage], question: str, scope: str
+        self,
+        task: AITask,
+        system: str,
+        history: list[CallMessage],
+        question: str,
+        scope: str,
+        sink: EventSink | None = None,
     ) -> str | None:
+        """Ответ модели. С приёмником (F1) — по мере генерации: события `model` и `token`; сбой посреди ответа —
+        `replace`, вызывающий подставит офлайн-ответ."""
+        model = self._router.for_task(task)
+        messages = [
+            ChatMessage(role="system", content=system),
+            *_history(history),
+            ChatMessage(role="user", content=question),
+        ]
+        streamed = False
         try:
-            model = self._router.for_task(task)
-            result = await model.complete(
-                [
-                    ChatMessage(role="system", content=system),
-                    *_history(history),
-                    ChatMessage(role="user", content=question),
-                ],
-                cache_scope=scope,
-            )
-            text = result.text.strip()
-            return text or None
+            if sink is None:
+                result = await model.complete(messages, cache_scope=scope)
+                return result.text.strip() or None
+            await emit(sink, "model", {"task": str(task), "model": model.model_id, "provider": model.provider_name})
+            parts: list[str] = []
+            async for piece in model.stream(messages, cache_scope=scope):
+                parts.append(piece)
+                streamed = True
+                await emit(sink, "token", {"text": piece})
+            return "".join(parts).strip() or None
         except ExternalServiceError as e:  # модель недоступна — офлайн-ответ
             log.warning("ИИ-задача %s недоступна: %s", task, e)
+            if streamed:
+                await emit(sink, "replace", {"reason": "модель прервала ответ"})
             return None
 
     async def applicant(
@@ -114,6 +131,7 @@ class Actors:
         revealed: list[str],
         scope: str,
         tone: CallerTone | None = None,
+        sink: EventSink | None = None,
     ) -> tuple[str, list[str]]:
         """Ответ заявителя. `tone` (п. 3.6) — его состояние после реплики оператора: модель получает его в промпте,
         офлайн-ответ им окрашивается. Факты в обоих случаях — только из легенды."""
@@ -133,7 +151,12 @@ class Actors:
             # спокойный и паникующий заявитель на один вопрос отвечают по-разному — у них разный кеш
             band = f":{tone.band.value}" if tone else ""
             text = await self._ask(
-                AITask.APPLICANT_ACTOR, system, history, question, f"{scope}:{','.join(offline.revealed)}{band}"
+                AITask.APPLICANT_ACTOR,
+                system,
+                history,
+                question,
+                f"{scope}:{','.join(offline.revealed)}{band}",
+                sink,
             )
             if text:
                 return text, offline.revealed
@@ -143,7 +166,13 @@ class Actors:
         return offline.text, offline.revealed
 
     async def applicant_psy(
-        self, legend: dict[str, Any], history: list[CallMessage], question: str, psy: PsyPrompt, scope: str
+        self,
+        legend: dict[str, Any],
+        history: list[CallMessage],
+        question: str,
+        psy: PsyPrompt,
+        scope: str,
+        sink: EventSink | None = None,
     ) -> str | None:
         """Реплика заявителя с психологическим профилем (промпт applicant_actor/v3). None — модели нет или ошибка:
         вызывающий берёт офлайн-реплику профиля."""
@@ -164,7 +193,7 @@ class Actors:
             )
             .replace("{blocked_topics}", ", ".join(TOPIC_NAMES.get(t, t) for t in psy.blocked) or "—")
         )
-        return await self._ask(AITask.APPLICANT_ACTOR, system, history, question, scope)
+        return await self._ask(AITask.APPLICANT_ACTOR, system, history, question, scope, sink)
 
     async def classify_acts(self, question: str, context: str) -> list[tuple[str, str]] | None:
         """Разметка реплики оператора моделью (ИИ-задача PSY_ACTS). None — модели нет или ошибка."""
@@ -184,7 +213,14 @@ class Actors:
             return None
         return [(a.code, a.quote) for a in out.acts]
 
-    async def brigade(self, ctx: DdsCallContext, service_short: str, history: list[CallMessage], question: str) -> str:
+    async def brigade(
+        self,
+        ctx: DdsCallContext,
+        service_short: str,
+        history: list[CallMessage],
+        question: str,
+        sink: EventSink | None = None,
+    ) -> str:
         data = {
             "service_status": ctx.service_status,
             "order_no": ctx.order_no,
@@ -197,20 +233,29 @@ class Actors:
                 service=service_short, context=context, status=ctx.service_status
             )
             text = await self._ask(
-                AITask.BRIGADE_ACTOR, system, history, question, f"{ctx.card_id}:{ctx.service_status}"
+                AITask.BRIGADE_ACTOR, system, history, question, f"{ctx.card_id}:{ctx.service_status}", sink
             )
             if text:
                 return text
         return brigade_reply(data, question)
 
-    async def service(self, ctx: DdsCallContext, target: str, history: list[CallMessage], question: str) -> str:
+    async def service(
+        self,
+        ctx: DdsCallContext,
+        target: str,
+        history: list[CallMessage],
+        question: str,
+        sink: EventSink | None = None,
+    ) -> str:
         short, status = ctx.services.get(target, (target, "added"))
         data = {"service_short": short, "card_number": ctx.card_number, "service_status_title": status}
         if self._online(AITask.SERVICE_ACTOR):
             system = load_prompt(AITask.SERVICE_ACTOR).format(
                 service=short, context=json.dumps(data, ensure_ascii=False)
             )
-            text = await self._ask(AITask.SERVICE_ACTOR, system, history, question, f"{ctx.card_id}:{target}:{status}")
+            text = await self._ask(
+                AITask.SERVICE_ACTOR, system, history, question, f"{ctx.card_id}:{target}:{status}", sink
+            )
             if text:
                 return text
         return service_reply(data, question)
