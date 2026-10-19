@@ -12,11 +12,15 @@ COPY alembic.ini ./
 COPY tools ./tools
 RUN uv sync --frozen --no-dev
 
+# Версия сборки для /health (F6.3): docker compose build --build-arg AISKRA_VERSION=$(git rev-parse --short HEAD)
+ARG AISKRA_VERSION=unknown
 ENV PATH="/app/backend/.venv/bin:$PATH" \
-    AISKRA_AI_CONFIG_PATH=/app/config/ai.yaml
+    AISKRA_AI_CONFIG_PATH=/app/config/ai.yaml \
+    AISKRA_VERSION=$AISKRA_VERSION
 EXPOSE 8000
 HEALTHCHECK --interval=15s --timeout=3s --retries=5 \
   CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health').status==200 else 1)"
-# Миграции → начальный администратор (если задан AISKRA_BOOTSTRAP_ADMIN_PASSWORD) → API.
+# Проверка настроек (в prod небезопасные — отказ до миграций и до создания администратора, ADR-0015) →
+# миграции → начальный администратор (если задан AISKRA_BOOTSTRAP_ADMIN_PASSWORD) → API.
 # --proxy-headers: реальный IP клиента из X-Forwarded-For от nginx попадает в аудит.
-CMD ["sh", "-c", "alembic upgrade head && python -m aiskra.cli ensure-admin && uvicorn aiskra.main:app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips='*'"]
+CMD ["sh", "-c", "python -m aiskra.cli check-config && alembic upgrade head && python -m aiskra.cli ensure-admin && uvicorn aiskra.main:app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips='*'"]

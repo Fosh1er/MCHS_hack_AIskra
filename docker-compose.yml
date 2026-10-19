@@ -18,10 +18,15 @@ services:
     restart: unless-stopped
 
   backend:
-    build: ./backend
+    build:
+      context: ./backend
+      args:
+        AISKRA_VERSION: ${AISKRA_VERSION:-unknown}   # версия в /health: make up подставляет короткий sha коммита
     env_file: [{path: .env, required: false}]
     environment:
-      AISKRA_APP_ENV: ${AISKRA_APP_ENV:-prod}   # prod | demo | dev (ADR-0015); демо-вход (F2) — только demo и dev
+      # prod | demo | dev (ADR-0015). prod: нет демо-входа, Swagger — только администратору; запуск с паролями
+      # по умолчанию или cookie без Secure отклоняется (задайте POSTGRES_PASSWORD и пароль администратора в .env)
+      AISKRA_APP_ENV: ${AISKRA_APP_ENV:-prod}
       AISKRA_DATABASE_URL: postgresql+asyncpg://aiskra:${POSTGRES_PASSWORD:-aiskra}@db:5432/aiskra
       AISKRA_AI_CONFIG_PATH: /app/config/${AISKRA_AI_CONFIG:-ai.yaml}   # демо на OpenRouter: AISKRA_AI_CONFIG=ai.openrouter.yaml
       AISKRA_BACKUP_DIR: /app/backups

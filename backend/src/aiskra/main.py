@@ -6,6 +6,7 @@ import asyncio
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime
 
 from fastapi import Depends, FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -14,6 +15,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from aiskra.ai.config import load_ai_config
 from aiskra.bootstrap import build_services, daily_backup_loop, wire
 from aiskra.modules.assessment.api.router import router as assessment_router
 from aiskra.modules.audit.api.router import router as audit_router
@@ -22,10 +24,12 @@ from aiskra.modules.identity.api.router import auth_router, demo_router, groups_
 from aiskra.modules.incidents.api.router import router as incidents_router
 from aiskra.modules.system.api.router import router as system_router
 from aiskra.modules.training.api.router import router as training_router
+from aiskra.platform.api_docs import mount_admin_docs
 from aiskra.platform.health import router as health_router
 from aiskra.platform.security_headers import SecurityHeadersMiddleware
 from aiskra.platform.services import Services
 from aiskra.platform.settings import Settings
+from aiskra.platform.startup_checks import UnsafeConfigError, check_startup
 from aiskra.platform.validation_ru import translate
 from aiskra.shared.errors import (
     AppError,
@@ -52,12 +56,17 @@ _STATUS: dict[type[AppError], int] = {
 
 def create_app(settings: Settings | None = None, services: Services | None = None) -> FastAPI:
     settings = settings or Settings()
-    logging.basicConfig(level=settings.log_level, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    logging.basicConfig(level=settings.effective_log_level, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    logging.getLogger().setLevel(settings.effective_log_level)  # basicConfig не меняет уже настроенный корень
+    # F6.3 (ADR-0015): в prod небезопасные настройки останавливают запуск сразу, в demo и dev — предупреждения
+    check_startup(settings, services.ai_config if services else load_ai_config(settings.ai_config_path))
+    public_docs = settings.expose_docs and not settings.docs_admin_only
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         svc = services or build_services(settings)
         app.state.services = svc
+        app.state.started_at = datetime.now(UTC)  # время старта — в /health
         wire(app, svc)
         backup_job = asyncio.create_task(daily_backup_loop(svc)) if settings.scheduler_enabled else None
         yield
@@ -67,11 +76,13 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
 
     app = FastAPI(
         title="АИскра — тренажёр оператора 112 / ДДС",
-        version="0.1.0",
+        version=settings.version,
         lifespan=lifespan,
-        docs_url="/docs" if settings.expose_docs else None,
-        openapi_url="/openapi.json" if settings.expose_docs else None,
+        docs_url="/docs" if public_docs else None,
+        openapi_url="/openapi.json" if public_docs else None,
     )
+    if settings.expose_docs and settings.docs_admin_only:
+        mount_admin_docs(app)  # prod: Swagger и схема API — только вошедшему администратору
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
@@ -130,4 +141,7 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
     return app
 
 
-app = create_app()
+try:
+    app = create_app()
+except UnsafeConfigError as exc:  # uvicorn aiskra.main:app — понятное сообщение без трассировки, код выхода 1
+    raise SystemExit(exc.message) from None

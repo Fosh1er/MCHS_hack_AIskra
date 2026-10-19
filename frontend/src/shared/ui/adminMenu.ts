@@ -5,5 +5,5 @@ import type { MenuItem } from './ArmTopBar';
 export const ADMIN_MENU: MenuItem[] = [
   { to: '/admin', label: 'панель', icon: 'dashboard', permission: PERMISSIONS.systemManage },
   { to: '/admin/audit', label: 'аудит', icon: 'eye', permission: PERMISSIONS.auditRead },
-  { to: '/dev/ai', label: 'ИИ-модели', icon: 'memory', permission: PERMISSIONS.systemManage },
+  { to: '/admin/ai', label: 'ИИ-модели', icon: 'memory', permission: PERMISSIONS.systemManage },
 ];

@@ -5,7 +5,11 @@ import { http } from './http';
 export interface TaskInfo { task: string; provider: string; model: string; temperature: number; cache_mode: string; cache_ttl_s: number }
 export interface AIConfig { allow_external: boolean; default_provider: string; tasks: TaskInfo[] }
 export interface ProbeResult { task: string; provider: string; model: string; text: string; cached: boolean; latency_ms: number }
-export interface Health { status: string; db: string; ai: { cache: { hits: number; misses: number; hit_rate: number } } }
+/** /health (F6.3): режим окружения prod | demo | dev, версия сборки (sha коммита или unknown), время старта. */
+export interface Health {
+  status: string; db: string; env: string; version: string; started_at: string | null;
+  ai: { cache: { hits: number; misses: number; hit_rate: number } };
+}
 
 export const useHealth = () => useQuery({ queryKey: ['health'], queryFn: () => http<Health>('/health'), refetchInterval: 10_000 });
 export const useAIConfig = () => useQuery({ queryKey: ['system', 'ai'], queryFn: () => http<AIConfig>('/api/v1/system/ai') });
