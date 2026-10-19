@@ -5,7 +5,14 @@ from __future__ import annotations
 from aiskra.ai.adapters.caching import CachingLLM, CachingTTS
 from aiskra.ai.adapters.fake import FakeLLM
 from aiskra.ai.adapters.openai_compatible import OpenAICompatibleLLM
-from aiskra.ai.adapters.speech import FakeSTT, FakeTTS, OpenAICompatibleSTT, OpenAICompatibleTTS
+from aiskra.ai.adapters.speech import (
+    FakeSTT,
+    FakeTTS,
+    FallbackSTT,
+    FallbackTTS,
+    OpenAICompatibleSTT,
+    OpenAICompatibleTTS,
+)
 from aiskra.ai.config import AIConfig, ProviderConfig
 from aiskra.ai.ports import LLMPort, STTPort, TTSPort
 from aiskra.ai.router import ModelRouter, TaskProfile
@@ -62,6 +69,21 @@ def build_tts(cfg: AIConfig) -> TTSPort:
             timeout_s=t.timeout_s,
             max_concurrency=t.max_concurrency,
         )
+        if t.fallback is not None:
+            f = t.fallback
+            backup = OpenAICompatibleTTS(
+                base_url=t.base_url,
+                model=f.model,
+                api_key_env=t.api_key_env,
+                voice=f.voice,
+                voices=f.voices,
+                style=f.style,
+                response_format=f.response_format,
+                pcm_rate=f.pcm_rate,
+                timeout_s=f.timeout_s,
+                max_concurrency=t.max_concurrency,
+            )
+            inner = FallbackTTS(inner, backup)
     else:
         inner = FakeTTS()
     return CachingTTS(inner, max_bytes=t.cache_mb * 1024 * 1024, ttl_s=t.cache_ttl)
@@ -70,7 +92,17 @@ def build_tts(cfg: AIConfig) -> TTSPort:
 def build_stt(cfg: AIConfig) -> STTPort:
     s = cfg.stt
     if s.kind == "openai_compatible" and s.base_url:
-        return OpenAICompatibleSTT(
+        primary = OpenAICompatibleSTT(
             base_url=s.base_url, model=s.model, api_key_env=s.api_key_env, language=s.language, timeout_s=s.timeout_s
         )
+        if not s.fallback_model:
+            return primary
+        backup = OpenAICompatibleSTT(
+            base_url=s.base_url,
+            model=s.fallback_model,
+            api_key_env=s.api_key_env,
+            language=s.language,
+            timeout_s=s.timeout_s,
+        )
+        return FallbackSTT(primary, backup)
     return FakeSTT()
