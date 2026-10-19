@@ -3226,6 +3226,31 @@
     }
    }
   },
+  "/api/v1/training/branch-templates": {
+   "get": {
+    "tags": [
+     "training"
+    ],
+    "summary": "Шаблоны ветвящихся сценариев (F5): ситуация развивается по решениям оператора",
+    "operationId": "branch_templates_api_v1_training_branch_templates_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/BranchTemplateOut"
+         },
+         "type": "array",
+         "title": "Response Branch Templates Api V1 Training Branch Templates Get"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/training/scenarios": {
    "get": {
     "tags": [
@@ -3773,6 +3798,53 @@
        "application/json": {
         "schema": {
          "$ref": "#/components/schemas/ReplicaOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/training/calls/{call_id}/tick": {
+   "post": {
+    "tags": [
+     "training"
+    ],
+    "summary": "F5: таймер ситуации — реплики-события, если ситуация изменилась сама (раз в 5 с, пока звонок идёт)",
+    "operationId": "tick_api_v1_training_calls__call_id__tick_post",
+    "parameters": [
+     {
+      "name": "call_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Call Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "$ref": "#/components/schemas/ReplicaOut"
+         },
+         "title": "Response Tick Api V1 Training Calls  Call Id  Tick Post"
         }
        }
       }
@@ -7135,6 +7207,66 @@
     ],
     "title": "Body_upload_material_api_v1_training_materials_post"
    },
+   "BranchSettingsIn": {
+    "properties": {
+     "weight": {
+      "type": "number",
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "title": "Weight",
+      "description": "0 — информативно, итог не влияет на балл",
+      "default": 0
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "title": "BranchSettingsIn",
+    "description": "Ветвящиеся сценарии (F5, ADR-0014): вес блока «Развитие ситуации» в итоговом балле."
+   },
+   "BranchTemplateOut": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "title": "Id"
+     },
+     "title": {
+      "type": "string",
+      "title": "Title"
+     },
+     "description": {
+      "type": "string",
+      "title": "Description"
+     },
+     "incident_codes": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Incident Codes"
+     },
+     "forks": {
+      "type": "integer",
+      "title": "Forks"
+     },
+     "outcomes": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Outcomes"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "title",
+     "description",
+     "incident_codes",
+     "forks",
+     "outcomes"
+    ],
+    "title": "BranchTemplateOut"
+   },
    "BrigadeOption": {
     "properties": {
      "code": {
@@ -7389,6 +7521,23 @@
        }
       ],
       "title": "Psy"
+     },
+     "branching": {
+      "type": "boolean",
+      "title": "Branching",
+      "default": false
+     },
+     "branch": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Branch"
      }
     },
     "type": "object",
@@ -7699,6 +7848,17 @@
       },
       "type": "array",
       "title": "Critical"
+     },
+     "branch_outcome": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Branch Outcome"
      }
     },
     "type": "object",
@@ -9531,6 +9691,20 @@
       "minimum": 1.0,
       "title": "Difficulty",
       "default": 2
+     },
+     "branching": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 32,
+        "pattern": "^[a-z0-9_]+$"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Branching",
+      "description": "F5: шаблон ветвления; нет — без ветвления"
      }
     },
     "additionalProperties": false,
@@ -12930,6 +13104,17 @@
       "type": "integer",
       "title": "Review Total",
       "default": 0
+     },
+     "branching": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Branching"
      }
     },
     "type": "object",
@@ -13008,6 +13193,18 @@
       },
       "type": "array",
       "title": "Review"
+     },
+     "branching": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Branching"
      }
     },
     "type": "object",
@@ -13435,6 +13632,13 @@
      },
      "psy_errors": {
       "$ref": "#/components/schemas/StressErrors"
+     },
+     "branch_outcomes": {
+      "additionalProperties": {
+       "type": "integer"
+      },
+      "type": "object",
+      "title": "Branch Outcomes"
      }
     },
     "type": "object",
@@ -13551,6 +13755,16 @@
       "anyOf": [
        {
         "$ref": "#/components/schemas/PsySettingsIn"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "branch": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/BranchSettingsIn"
        },
        {
         "type": "null"
