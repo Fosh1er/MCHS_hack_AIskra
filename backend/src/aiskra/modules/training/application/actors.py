@@ -7,6 +7,7 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass
+from hashlib import sha1
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -69,6 +70,7 @@ class PsyPrompt:
     intensity: int
     allowed: list[str]
     blocked: list[str]
+    situation: str = ""  # F5: что происходит сейчас по узлу ветвления
 
 
 def _history(messages: list[CallMessage]) -> list[ChatMessage]:
@@ -132,30 +134,35 @@ class Actors:
         scope: str,
         tone: CallerTone | None = None,
         sink: EventSink | None = None,
+        situation: str | None = None,
     ) -> tuple[str, list[str]]:
         """Ответ заявителя. `tone` (п. 3.6) — его состояние после реплики оператора: модель получает его в промпте,
-        офлайн-ответ им окрашивается. Факты в обоих случаях — только из легенды."""
+        офлайн-ответ им окрашивается. Факты в обоих случаях — только из легенды. `situation` (F5) — что происходит
+        сейчас по узлу ветвления: тогда промпт v4, легенда уже с фактами узла."""
         offline = applicant_reply(legend, question, revealed)
         if self._online(AITask.APPLICANT_ACTOR):
             public = {
                 k: legend[k] for k in ("applicant", "address", "what", "details", "facts", "victims") if k in legend
             }
-            version = self._router.for_task(AITask.APPLICANT_ACTOR).profile.prompt_version
+            version = "v4" if situation else self._router.for_task(AITask.APPLICANT_ACTOR).profile.prompt_version
             system = load_prompt(AITask.APPLICANT_ACTOR, version).format(
                 legend=json.dumps(public, ensure_ascii=False, indent=1),
                 emotion=EMOTION_TITLES[tone.emotion] if tone else legend.get("emotion", "спокойно"),
                 tension=tone.tension if tone else "—",
                 trust=tone.trust if tone else "—",
                 readiness=tone.readiness if tone else "—",
+                situation=situation or "",
             )
             # спокойный и паникующий заявитель на один вопрос отвечают по-разному — у них разный кеш
             band = f":{tone.band.value}" if tone else ""
+            # другая ситуация — другой ответ на тот же вопрос
+            node = f":{sha1(situation.encode()).hexdigest()[:10]}" if situation else ""
             text = await self._ask(
                 AITask.APPLICANT_ACTOR,
                 system,
                 history,
                 question,
-                f"{scope}:{','.join(offline.revealed)}{band}",
+                f"{scope}:{','.join(offline.revealed)}{band}{node}",
                 sink,
             )
             if text:
@@ -193,6 +200,8 @@ class Actors:
             )
             .replace("{blocked_topics}", ", ".join(TOPIC_NAMES.get(t, t) for t in psy.blocked) or "—")
         )
+        if psy.situation:  # F5: ворота модификатора уже объединены с воротами узла, ситуация — отдельным блоком
+            system += f"\n\nЧто происходит у тебя прямо сейчас (ситуация меняется по ходу звонка):\n{psy.situation}\n"
         return await self._ask(AITask.APPLICANT_ACTOR, system, history, question, scope, sink)
 
     async def classify_acts(self, question: str, context: str) -> list[tuple[str, str]] | None:
@@ -227,8 +236,11 @@ class Actors:
             "address": ctx.address,
             "victims": ctx.victims,
         }
+        # F5: доклад по прибытии зависит от того, как оператор 112 вёл ситуацию
+        report = (ctx.branch_report or {}).get(ctx.service_status)
         if self._online(AITask.BRIGADE_ACTOR):
-            context = json.dumps({**data, "описание": ctx.description}, ensure_ascii=False)
+            extra = {"обстановка_на_месте": ctx.situation, "доклад": report} if ctx.situation else {}
+            context = json.dumps({**data, "описание": ctx.description, **extra}, ensure_ascii=False)
             system = load_prompt(AITask.BRIGADE_ACTOR).format(
                 service=service_short, context=context, status=ctx.service_status
             )
@@ -237,6 +249,8 @@ class Actors:
             )
             if text:
                 return text
+        if report:
+            return report
         return brigade_reply(data, question)
 
     async def service(

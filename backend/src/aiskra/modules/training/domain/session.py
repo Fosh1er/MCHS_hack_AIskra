@@ -43,6 +43,7 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "feed_interval_s": 45,  # темп системных карточек для ДДС
     "max_waiting": 3,  # сколько карточек одновременно ждут в очереди ДДС (#706)
     "psy": dict(PSY_DEFAULTS),  # п. 3.7: психологический модификатор, по умолчанию выключен
+    "branch": {"weight": 0.0},  # F5: вес блока «Развитие ситуации» в итоговом балле, по умолчанию информативно
 }
 
 
@@ -79,6 +80,10 @@ class TrainingSession:
             raise DomainError("Название занятия не может быть пустым", code="empty_title")
         self.settings = {**DEFAULT_SETTINGS, **self.settings}
         self.settings["psy"] = psy_settings(self.settings.get("psy"))
+        branch = self.settings.get("branch") or {}
+        self.settings["branch"] = {"weight": float(branch.get("weight") or 0)}
+        if not 0 <= self.settings["branch"]["weight"] <= 1:
+            raise DomainError("Вес блока «Развитие ситуации» — от 0 до 1", code="bad_setting")
         try:
             check_settings(self.settings["psy"])
         except ValueError as e:

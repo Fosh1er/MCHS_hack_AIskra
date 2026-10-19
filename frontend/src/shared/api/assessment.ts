@@ -1,6 +1,7 @@
 /** Модуль assessment: автооценка по эталону (п. 3.4), отчёт по занятию, экспертная правка и прогресс (п. 4.3). */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, http } from './http';
+import type { BranchDebrief, OutcomeCode } from './training';
 
 export interface CriterionResult { key: string; title: string; score: number | null; errors: string[]; note: string }
 export interface Assessment {
@@ -11,6 +12,7 @@ export interface Assessment {
     expert?: { score: number; comment: string; teacher_id: string; auto_score: number };
     role_score?: number;
     psy?: PsyBlock;
+    branch?: BranchDebrief; // F5: «Развитие ситуации» — итог ветвящегося сценария
   };
 }
 /** Блок «Работа с заявителем» (п. 3.7): отдельный от балла роли, с лентой разбора. */
@@ -66,6 +68,7 @@ export interface CardResult {
   call_mode?: 'text' | 'voice' | 'hands_free' | null; // как вёл разговор оператор 112 (п. 3.6)
   assessment_id: string | null; score: number | null; passed: boolean | null; expert: boolean; expert_comment: string; errors: string[];
   criteria: Record<string, number | null>; critical?: string[];
+  branch_outcome?: OutcomeCode | null; // F5
 }
 /** Отзыв преподавателя по занятию (specs/4.7): видят преподаватель и сам обучающийся. */
 export interface FeedbackView { text: string; updated_at: string | null }
@@ -80,6 +83,7 @@ export interface SessionReport {
   heatmap: { criteria: { key: string; title: string }[]; rows: { student: string; role: string; values: Record<string, number> }[] };
   time_buckets: { label: string; count: number }[];
   score_series: { t: string; v: number; who: string }[];
+  branch_outcomes?: Partial<Record<OutcomeCode, number>>; // F5: итоги ситуаций по группе
 }
 export interface ProgressView {
   points: { t: string; v: number; role: string; card_number: number | null; passed: boolean }[];

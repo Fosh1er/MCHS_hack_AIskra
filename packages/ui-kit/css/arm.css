@@ -1210,6 +1210,30 @@ body:has(.dds-editor) .ipphone > .arm-dock__section:not(.ipphone__screen) { disp
 .progress-page { display: flex; flex-direction: column; gap: 12px; }
 /* ---- Работа с заявителем (п. 3.7): психологический модификатор, лента разбора ----------------- */
 .assess__psy { border-top: 1px solid var(--border-subtle); padding-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+/* F5: «Итог ситуации» ветвящегося сценария */
+.branch { border-top: 1px solid var(--border-subtle); padding-top: 8px; display: flex; flex-direction: column; gap: 6px; font-size: var(--fs-sm); }
+.branch__head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.branch__badge { padding: 1px 8px; border: 1px solid var(--border); font-size: var(--fs-xs); font-weight: var(--fw-medium); }
+.branch__badge.is-ok { color: var(--s-ok); border-color: var(--s-ok); }
+.branch__badge.is-warn { color: var(--text-strong); border-color: var(--s-warn); }
+.branch__badge.is-bad { color: var(--s-critical); border-color: var(--s-critical); }
+.branch__outcome { margin: 0; padding: 6px 8px; border-left: 3px solid var(--border); background: var(--c-white); }
+.branch__outcome.is-ok { border-left-color: var(--s-ok); }
+.branch__outcome.is-warn { border-left-color: var(--s-warn); }
+.branch__outcome.is-bad { border-left-color: var(--s-critical); }
+.branch__path { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 0; color: var(--text-muted); }
+.branch__path li + li::before { content: "→"; margin: 0 6px; }
+.branch__path span { font-variant-numeric: tabular-nums; }
+.branch__fork { padding: 4px 0; border-bottom: 1px dotted var(--border-subtle); }
+.branch__fork-title { color: var(--text-muted); font-size: var(--fs-xs); }
+.branch__fork ul { list-style: none; margin: 2px 0 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.branch__fork li { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 8px; color: var(--text-muted); }
+.branch__fork li.is-taken { color: var(--text-strong); }
+.branch__who { font-weight: var(--fw-medium); }
+.branch__src { font-size: var(--fs-2xs); color: var(--accent); }
+.branch__note { font-size: var(--fs-2xs); color: var(--text-muted); }
+.branch__instr { display: flex; flex-wrap: wrap; gap: 4px; }
+.branch__instr .is-off { opacity: 0.55; }
 .assess__psy-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: var(--fs-sm); }
 .assess__psy-sources { margin: 0; font-size: var(--fs-2xs); color: var(--text-muted); }
 .psy-levels { display: inline-flex; gap: 2px; vertical-align: middle; }

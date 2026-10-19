@@ -178,6 +178,8 @@
 
 .cab-grid { display: grid; gap: var(--sp-3); }
 .cab-grid--main-aside { grid-template-columns: minmax(0, 1fr) 340px; align-items: start; }
+/* узкая боковая колонка: переключатель режимов уходит под заголовок, а не за край */
+.cab-grid--main-aside > :last-child .cab-card__head { flex-wrap: wrap; }
 .cab-grid--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .cab-grid--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 
@@ -607,3 +609,13 @@
 
 /* Группа кнопок в шапке — цель подсказки обучения интерфейсу (п. 5.4) */
 .tch-tour-group { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+
+/* F5: граф ветвящегося сценария в банке (только чтение) */
+.branch-graph { display: flex; flex-direction: column; gap: 8px; font-size: var(--fs-sm); }
+.branch-graph p { margin: 0; }
+.branch-graph__nodes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.branch-graph__nodes > li { padding: 8px 10px; border-left: 3px solid var(--accent); background: var(--c-white); display: flex; flex-direction: column; gap: 4px; }
+.branch-graph__nodes > li.is-outcome { border-left-color: var(--border); }
+.branch-graph__title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.branch-graph__event { font-style: italic; }
+.branch-graph__edges { margin: 0; padding-left: 16px; display: flex; flex-direction: column; gap: 4px; }

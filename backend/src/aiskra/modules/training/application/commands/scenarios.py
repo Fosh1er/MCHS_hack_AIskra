@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import logging
 import random
+import re
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
@@ -20,9 +21,11 @@ from aiskra.ai.ports import ChatMessage
 from aiskra.ai.prompts import load_prompt
 from aiskra.ai.router import ModelRouter
 from aiskra.ai.tasks import AITask
+from aiskra.modules.training.application.ports.branching import BranchCatalog
 from aiskra.modules.training.application.ports.materials import MaterialContext
 from aiskra.modules.training.application.ports.psy import PsyCatalog
 from aiskra.modules.training.application.ports.scenarios import ScenarioFactsSource, ScenarioRepository
+from aiskra.modules.training.domain.branching import Template, apply_texts, event_nodes
 from aiskra.modules.training.domain.review import accept_all
 from aiskra.modules.training.domain.scenario import FLAG_FACTS, Scenario, ScenarioStatus, build_scenario, offline_story
 from aiskra.modules.training.domain.spelling import Remark, check_legend
@@ -33,6 +36,50 @@ from aiskra.shared.security import Principal
 
 log = logging.getLogger(__name__)
 MAX_BATCH = 50
+
+
+class BranchTextsOut(BaseModel):
+    """Ответ модели для F5: реплики-события узлов под легенду, ключ — id узла."""
+
+    texts: dict[str, str] = Field(default_factory=dict)
+
+
+_DIGITS = re.compile(r"\d+")
+
+
+def check_event_text(text: str, original: str, legend: Mapping[str, object]) -> str | None:
+    """Факты в реплике-событии модели: только из исходной реплики и легенды (как в 3.2). Причина отказа или None."""
+    t = text.strip()
+    if not 3 <= len(t) <= 200:
+        return "длина"
+    if "[" in t or "]" in t:
+        return "ремарки"
+    known = set(_DIGITS.findall(original)) | set(_DIGITS.findall(json.dumps(legend, ensure_ascii=False)))
+    if set(_DIGITS.findall(t)) - known:
+        return "новые числа"
+    if re.search(r"\b(10[1-4]|112|0[1-4])\b", t) and not re.search(r"\b(10[1-4]|112|0[1-4])\b", original):
+        return "номера служб"
+    return None
+
+
+def with_template(scenario: Scenario, tpl: Template, snapshot: dict[str, object]) -> Scenario:
+    """F5: легенда и эталон согласуются с шаблоном (пострадавшие, статус заявителя, первые фразы), сценарию —
+    копия шаблона. Узлы рассчитаны на эту ситуацию, поэтому её тексты берутся из шаблона, а не у модели."""
+    legend = dict(scenario.legend)
+    for key, value in tpl.legend.items():
+        legend[key] = (
+            {**legend[key], **value} if isinstance(value, dict) and isinstance(legend.get(key), dict) else value
+        )
+    reference = dict(scenario.reference_card)
+    if "victims" in tpl.legend:
+        reference["victims"] = dict(legend["victims"])
+    status = (tpl.legend.get("applicant") or {}).get("status")
+    if status:
+        reference["applicant"] = {**(reference.get("applicant") or {}), "status": status}
+    scenario.legend = legend
+    scenario.reference_card = reference
+    scenario.branching = snapshot
+    return scenario
 
 
 class StoryOut(BaseModel):
@@ -51,6 +98,7 @@ class GenerateScenarios(Command):
     difficulty: int = 2
     approve: bool = False  # сразу в банк (CLI-заготовка демо); по умолчанию — на проверку преподавателю
     seed: int | None = None
+    branching: str | None = None  # F5: шаблон ветвления; None — сценарий без ветвления
     meta: RequestMeta = field(default_factory=RequestMeta)
 
 
@@ -58,11 +106,48 @@ class ScenarioGenerator:
     """Одна генерация без сохранения — используется и командой, и входящим вызовом при пустом банке."""
 
     def __init__(
-        self, facts: ScenarioFactsSource, router: ModelRouter, materials: MaterialContext | None = None
+        self,
+        facts: ScenarioFactsSource,
+        router: ModelRouter,
+        materials: MaterialContext | None = None,
+        branches: BranchCatalog | None = None,
     ) -> None:
         self._facts = facts
         self._router = router
         self._materials = materials
+        self._branches = branches
+
+    async def _event_texts(self, snapshot: dict[str, object], legend: dict[str, object]) -> dict[str, str]:
+        """RF5-09: модель переписывает только реплики-события под легенду; структура, условия и итоги — из шаблона.
+        Реплика с новыми фактами (числа, номера служб) отклоняется — остаётся текст шаблона."""
+        model = self._router.for_task(AITask.BRANCH_TEXTS)
+        events = event_nodes(snapshot)
+        if model.provider_name == "fake" or not events:
+            return {}
+        public: dict[str, object] = {k: legend[k] for k in ("what", "details", "applicant", "victims") if k in legend}
+        try:
+            result = await model.complete(
+                [
+                    ChatMessage(role="system", content=load_prompt(AITask.BRANCH_TEXTS)),
+                    ChatMessage(
+                        role="user", content=json.dumps({"легенда": public, "реплики": events}, ensure_ascii=False)
+                    ),
+                ],
+                schema=BranchTextsOut,
+            )
+            out = (
+                result.parsed
+                if isinstance(result.parsed, BranchTextsOut)
+                else BranchTextsOut.model_validate_json(result.text)
+            )
+        except (ExternalServiceError, ValueError) as e:
+            log.warning("Реплики ветвления моделью не получились, текст шаблона: %s", e)
+            return {}
+        return {
+            nid: text.strip()
+            for nid, text in out.texts.items()
+            if nid in events and check_event_text(text, events[nid], public) is None
+        }
 
     async def _with_materials(self, facts: dict[str, object]) -> dict[str, object]:
         """R4.4-06: выдержки из материалов «для генерации» по типу и признакам — модель согласует с ними легенду."""
@@ -97,10 +182,23 @@ class ScenarioGenerator:
             log.warning("Генерация легенды моделью не удалась, шаблон: %s", e)
             return fallback, "offline"
 
-    async def generate(self, rng: random.Random, groups: list[int], difficulty: int, author: UUID | None) -> Scenario:
-        incident = await self._facts.pick_incident(rng, groups or None)
+    async def generate(
+        self,
+        rng: random.Random,
+        groups: list[int],
+        difficulty: int,
+        author: UUID | None,
+        branching: str | None = None,
+    ) -> Scenario:
+        tpl = self._branches.get(branching) if branching and self._branches else None
+        if branching and tpl is None:
+            raise DomainError("Нет такого шаблона ветвления", code="bad_branching")
+        incident = await self._facts.pick_incident(rng, groups or None, list(tpl.incident_codes) if tpl else None)
         address = await self._facts.pick_address(rng)
         flags = [f for f in incident.flags if f in FLAG_FACTS and rng.random() < 0.5]
+        if tpl is not None:  # F5: признаки — по легенде шаблона, а не случайно (иначе эталон разойдётся с ситуацией)
+            victims = bool((tpl.legend.get("victims") or {}).get("has"))
+            flags = [f for f in incident.flags if f == "victims" and victims]
         services = await self._facts.resolve_services(incident.code, flags, address.okrug, address.district)
         fallback = offline_story(incident, address, flags, difficulty)
         facts = {
@@ -111,7 +209,8 @@ class ScenarioGenerator:
             "признаки_опросной_карты": [FLAG_FACTS[f][1] for f in flags],
             "сложность": difficulty,
         }
-        story, source = await self._story(facts, fallback)
+        # F5: у ветвящегося сценария первые фразы и описание — из шаблона (узлы рассчитаны на эту ситуацию)
+        story, source = (fallback, "offline") if tpl else await self._story(facts, fallback)
         scenario = build_scenario(
             incident=incident,
             address=address,
@@ -123,6 +222,11 @@ class ScenarioGenerator:
             source="ai" if source == "ai" else "template",
             author_id=author,
         )
+        if tpl is not None and self._branches is not None:
+            snapshot = self._branches.snapshot(tpl.id, scenario.legend)
+            scenario = with_template(scenario, tpl, snapshot)
+            texts = await self._event_texts(snapshot, scenario.legend)
+            scenario.branching = apply_texts(snapshot, texts) if texts else snapshot
         return scenario
 
 
@@ -143,7 +247,7 @@ class GenerateScenariosHandler:
         ids: list[UUID] = []
         try:
             for _ in range(cmd.count):
-                scenario = await self._gen.generate(rng, cmd.groups, cmd.difficulty, author)
+                scenario = await self._gen.generate(rng, cmd.groups, cmd.difficulty, author, cmd.branching)
                 if cmd.approve:  # из CLI — от имени системы
                     scenario.status = ScenarioStatus.APPROVED
                     scenario.approved_by = author
@@ -155,7 +259,7 @@ class GenerateScenariosHandler:
                     actor=cmd.actor,
                     meta=cmd.meta,
                     description=f"Сгенерировано сценариев: {len(ids)}, сложность {cmd.difficulty}",
-                    data={"groups": cmd.groups, "count": len(ids)},
+                    data={"groups": cmd.groups, "count": len(ids), "branching": cmd.branching},
                 )
             )
             await self._uow.commit()

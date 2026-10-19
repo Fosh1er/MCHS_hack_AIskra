@@ -144,6 +144,7 @@ from aiskra.modules.system.application.queries.get_ai_config import GetAIConfigH
 from aiskra.modules.system.infrastructure.settings import SqlSettingsStore
 from aiskra.modules.training.api import deps as training_deps
 from aiskra.modules.training.application.actors import Actors
+from aiskra.modules.training.application.branching import BranchDirector
 from aiskra.modules.training.application.commands.calls import (
     AnswerCallHandler,
     EndCallHandler,
@@ -151,6 +152,7 @@ from aiskra.modules.training.application.commands.calls import (
     SendReplicaHandler,
     StartDdsCallHandler,
     StartIncomingCallHandler,
+    TickCallHandler,
 )
 from aiskra.modules.training.application.commands.materials import (
     DeleteMaterialHandler,
@@ -171,7 +173,7 @@ from aiskra.modules.training.application.commands.sessions import (
     FeedDdsCardHandler,
 )
 from aiskra.modules.training.application.psy import PsyDirector
-from aiskra.modules.training.application.queries.calls import CardCallsHandler, GetCallHandler
+from aiskra.modules.training.application.queries.calls import BranchViews, CardCallsHandler, GetCallHandler
 from aiskra.modules.training.application.queries.materials import GetMaterialHandler, ListMaterialsHandler
 from aiskra.modules.training.application.queries.scenarios import (
     GetScenarioHandler,
@@ -195,6 +197,7 @@ from aiskra.modules.training.application.speech import (
     TranscribeHandler,
 )
 from aiskra.modules.training.application.voice_lab import VoiceLab
+from aiskra.modules.training.infrastructure.branch_catalog import YamlBranchCatalog
 from aiskra.modules.training.infrastructure.materials import (
     DocumentTextExtractor,
     LocalFileStorage,
@@ -531,9 +534,11 @@ def _wire_incidents(app: FastAPI) -> None:
     ov[incidents_deps.provide_dds_brigades] = dds_brigades
 
 
-def build_generate_handler(router: ModelRouter, session: AsyncSession) -> GenerateScenariosHandler:
+def build_generate_handler(
+    router: ModelRouter, session: AsyncSession, branches: YamlBranchCatalog | None = None
+) -> GenerateScenariosHandler:
     return GenerateScenariosHandler(
-        ScenarioGenerator(DictionaryScenarioFacts(session), router, SqlMaterialContext(session)),
+        ScenarioGenerator(DictionaryScenarioFacts(session), router, SqlMaterialContext(session), branches),
         SqlScenarioRepository(session),
         SqlAuditRecorder(session),
         SqlAlchemyUnitOfWork(session),
@@ -547,6 +552,7 @@ def _wire_training(app: FastAPI, services: Services) -> None:
     router = services.model_router
 
     catalog = YamlPsyCatalog(services.settings.dictionaries_dir / "psy_profiles.yaml")  # п. 3.7, проверка при старте
+    branches = YamlBranchCatalog(services.settings.dictionaries_dir / "branch_templates.yaml")  # F5, проверка графов
 
     def call_parts(session: AsyncSession) -> tuple[object, ...]:
         return (
@@ -560,10 +566,17 @@ def _wire_training(app: FastAPI, services: Services) -> None:
 
     def psy_parts(session: AsyncSession) -> dict[str, object]:
         """Психологический модификатор (п. 3.7): ведущий и занятия — чтобы выбрать профиль по настройкам."""
-        return {"psy": PsyDirector(catalog, Actors(router)), "sessions": SqlTrainingSessionRepository(session)}
+        return {
+            "psy": PsyDirector(catalog, Actors(router)),
+            "sessions": SqlTrainingSessionRepository(session),
+            "branch": BranchDirector(IncidentCardContext(session)),  # F5: ход ситуации ветвящегося сценария
+        }
+
+    def branch_views(session: AsyncSession) -> BranchViews:
+        return BranchViews(BranchDirector(IncidentCardContext(session)), SqlScenarioRepository(session), clock)
 
     def generate(session: Session) -> GenerateScenariosHandler:
-        return build_generate_handler(router, session)
+        return build_generate_handler(router, session, branches)
 
     def review(session: Session) -> ReviewScenarioHandler:
         return ReviewScenarioHandler(
@@ -584,7 +597,9 @@ def _wire_training(app: FastAPI, services: Services) -> None:
     def incoming(session: Session) -> StartIncomingCallHandler:
         return StartIncomingCallHandler(
             *call_parts(session),
-            generator=ScenarioGenerator(DictionaryScenarioFacts(session), router, SqlMaterialContext(session)),
+            generator=ScenarioGenerator(
+                DictionaryScenarioFacts(session), router, SqlMaterialContext(session), branches
+            ),
             switches=SystemServiceSwitches(session),
             **psy_parts(session),
         )
@@ -610,7 +625,10 @@ def _wire_training(app: FastAPI, services: Services) -> None:
         )
 
     def get_call(session: Session) -> GetCallHandler:
-        return GetCallHandler(SqlCallRepository(session))
+        return GetCallHandler(SqlCallRepository(session), branch_views(session))
+
+    def tick(session: Session) -> TickCallHandler:
+        return TickCallHandler(*call_parts(session), **psy_parts(session))  # type: ignore[arg-type]
 
     def replica_audio(session: Session) -> ReplicaAudioHandler:
         return ReplicaAudioHandler(services.tts, SqlCallRepository(session), SqlScenarioRepository(session))
@@ -619,7 +637,7 @@ def _wire_training(app: FastAPI, services: Services) -> None:
         return CallRecordingHandler(services.tts, SqlCallRepository(session), SqlScenarioRepository(session))
 
     def card_calls(session: Session) -> CardCallsHandler:
-        return CardCallsHandler(SqlCallRepository(session))
+        return CardCallsHandler(SqlCallRepository(session), branch_views(session))
 
     ov[training_deps.provide_generate] = generate
     ov[training_deps.provide_review] = review
@@ -656,6 +674,8 @@ def _wire_training(app: FastAPI, services: Services) -> None:
     ov[training_deps.provide_replica_audio] = replica_audio
     ov[training_deps.provide_call_recording] = call_recording
     ov[training_deps.provide_card_calls] = card_calls
+    ov[training_deps.provide_tick] = tick
+    ov[training_deps.provide_branch_catalog] = lambda: branches
     _wire_sessions(app, services)
 
 

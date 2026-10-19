@@ -63,6 +63,7 @@ class SqlScenarioRepository:
         row.source = scenario.source
         row.psy_profile = scenario.psy_profile
         row.review = dict(scenario.review) or None
+        row.branching = dict(scenario.branching) if scenario.branching else None
         row.author_id = scenario.author_id
         row.approved_by = scenario.approved_by
         if scenario.status is ScenarioStatus.APPROVED and row.approved_at is None:
@@ -90,6 +91,7 @@ class SqlScenarioRepository:
             approved_by=row.approved_by,
             psy_profile=row.psy_profile,
             review=dict(row.review or {}),
+            branching=dict(row.branching) if row.branching else None,
         )
 
     async def page(
@@ -125,6 +127,7 @@ class SqlScenarioRepository:
                 source=r.source,
                 created_at=as_utc(r.created_at),
                 psy_profile=r.psy_profile,
+                branching=str((r.branching or {}).get("id") or "") or None,
                 **_review_counts(self._scenario(r)),
             )
             for r in rows
@@ -180,6 +183,7 @@ class SqlCallRepository:
         row.revealed = list(call.revealed)
         row.tone = call.tone.to_json() if call.tone else None
         row.psy = dict(call.psy) if call.psy is not None else None
+        row.branch = dict(call.branch) if call.branch is not None else None
         row.ended_by = call.ended_by
         row.answered_at = call.answered_at
         row.ended_at = call.ended_at
@@ -206,6 +210,7 @@ class SqlCallRepository:
             revealed=list(row.revealed or []),
             tone=CallerTone.from_json(row.tone),
             psy=dict(row.psy) if row.psy else None,
+            branch=dict(row.branch) if row.branch else None,
             ended_by=row.ended_by,
         )
 

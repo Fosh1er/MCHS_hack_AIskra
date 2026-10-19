@@ -20,6 +20,9 @@ class GenerateIn(_Strict):
     count: int = Field(default=5, ge=1, le=50)
     groups: list[int] = Field(default_factory=list, description="Группы классификатора; пусто — любые")
     difficulty: int = Field(default=2, ge=1, le=5)
+    branching: str | None = Field(
+        default=None, max_length=32, pattern=r"^[a-z0-9_]+$", description="F5: шаблон ветвления; нет — без ветвления"
+    )
 
 
 class GeneratedOut(BaseModel):
@@ -110,6 +113,22 @@ class SessionSettingsIn(_Strict):
     feed_interval_s: float | None = Field(default=None, ge=5, le=3600)
     max_waiting: int | None = Field(default=None, ge=1, le=10)
     psy: PsySettingsIn | None = None
+    branch: BranchSettingsIn | None = None
+
+
+class BranchSettingsIn(_Strict):
+    """Ветвящиеся сценарии (F5, ADR-0014): вес блока «Развитие ситуации» в итоговом балле."""
+
+    weight: float = Field(default=0, ge=0, le=1, description="0 — информативно, итог не влияет на балл")
+
+
+class BranchTemplateOut(BaseModel):
+    id: str
+    title: str
+    description: str
+    incident_codes: list[str]
+    forks: int
+    outcomes: list[str]
 
 
 class PsySettingsIn(_Strict):

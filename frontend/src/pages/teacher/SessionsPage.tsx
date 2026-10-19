@@ -16,7 +16,7 @@ import { useScreenTour } from '../../shared/onboarding/OnboardingProvider';
 import { GroupPicker } from './ScenariosPage';
 
 const DEFAULTS: SessionSettings = { norm_112: 75, norm_dds: 30, threshold: 70, difficulty: 2, call_interval_s: 40, feed_interval_s: 45, max_waiting: 3 };
-const SETTING_LABELS: [Exclude<keyof SessionSettings, 'psy'>, string, number, number][] = [
+const SETTING_LABELS: [Exclude<keyof SessionSettings, 'psy' | 'branch'>, string, number, number][] = [
   ['norm_112', 'Норматив карточки 112, с', 5, 3600],
   ['norm_dds', 'Норматив решения ДДС, с', 5, 3600],
   ['threshold', 'Порог «зачтено», балл', 0, 100],
@@ -41,6 +41,7 @@ function CreateForm({ onCreated, assign }: { onCreated: (id: string) => void; as
   const [picked, setPicked] = useState<number[]>([]);
   const [roles, setRoles] = useState<Record<string, { role: Role; service: string }>>({});
   const [settings, setSettings] = useState<SessionSettings>(DEFAULTS);
+  const [branchWeight, setBranchWeight] = useState(0); // F5: вес «Развитие ситуации», %
   const [psy, setPsy] = useState<PsySettings>(PSY_DEFAULTS); // п. 3.7: психологический модификатор
   // значения по умолчанию — из настроек администратора (п. 5.2)
   const defaults = useSessionDefaults().data;
@@ -89,7 +90,10 @@ function CreateForm({ onCreated, assign }: { onCreated: (id: string) => void; as
     }
   }, [assign, defaults]); // eslint-disable-line react-hooks/exhaustive-deps
   const submit = () => {
-    const body: CreateSessionBody = { title: title.trim(), mode, card_source: source, groups: picked, participants, settings: { ...settings, psy } };
+    const body: CreateSessionBody = {
+      title: title.trim(), mode, card_source: source, groups: picked, participants,
+      settings: { ...settings, psy, branch: { weight: branchWeight / 100 } },
+    };
     create.mutate(body, { onSuccess: (r) => onCreated(r.id) });
   };
   return (
@@ -161,6 +165,10 @@ function CreateForm({ onCreated, assign }: { onCreated: (id: string) => void; as
             <input type="number" min={min} max={max} value={settings[k]} onChange={(e) => setSettings({ ...settings, [k]: Number(e.target.value) })} />
           </label>
         ))}
+        <label title="Ветвящиеся сценарии: итог ситуации (благоприятный, частичный, неблагоприятный, трагический). 0 — информативно, на балл не влияет">
+          Вес «Развитие ситуации», %
+          <input type="number" min={0} max={100} value={branchWeight} onChange={(e) => setBranchWeight(Math.min(100, Math.max(0, Number(e.target.value))))} />
+        </label>
       </div>
       <PsyForm value={psy} onChange={setPsy} />
       <div className="cab-filters" style={{ marginTop: 12 }}>

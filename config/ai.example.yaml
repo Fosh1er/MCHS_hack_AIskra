@@ -41,6 +41,7 @@ ai:
     insights:            {provider: local,       temperature: 0.3, cache: off}
     psy_acts:            {provider: local_small, temperature: 0,   cache: exact, cache_ttl: 7d, max_tokens: 300}
     psy_judge:           {provider: local, temperature: 0,   cache: exact, cache_ttl: 7d, max_tokens: 700}
+    branch_texts:        {provider: local,       temperature: 0.7, cache: off, max_tokens: 700}
     feedback_draft:      {provider: local,       temperature: 0.4, cache: off, max_tokens: 700}
   # Голос собеседника (п. 3.6): серверный синтез за OpenAI-совместимым /audio/speech. Выключен, пока TTS_KIND не задан, —
   # тогда реплики озвучивает браузер (темп, высота, громкость по состоянию заявителя).

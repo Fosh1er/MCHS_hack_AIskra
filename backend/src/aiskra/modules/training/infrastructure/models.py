@@ -30,6 +30,7 @@ class ScenarioModel(Base):
     source: Mapped[str] = mapped_column(String(16), default="ai")  # ai | manual | trainee | ticket
     psy_profile: Mapped[str | None] = mapped_column(String(32))  # п. 3.7: закреплённый профиль заявителя
     review: Mapped[dict[str, Any] | None] = mapped_column(JsonType)  # п. 3.3: решения по разделам эталона
+    branching: Mapped[dict[str, Any] | None] = mapped_column(JsonType)  # F5: копия шаблона ветвления
     version: Mapped[int] = mapped_column(Integer, default=1)
     author_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
     approved_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
@@ -93,6 +94,7 @@ class CallModel(Base):
     revealed: Mapped[list[str]] = mapped_column(JsonType, default=list)
     tone: Mapped[dict[str, Any] | None] = mapped_column(JsonType)  # состояние заявителя (п. 3.6)
     psy: Mapped[dict[str, Any] | None] = mapped_column(JsonType)  # п. 3.7: профиль и состояние заявителя
+    branch: Mapped[dict[str, Any] | None] = mapped_column(JsonType)  # F5: ход ветвления в звонке
     ended_by: Mapped[str | None] = mapped_column(String(16))  # operator | party
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     answered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

@@ -11,7 +11,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Composer, Icon, Transcript, type TranscriptMessage } from '@smena112/ui-kit';
 import { ApiError } from '../api/http';
-import { endCall, getCall, pauseCall, replicaAudioUrl, sendReplica, speakUrl, streamReplica, transcribe, useSpeechStatus, type CallMessage, type PsyLive, type Replica, type ReplicaVia, type StreamMetrics, type Tone } from '../api/training';
+import { endCall, getCall, pauseCall, replicaAudioUrl, sendReplica, speakUrl, streamReplica, tickCall, transcribe, useSpeechStatus, type CallMessage, type PsyLive, type Replica, type ReplicaVia, type StreamMetrics, type Tone } from '../api/training';
 import { useActiveTour } from '../onboarding/OnboardingProvider';
 import { useHandsFree, type HandsFreeState } from '../voice/useHandsFree';
 import { VAD_PROFILES, isLikelyEcho, type VadProfileName } from '../voice/vad';
@@ -149,6 +149,7 @@ export function CallPanel({ callId, title, subtitle, partyName, initial, onEnded
   const [now, setNow] = useState(() => Date.now());
   const [voice, setVoice] = useState(() => { try { return localStorage.getItem(VOICE_KEY) === '1'; } catch { return false; } });
   const [psy, setPsy] = useState(false); // п. 3.7: у заявителя психологический профиль — доступна «Пауза»
+  const [branching, setBranching] = useState(false); // F5: ветвящийся сценарий — ситуация меняется и без реплик
   const spoken = useRef(0);
   const audio = useRef<HTMLAudioElement | null>(null);
   const lastParty = useRef<{ text: string; at: number } | null>(null); // для отсева эха собеседника
@@ -217,8 +218,25 @@ export function CallPanel({ callId, title, subtitle, partyName, initial, onEnded
       setEnded(c.status === 'ended');
       setPsy(!!c.psy);
       if (c.psy) setPsyLevel({ level: c.psy.level });
+      setBranching(!!c.branching);
     }).catch(() => undefined);
   }, [callId]);
+  const busyRef = useRef(false);
+  busyRef.current = busy;
+  // F5: таймер ситуации — раз в 5 с, пока звонок идёт: «Дым уже в коридоре!» звучит, даже если оператор молчит
+  useEffect(() => {
+    if (!branching || ended) return;
+    const t = setInterval(() => {
+      if (busyRef.current) return; // ответ на реплику сам продвинет ситуацию
+      tickCall(callId).then((events) => {
+        if (!events.length) return;
+        setMessages((m) => [...m, ...events.map((e) => ({
+          speaker: e.speaker, text: e.text, at: new Date().toISOString(), id: e.message_id, tone: e.tone, remarks: e.remarks,
+        }))]);
+      }).catch(() => undefined);
+    }, 5000);
+    return () => clearInterval(t);
+  }, [branching, ended, callId]);
   useEffect(() => { if (ended) return; const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, [ended]);
   useEffect(() => {
     if (status.isLoading) return; // сначала узнаём, есть ли серверный голос, — иначе первую реплику скажет браузер
