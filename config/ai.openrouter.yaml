@@ -1,20 +1,17 @@
-# Демо-стенд на бесплатных моделях OpenRouter (OpenAI-совместимый API). Только синтетические данные: запросы
+# Демо-стенд на моделях OpenRouter (OpenAI-совместимый API). Только синтетические данные: запросы
 # уходят во внешний сервис (ответ заказчика #710). В контуре заказчика — config/ai.example.yaml с локальной моделью.
 #
 # Подключение: в .env —
 #   AISKRA_AI_CONFIG_PATH=<путь к этому файлу>   (в docker — /app/config/ai.openrouter.yaml)
 #   AISKRA_AI_ALLOW_EXTERNAL=true
 #   DEMO_LLM_API_KEY=<ключ OpenRouter>            ключ только в .env, не в этом файле
-#   TTS_KIND=openai_compatible                    голос собеседника (Gemini TTS) — платно, нужен баланс
-#   STT_KIND=openai_compatible                    распознавание речи оператора (Whisper) — платно, нужен баланс
+#   TTS_KIND=openai_compatible                    голос собеседника (Gemini TTS, резерв — MAI Voice) — платно
+#   STT_KIND=openai_compatible                    распознавание оператора (Qwen3-ASR, резерв — Whisper) — платно
 # Голос и распознавание используют тот же ключ. Для проверки без ключа — локальные make dev-tts и make dev-stt
 # (переменные STT_URL / TTS_URL), тот же адаптер: переключение — только переменными окружения.
-# Модели выбраны 27.09.2026 по https://openrouter.ai/api/v1/models (цена 0, поддержка JSON-ответа) и проверены
-# запросом: qwen3.8-27b и gemma-4 в тот день были перегружены у поставщика (429 upstream), nemotron-3-super
-# отвечал за 2 с чистым русским текстом при reasoning.enabled: false. Бесплатные модели OpenRouter меняются —
-# при ошибке «model not found» или 429 замените имя в DEMO_LLM_MODEL / DEMO_SMALL_MODEL.
-# Бесплатный аккаунт без пополнения — 50 запросов в сутки (реплика собеседника = 1 запрос).
-# Лимиты бесплатного тарифа — порядка 20 запросов в минуту и ограниченное число в сутки: параллельность низкая.
+# Модели выбраны командой 19.10.2026 (F3): LLM — openai/gpt-4o; TTS — google/gemini-3.8-flash-tts (голос Zephyr),
+# резерв — microsoft/mai-voice-2.1-flash (ru-RU-Masha); STT — qwen/qwen3-asr-0.6b, резерв — openai/whisper-large-v3-turbo.
+# Модели платные — поставьте лимит расходов на ключ. Любую можно заменить переменной окружения без правки файла.
 ai:
   allow_external: ${AISKRA_AI_ALLOW_EXTERNAL:-false}
   default_provider: demo
@@ -24,7 +21,7 @@ ai:
       kind: openai_compatible
       base_url: ${DEMO_LLM_URL:-https://openrouter.ai/api/v1}
       api_key_env: DEMO_LLM_API_KEY
-      model: ${DEMO_LLM_MODEL:-nvidia/nemotron-3-super-120b-a12b:free}
+      model: ${DEMO_LLM_MODEL:-openai/gpt-4o}   # F3; альтернатива — Qwen flash
       timeout_s: 90
       max_concurrency: 2
       structured_output: json_object
@@ -34,7 +31,7 @@ ai:
       kind: openai_compatible
       base_url: ${DEMO_LLM_URL:-https://openrouter.ai/api/v1}
       api_key_env: DEMO_LLM_API_KEY
-      model: ${DEMO_SMALL_MODEL:-nvidia/nemotron-3-super-120b-a12b:free}
+      model: ${DEMO_SMALL_MODEL:-openai/gpt-4o}
       timeout_s: 45
       max_concurrency: 2
       structured_output: json_object
@@ -60,12 +57,12 @@ ai:
     kind: ${TTS_KIND:-fake}          # openai_compatible — включить
     base_url: ${TTS_URL:-https://openrouter.ai/api/v1}
     api_key_env: DEMO_LLM_API_KEY    # тот же ключ OpenRouter
-    model: ${TTS_MODEL:-google/gemini-3.8-flash-lite-tts}
+    model: ${TTS_MODEL:-google/gemini-3.8-flash-tts}   # F3: выбрана командой 19.10.2026
     style: ${TTS_STYLE:-google}      # google | openai | none
     response_format: ${TTS_FORMAT:-pcm}   # Gemini отдаёт сырой звук 24 кГц — сервер оборачивает его в WAV
     voice: ${TTS_VOICE:-Zephyr}
     voices:
-      applicant_female: ${TTS_VOICE_FEMALE:-Kore}
+      applicant_female: ${TTS_VOICE_FEMALE:-Zephyr}
       applicant_male: ${TTS_VOICE_MALE:-Charon}
       brigade: ${TTS_VOICE_BRIGADE:-Orus}
       service: ${TTS_VOICE_SERVICE:-Aoede}
@@ -73,6 +70,13 @@ ai:
     cache_mb: 64
     max_concurrency: 2
     timeout_s: 30
+    # F3: основная не ответила — синтез резервной моделью (тот же ключ). Отключить: TTS_FALLBACK_MODEL= (пусто)
+    fallback:
+      model: ${TTS_FALLBACK_MODEL:-microsoft/mai-voice-2.1-flash}
+      voice: ${TTS_FALLBACK_VOICE:-ru-RU-Masha:MAI-Voice-2.1-Flash}
+      style: none                    # эмоция — темпом; стиль Gemini резервная модель не понимает
+      response_format: ${TTS_FALLBACK_FORMAT:-mp3}
+      timeout_s: 30
   # Голосовой ввод оператора: Whisper через OpenRouter (/audio/transcriptions, multipart — тот же адаптер, что для
   # локального Whisper). whisper-large-v3-turbo — по цене 29.09.2026 около 0,0002 $ за минуту звука, в 30 раз дешевле
   # whisper-1. Выключен, пока STT_KIND не задан. Локально: STT_URL=http://localhost:8200/v1 (make dev-stt) или Speaches.
@@ -80,6 +84,7 @@ ai:
     kind: ${STT_KIND:-fake}          # openai_compatible — включить
     base_url: ${STT_URL:-https://openrouter.ai/api/v1}
     api_key_env: DEMO_LLM_API_KEY    # тот же ключ OpenRouter; локальному серверу он не нужен
-    model: ${STT_MODEL:-openai/whisper-large-v3-turbo}
+    model: ${STT_MODEL:-qwen/qwen3-asr-0.6b}                         # F3: основная
+    fallback_model: ${STT_FALLBACK_MODEL:-openai/whisper-large-v3-turbo}   # F3: при сбое основной
     language: ru
     timeout_s: 30

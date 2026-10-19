@@ -6,14 +6,17 @@ from __future__ import annotations
 
 import asyncio
 import io
+import logging
 import os
 import wave
 from typing import Any, Literal
 
 import httpx
 
-from aiskra.ai.ports import AudioBlob, Transcript, VoiceProfile
+from aiskra.ai.ports import AudioBlob, STTPort, Transcript, TTSPort, VoiceProfile
 from aiskra.shared.errors import ExternalServiceError
+
+log = logging.getLogger(__name__)
 
 EXT = {"audio/webm": "webm", "audio/ogg": "ogg", "audio/wav": "wav", "audio/x-wav": "wav", "audio/mpeg": "mp3",
        "audio/mp4": "m4a", "audio/aac": "aac", "audio/flac": "flac"}  # fmt: skip
@@ -172,3 +175,46 @@ class OpenAICompatibleTTS:
             return AudioBlob(content=pcm_to_wav(resp.content, self._rate), mime="audio/wav")
         mime = resp.headers.get("content-type", "").split(";")[0].strip() or MIME[self._format]
         return AudioBlob(content=resp.content, mime=mime)
+
+
+class FallbackTTS:
+    """Основная модель синтеза, при её сбое — резервная (F3). Ответ резервной не хуже тишины: оператор слышит
+    заявителя, а в журнале видно, что основная не ответила."""
+
+    def __init__(self, primary: TTSPort, backup: TTSPort) -> None:
+        self._primary, self._backup = primary, backup
+
+    @property
+    def enabled(self) -> bool:
+        return self._primary.enabled
+
+    @property
+    def model_id(self) -> str:
+        return self._primary.model_id
+
+    async def synthesize(self, text: str, *, voice: VoiceProfile) -> AudioBlob:
+        try:
+            return await self._primary.synthesize(text, voice=voice)
+        except ExternalServiceError as e:
+            log.warning(
+                "Синтез %s не ответил (%s) — резервная модель %s", self._primary.model_id, e, self._backup.model_id
+            )
+            return await self._backup.synthesize(text, voice=voice)
+
+
+class FallbackSTT:
+    """Основная модель распознавания, при её сбое — резервная (F3)."""
+
+    def __init__(self, primary: STTPort, backup: STTPort) -> None:
+        self._primary, self._backup = primary, backup
+
+    @property
+    def enabled(self) -> bool:
+        return self._primary.enabled
+
+    async def transcribe(self, audio: bytes, *, lang: str = "", mime: str = "audio/webm") -> Transcript:
+        try:
+            return await self._primary.transcribe(audio, lang=lang, mime=mime)
+        except ExternalServiceError as e:
+            log.warning("Распознавание не ответило (%s) — резервная модель", e)
+            return await self._backup.transcribe(audio, lang=lang, mime=mime)
