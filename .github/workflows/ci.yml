@@ -1,4 +1,4 @@
-# CI (F6.4): проверки кода и прод-сборка в docker compose с PostgreSQL, nginx и смоуком в браузерах.
+# CI (F6.4): проверки кода, e2e (F6.5, Chromium) и прод-сборка в docker compose с PostgreSQL, nginx и смоуком в браузерах.
 # ИИ — офлайн (fake), ключи моделей не нужны; пароли стенда генерируются в прогоне.
 name: ci
 
@@ -51,6 +51,36 @@ jobs:
       - run: make be-check
       - run: make fe-install
       - run: make fe-build
+
+  e2e:
+    name: e2e (Playwright, Chromium)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: make be-install
+      - run: make fe-install
+      - name: Системные библиотеки браузера
+        working-directory: backend
+        run: uv run --with 'playwright>=1.48' python -m playwright install --with-deps chromium
+      - name: make e2e
+        run: make e2e E2E_BROWSER=chromium
+      - name: Артефакты e2e при падении — снимки экрана, консоль, журналы стенда
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-chromium-${{ github.run_id }}
+          path: backend/tests/e2e/artifacts/
+          retention-days: 14
 
   compose:
     name: compose (PostgreSQL, nginx, смоук Chromium и Firefox)

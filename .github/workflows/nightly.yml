@@ -1,4 +1,4 @@
-# Ночной CI (F6.4, F6.6): повторы тестов ловят нестабильные (D4), уменьшенный нагрузочный тест на PostgreSQL (D3).
+# Ночной CI (F6.4, F6.6): повторы тестов ловят нестабильные (D4), e2e в Firefox, уменьшенный нагрузочный тест на PostgreSQL (D3).
 name: nightly
 
 on:
@@ -66,6 +66,36 @@ jobs:
           name: pytest-repeat-${{ github.run_id }}
           path: artifacts/pytest/
           retention-days: 30
+
+  e2e-firefox:
+    name: e2e (Playwright, Firefox)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: make be-install
+      - run: make fe-install
+      - name: Системные библиотеки браузера
+        working-directory: backend
+        run: uv run --with 'playwright>=1.48' python -m playwright install --with-deps firefox
+      - name: make e2e (Firefox)
+        run: make e2e E2E_BROWSER=firefox
+      - name: Артефакты e2e при падении — снимки экрана, консоль, журналы стенда
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-firefox-${{ github.run_id }}
+          path: backend/tests/e2e/artifacts/
+          retention-days: 14
 
   loadtest:
     name: нагрузочный тест на PostgreSQL (compose)
