@@ -16,11 +16,26 @@ concurrency:
 permissions:
   contents: read
 
+defaults:
+  run:
+    shell: bash   # с pipefail: падение до `| tee` не теряется
+
 jobs:
   checks:
     name: checks (be-check, fe-build)
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    services:
+      postgres:   # для тестов, которым нужен PostgreSQL (одновременная выдача номеров карточек, F6.6)
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: aiskra_test
+          POSTGRES_HOST_AUTH_METHOD: trust   # одноразовая база job'а, доступна только на раннере
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres -d aiskra_test" --health-interval 5s --health-retries 10
+    env:
+      AISKRA_TEST_POSTGRES_URL: postgresql+asyncpg://postgres@localhost:5432/aiskra_test
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6

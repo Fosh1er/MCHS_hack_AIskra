@@ -22,6 +22,10 @@ concurrency:
 permissions:
   contents: read
 
+defaults:
+  run:
+    shell: bash   # с pipefail: падение loadtest до `| tee` не теряется
+
 jobs:
   repeat-tests:
     name: pytest × ${{ inputs.runs || '20' }} (нестабильные тесты)
@@ -80,6 +84,11 @@ jobs:
         uses: ./.github/actions/compose-stand
         with:
           load-users: "100"
+
+      - name: Журнал PostgreSQL — ожидания блокировок и запросы дольше 500 мс
+        run: |
+          docker compose exec -T db psql -U aiskra -d aiskra -c "ALTER SYSTEM SET log_lock_waits = on" \
+            -c "ALTER SYSTEM SET log_min_duration_statement = 500" -c "SELECT pg_reload_conf()"
 
       - name: Объём данных — bulk_seed
         run: |
