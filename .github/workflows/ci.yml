@@ -1,0 +1,180 @@
+# CI (F6.4): проверки кода, e2e (F6.5, Chromium) и прод-сборка в docker compose с PostgreSQL, nginx и смоуком в браузерах.
+# ИИ — офлайн (fake), ключи моделей не нужны; пароли стенда генерируются в прогоне.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash   # с pipefail: падение до `| tee` не теряется
+
+jobs:
+  checks:
+    name: checks (be-check, fe-build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:   # для тестов, которым нужен PostgreSQL (одновременная выдача номеров карточек, F6.6)
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: aiskra_test
+          POSTGRES_HOST_AUTH_METHOD: trust   # одноразовая база job'а, доступна только на раннере
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres -d aiskra_test" --health-interval 5s --health-retries 10
+    env:
+      AISKRA_TEST_POSTGRES_URL: postgresql+asyncpg://postgres@localhost:5432/aiskra_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: make be-install
+      - run: make be-check
+      - run: make fe-install
+      - run: make fe-build
+
+  e2e:
+    name: e2e (Playwright, Chromium)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: make be-install
+      - run: make fe-install
+      - name: Системные библиотеки браузера
+        working-directory: backend
+        run: uv run --with 'playwright>=1.48' python -m playwright install --with-deps chromium
+      - name: make e2e
+        run: make e2e E2E_BROWSER=chromium
+      - name: Артефакты e2e при падении — снимки экрана, консоль, журналы стенда
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-chromium-${{ github.run_id }}
+          path: backend/tests/e2e/artifacts/
+          retention-days: 14
+
+  compose:
+    name: compose (PostgreSQL, nginx, смоук Chromium и Firefox)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      WEB: https://localhost:8443
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Стенд в docker compose
+        id: stand
+        uses: ./.github/actions/compose-stand
+        with:
+          history-lessons: "2"
+
+      - name: nginx — /health по https (8443)
+        run: |
+          curl -fsS --insecure "$WEB/health" | tee /tmp/health.json; echo
+          jq -e --arg v "${GITHUB_SHA::7}" '.status == "ok" and .db == "ok" and .env == "demo" and .version == $v' /tmp/health.json
+          # http :8080 перенаправляет на https :8443, /health по http — для проверок без TLS
+          curl -sS -o /dev/null -w '%{http_code} %{redirect_url}\n' http://localhost:8080/ | tee /tmp/redirect.txt
+          grep -q "^301 https://localhost:8443/" /tmp/redirect.txt
+          curl -fsS http://localhost:8080/health > /dev/null
+
+      - name: nginx — главная страница и заголовки безопасности
+        run: |
+          curl -fsS --insecure -D /tmp/index.headers -o /tmp/index.html "$WEB/"
+          grep -q '<div id="root">' /tmp/index.html
+          cat /tmp/index.headers
+          csp=$(grep -i '^content-security-policy:' /tmp/index.headers)
+          echo "$csp" | grep -q "media-src 'self' blob:"   # голосовой полигон проигрывает звук из blob: (D2)
+          echo "$csp" | grep -q "script-src 'self';"
+          grep -qi '^strict-transport-security:' /tmp/index.headers
+          grep -qi '^x-content-type-options: nosniff' /tmp/index.headers
+
+      - name: API без сессии — 401
+        run: |
+          for path in /api/v1/auth/me /api/v1/incidents/journal /api/v1/training/sessions/my /api/v1/system/status \
+                      /api/v1/dictionaries/services /api/v1/assessment/my/progress; do
+            code=$(curl -sS --insecure -o /dev/null -w '%{http_code}' "$WEB$path")
+            echo "$path → $code"
+            [ "$code" = 401 ] || exit 1
+          done
+          # в режиме demo демо-вход (F2) публичен
+          curl -fsS --insecure "$WEB/api/v1/auth/demo-accounts" | jq -e '(.accounts | length) == 5 and .password == null' > /dev/null
+
+      - name: Голосовой полигон — /voice-lab/index.html
+        run: |
+          code=$(curl -sS --insecure -D /tmp/vl.headers -o /tmp/vl.html -w '%{http_code}' "$WEB/voice-lab/index.html")
+          [ "$code" = 200 ]
+          grep -q 'src="app.js"' /tmp/vl.html   # сама страница полигона, а не index.html SPA
+          grep -i '^content-security-policy:' /tmp/vl.headers | grep -q "media-src 'self' blob:"
+          curl -fsS --insecure -o /dev/null "$WEB/voice-lab/app.js"
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+
+      - name: Playwright — Chromium и Firefox
+        working-directory: backend
+        run: uv run --with playwright python -m playwright install --with-deps chromium firefox
+
+      - name: Смоук в Chromium
+        id: chromium
+        working-directory: backend
+        run: >
+          uv run --with playwright python tools/browser_smoke.py --browser chromium
+          --web "$WEB" --insecure --strict --out ../artifacts/smoke/chromium
+
+      - name: Смоук в Firefox   # и после падения Chromium: видно, общий ли дефект
+        if: (success() || failure()) && steps.chromium.outcome != 'skipped'
+        working-directory: backend
+        run: >
+          uv run --with playwright python tools/browser_smoke.py --browser firefox
+          --web "$WEB" --insecure --strict --out ../artifacts/smoke/firefox
+
+      - name: Журналы docker compose
+        if: failure()
+        run: |
+          mkdir -p artifacts
+          docker compose ps > artifacts/compose-ps.txt 2>&1 || true
+          docker compose logs --no-color --timestamps > artifacts/compose-logs.txt 2>&1 || true
+
+      - name: Артефакты при падении — снимки экранов и журналы
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: compose-smoke-${{ github.run_id }}
+          path: artifacts/
+          retention-days: 14
+
+      - name: Остановить стенд
+        if: always()
+        run: docker compose down -v

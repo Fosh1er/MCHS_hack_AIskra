@@ -6,6 +6,9 @@
 
 Firefox для Playwright: `uv run --with playwright python -m playwright install firefox`. Яндекс.Браузер построен на
 Chromium — его покрывает прогон `--browser chromium`. Стенд — после `demo-seed` (и лучше `tools/demo_history.py`).
+
+Стенд в docker (CI, F6.4): `--web https://localhost:8443 --insecure` (сертификат самоподписанный) и `--strict` —
+код выхода 1, если экран не открылся, действие не прошло, в консоли ошибка JavaScript или CSP, или сервер ответил 5xx.
 """
 
 from __future__ import annotations
@@ -23,7 +26,7 @@ from playwright.sync_api import Page, sync_playwright
 PAGES = {
     "teacher": [
         "/teacher", "/teacher/scenarios", "/teacher/sessions", "/teacher/analytics", "/teacher/readiness",
-        "/teacher/validation", "/teacher/materials",
+        "/teacher/validation", "/teacher/materials", "/voice-lab/index.html",
     ],
     "op1": ["/student", "/arm/112/journal"],
     "dds1": ["/student", "/arm/dds/S101"],
@@ -37,7 +40,8 @@ def login(page: Page, web: str, user: str, password: str, arm: str = "") -> None
     page.locator("input[type=password]").fill(password)
     if arm:
         page.get_by_label("номер АРМ").fill(arm)
-    page.get_by_role("button", name="ВОЙТИ").click()
+    # exact: в режиме demo под формой ещё кнопки «Войти: <роль>» (F2)
+    page.get_by_role("button", name="ВОЙТИ", exact=True).click()
     page.wait_for_load_state("networkidle")
     time.sleep(0.8)
     skip_tour(page)
@@ -58,6 +62,8 @@ def main() -> None:
     ap.add_argument("--browser", choices=["firefox", "chromium", "chrome"], default="firefox")
     ap.add_argument("--web", default="http://localhost:5173")
     ap.add_argument("--out", default="../docs/browsers/firefox")
+    ap.add_argument("--insecure", action="store_true", help="принять самоподписанный сертификат стенда (nginx :8443)")
+    ap.add_argument("--strict", action="store_true", help="код выхода 1 при любой неудаче (для CI)")
     args = ap.parse_args()
     password = os.environ["AISKRA_DEMO_PASSWORD"]
     out = Path(args.out)
@@ -70,8 +76,18 @@ def main() -> None:
         report["version"] = browser.version
 
         def context(user: str) -> Page:
-            page = browser.new_context(viewport={"width": 1600, "height": 900}, locale="ru-RU").new_page()
+            page = browser.new_context(
+                viewport={"width": 1600, "height": 900}, locale="ru-RU", ignore_https_errors=args.insecure
+            ).new_page()
             page.set_default_timeout(15_000)
+            page.on(
+                "response",
+                lambda r: (
+                    report["errors"].append({"user": user, "url": r.url, "status": r.status})
+                    if r.status >= 500
+                    else None
+                ),
+            )
             page.on(
                 "pageerror", lambda e: report["errors"].append({"user": user, "url": page.url, "error": str(e)[:300]})
             )
@@ -161,6 +177,11 @@ def main() -> None:
     (out / "report.json").write_text(json.dumps(report, ensure_ascii=False, indent=1), "utf-8")
     print(f"{args.browser} {report['version']}: экранов {ok_pages}/{len(report['pages'])}, "
           f"действий {ok_steps}/{len(report['steps'])}, ошибок JS {len(report['errors'])}")  # fmt: skip
+    failed = [x for x in report["pages"] if not x["ok"]] + [x for x in report["steps"] if not x["ok"]]
+    for x in [*failed, *report["errors"]]:
+        print("  ✗", json.dumps(x, ensure_ascii=False))
+    if args.strict and (failed or report["errors"]):
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":

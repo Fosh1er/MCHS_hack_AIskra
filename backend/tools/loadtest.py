@@ -13,6 +13,10 @@
     AISKRA_DEMO_PASSWORD=… uv run python -m aiskra.cli demo-seed --load-users 100
 Запуск:
     AISKRA_DEMO_PASSWORD=… uv run python tools/loadtest.py --base http://127.0.0.1:8000 --duration 60
+
+Стенд в docker (F6.6, ночной CI): через nginx — `--base https://localhost:8443 --insecure` (cookie сессии с флагом
+Secure по http не уходит). Пороги — `--max-p95-ms 2000 --max-5xx 0`: при нарушении код выхода 1; `--summary FILE`
+дописывает сводку в Markdown (например, в `$GITHUB_STEP_SUMMARY`).
 """
 
 from __future__ import annotations
@@ -55,6 +59,7 @@ def card_data(aon: str) -> dict[str, Any]:
 class Stats:
     samples: dict[str, list[float]] = field(default_factory=lambda: defaultdict(list))
     errors: dict[str, int] = field(default_factory=lambda: defaultdict(int))
+    server_errors: dict[str, int] = field(default_factory=lambda: defaultdict(int))  # 5xx и обрыв соединения
 
     def table(self) -> list[dict[str, Any]]:
         rows = []
@@ -86,15 +91,18 @@ async def timed(stats: Stats, name: str, coro: Any) -> httpx.Response | None:
         r: httpx.Response = await coro
     except httpx.HTTPError:
         stats.errors[name] += 1
+        stats.server_errors[name] += 1
         return None
     stats.samples[name].append(time.perf_counter() - t)
     if r.status_code >= 400:
         stats.errors[name] += 1
+    if r.status_code >= 500:
+        stats.server_errors[name] += 1
     return r
 
 
-async def login(base: str, user: str, password: str, stats: Stats) -> httpx.AsyncClient:
-    c = httpx.AsyncClient(base_url=base, timeout=30)
+async def login(base: str, user: str, password: str, stats: Stats, *, verify: bool = True) -> httpx.AsyncClient:
+    c = httpx.AsyncClient(base_url=base, timeout=30, verify=verify)
     r = await timed(
         stats,
         "POST /auth/login",
@@ -209,24 +217,71 @@ async def operator(
         await asyncio.sleep(rng.uniform(0.5, 1.5))
 
 
-async def writers(clients: list[httpx.AsyncClient], seconds: float) -> tuple[int, int, float]:
-    """Сколько карточек (запись карточки + аудит) база принимает в секунду при 20 одновременных писателях."""
-    done = errors = 0
+async def writers(clients: list[httpx.AsyncClient], seconds: float) -> tuple[int, int, int, float]:
+    """Сколько карточек (запись карточки + аудит) база принимает в секунду при 20 одновременных писателях.
+    Возвращает: успешных, ошибок, из них 5xx и обрывов, секунд."""
+    done = errors = server = 0
     until = time.monotonic() + seconds
 
     async def one(c: httpx.AsyncClient) -> None:
-        nonlocal done, errors
+        nonlocal done, errors, server
         while time.monotonic() < until:
             try:
                 r = await c.post(f"{API}/incidents/cards", json={"aon": "+7 (900) 000-00-00"})
                 done += r.is_success
                 errors += not r.is_success
+                server += r.status_code >= 500
             except httpx.HTTPError:
                 errors += 1
+                server += 1
 
     t = time.monotonic()
     await asyncio.gather(*(one(c) for c in clients))
-    return done, errors, time.monotonic() - t
+    return done, errors, server, time.monotonic() - t
+
+
+def check_thresholds(result: dict[str, Any], *, max_p95_ms: float | None, max_5xx: int | None) -> list[dict[str, Any]]:
+    """Пороги F6.6: p95 отклика API и число ответов 5xx (с обрывами соединения)."""
+    checks = []
+    if max_p95_ms is not None:
+        checks.append(
+            {"name": "p95 отклика API, мс", "limit": f"≤ {max_p95_ms:g}", "value": result["p95_all_ms"],
+             "ok": result["p95_all_ms"] <= max_p95_ms}
+        )  # fmt: skip
+    if max_5xx is not None:
+        checks.append(
+            {"name": "ответов 5xx и обрывов", "limit": f"≤ {max_5xx}", "value": result["server_errors"],
+             "ok": result["server_errors"] <= max_5xx}
+        )  # fmt: skip
+    return checks
+
+
+def markdown(result: dict[str, Any]) -> str:
+    """Сводка прогона для `$GITHUB_STEP_SUMMARY` и отчёта в docs/performance."""
+    ok = all(c["ok"] for c in result["thresholds"])
+    rep = result["report"]
+    lines = [
+        f"### Нагрузочный тест: {'пороги выполнены' if ok else 'ПОРОГИ НЕ ВЫПОЛНЕНЫ'}",
+        "",
+        "| Показатель | Порог | Значение | |",
+        "|---|---|---|---|",
+        *(f"| {c['name']} | {c['limit']} | {c['value']} | {'✅' if c['ok'] else '❌'} |" for c in result["thresholds"]),
+        f"| запись карточек в секунду | ≥ 100 (справочно) | {result['write_ops_per_s']} | |",
+        f"| отчёт по занятию, с | ≤ 30 (справочно) | {rep['seconds']} ({rep['cards']} карточек) | |",
+        "",
+        f"Пользователей {result['users']}, активных сессий {result['active_sessions']}, смешанная нагрузка "
+        f"{result['duration_s']} с: {result['requests']} запросов ({result['rps']} в секунду), "
+        f"ответов 4xx и 5xx — {result['errors']}, вход всех — {result['login_all_s']} с.",
+        "",
+        "| операция | n | ошибок | 5xx | p50, мс | p95, мс | p99, мс | max, мс |",
+        "|---|---:|---:|---:|---:|---:|---:|---:|",
+    ]
+    for r in result["ops"]:
+        cells = [r[k] if r[k] is not None else "–" for k in ("p50_ms", "p95_ms", "p99_ms", "max_ms")]
+        lines.append(
+            f"| `{r['op']}` | {r['n']} | {r['errors']} | {r['server_errors']} | " + " | ".join(map(str, cells)) + " |"
+        )
+    return "\n".join(lines) + "\n"
 
 
 async def main() -> None:
@@ -237,7 +292,12 @@ async def main() -> None:
     ap.add_argument("--duration", type=float, default=60, help="секунд смешанной нагрузки")
     ap.add_argument("--write-seconds", type=float, default=15)
     ap.add_argument("--out", default="loadtest-result.json")
+    ap.add_argument("--insecure", action="store_true", help="принять самоподписанный сертификат стенда (nginx :8443)")
+    ap.add_argument("--max-p95-ms", type=float, default=None, help="порог p95 отклика API, мс (F6.6: 2000)")
+    ap.add_argument("--max-5xx", type=int, default=None, help="допустимо ответов 5xx и обрывов (F6.6: 0)")
+    ap.add_argument("--summary", default=None, help="дописать сводку в Markdown в этот файл")
     args = ap.parse_args()
+    verify = not args.insecure
     password = os.environ.get("AISKRA_DEMO_PASSWORD") or ""
     if not password:
         raise SystemExit("Задайте AISKRA_DEMO_PASSWORD (пароль учёток load001…, teacher)")
@@ -248,12 +308,12 @@ async def main() -> None:
 
     async def enter(i: int) -> httpx.AsyncClient:
         async with sem:
-            return await login(args.base, f"load{i:03d}", password, stats)
+            return await login(args.base, f"load{i:03d}", password, stats, verify=verify)
 
     t0 = time.perf_counter()
     clients = await asyncio.gather(*(enter(i) for i in range(1, args.users + 1)))
     login_s = time.perf_counter() - t0
-    teacher = await login(args.base, "teacher", password, Stats())
+    teacher = await login(args.base, "teacher", password, Stats(), verify=verify)
 
     # занятие для отчёта: 20 активных — операторы 112
     active = clients[: args.sessions]
@@ -277,7 +337,7 @@ async def main() -> None:
     total_requests = sum(len(v) for k, v in stats.samples.items() if k != "POST /auth/login")
 
     # 3. запись
-    done, werr, wsec = await writers(active, args.write_seconds)
+    done, werr, w5xx, wsec = await writers(active, args.write_seconds)
 
     # 4. отчёт по занятию
     await teacher.post(f"{API}/training/sessions/{session_id}/finish")
@@ -285,6 +345,8 @@ async def main() -> None:
     ev = await teacher.post(f"{API}/assessment/sessions/{session_id}/evaluate", timeout=120)
     rep = await teacher.get(f"{API}/assessment/sessions/{session_id}/report", timeout=120)
     report_s = time.perf_counter() - t2
+    stats.server_errors["POST /assessment/sessions/{id}/evaluate"] += ev.status_code >= 500
+    stats.server_errors["GET /assessment/sessions/{id}/report"] += rep.status_code >= 500
 
     rows = stats.table()
     reading = [x for k, v in stats.samples.items() if k != "POST /auth/login" for x in v]
@@ -299,15 +361,18 @@ async def main() -> None:
         "rps": round(total_requests / mixed_s, 1),
         "p95_all_ms": round(p95_all * 1000),
         "errors": sum(v for k, v in stats.errors.items()),
+        "server_errors": sum(stats.server_errors.values()) + w5xx,
         "write_ops_per_s": round(done / wsec, 1),
         "write_errors": werr,
+        "write_server_errors": w5xx,
         "report": {
             "evaluated": ev.json() if ev.status_code == 200 else ev.text[:200],
             "cards": rep.json().get("cards_count") if rep.status_code == 200 else None,
             "seconds": round(report_s, 2),
         },
-        "ops": rows,
+        "ops": [{**r, "server_errors": stats.server_errors.get(r["op"], 0)} for r in rows],
     }
+    result["thresholds"] = check_thresholds(result, max_p95_ms=args.max_p95_ms, max_5xx=args.max_5xx)
     for c in [*clients, teacher]:
         await c.aclose()
     await asyncio.to_thread(Path(args.out).write_text, json.dumps(result, ensure_ascii=False, indent=2), "utf-8")
@@ -324,6 +389,13 @@ async def main() -> None:
     print(f"Запись: {result['write_ops_per_s']} карточек/с (ошибок {werr})")
     rep_ = result["report"]
     print(f"Отчёт по занятию ({rep_['cards']} карточек): {rep_['seconds']} с — {rep_['evaluated']}")
+    for c in result["thresholds"]:
+        print(f"Порог «{c['name']}» {c['limit']}: {c['value']} — {'выполнен' if c['ok'] else 'НЕ ВЫПОЛНЕН'}")
+    if args.summary:
+        with Path(args.summary).open("a", encoding="utf-8") as f:  # noqa: ASYNC230 — один раз в конце прогона
+            f.write(markdown(result))
+    if not all(c["ok"] for c in result["thresholds"]):
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":

@@ -1,9 +1,14 @@
 """Логическая резервная копия рабочих данных (п. 5.2): все таблицы, кроме справочников (`dict_*`, их даёт импорт
 из data/) и сессий входа. Формат — gzip JSON {format, created_at, tables: {имя: [строки]}}; типы восстанавливаются
-по колонкам ORM-метаданных. Одинаково работает на PostgreSQL и SQLite."""
+по колонкам ORM-метаданных. Одинаково работает на PostgreSQL и SQLite.
+
+Сериализация, сжатие и разбор копии — в отдельном потоке (`asyncio.to_thread`): на объёме года это секунды и десятки
+секунд CPU. В цикле событий они останавливали весь API — ежедневная копия при старте стенда давала паузу 8–10 с у всех
+запросов (нагрузочный тест на PostgreSQL, F6.6)."""
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import gzip
 import json
@@ -14,7 +19,7 @@ from pathlib import Path
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import Date, DateTime, Integer, LargeBinary, Table, Uuid, delete, insert, select, text
+from sqlalchemy import Date, DateTime, Integer, LargeBinary, Row, Table, Uuid, delete, insert, select, text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from aiskra.modules.system.application.ports.admin import BackupInfo
@@ -39,6 +44,25 @@ def _encode(v: Any) -> Any:
     if isinstance(v, bytes):
         return base64.b64encode(v).decode()
     raise TypeError(f"не сериализуется: {type(v).__name__}")
+
+
+def _write(path: Path, created_at: datetime, rows: dict[str, list[Row[Any]]]) -> int:
+    """Записать копию (в потоке, не в цикле событий). Возвращает число строк."""
+    dump = {name: [dict(r._mapping) for r in table_rows] for name, table_rows in rows.items()}
+    payload = {"format": FORMAT, "created_at": created_at.isoformat(), "tables": dump}
+    with gzip.open(path, "wt", encoding="utf-8") as f:
+        json.dump(payload, f, ensure_ascii=False, default=_encode)
+    return sum(len(v) for v in dump.values())
+
+
+def _read(path: Path, tables: list[Table]) -> dict[str, list[dict[str, Any]]]:
+    """Прочитать и разобрать копию (в потоке): строки по таблицам с восстановленными типами."""
+    with gzip.open(path, "rt", encoding="utf-8") as f:
+        payload = json.load(f)
+    if payload.get("format") != FORMAT:
+        raise ValueError("Неизвестный формат копии")
+    data: dict[str, list[dict[str, Any]]] = payload["tables"]
+    return {t.name: [_decode(t, r) for r in data.get(t.name, [])] for t in tables}
 
 
 def _decode(table: Table, row: dict[str, Any]) -> dict[str, Any]:
@@ -86,16 +110,14 @@ class FileBackupStore:
     async def create(self) -> BackupInfo:
         self._dir.mkdir(parents=True, exist_ok=True)
         now = datetime.now(UTC)
-        dump: dict[str, list[dict[str, Any]]] = {}
+        raw: dict[str, list[Row[Any]]] = {}
         async with self._engine.connect() as conn:
             for t in _tables():
-                dump[t.name] = [dict(r._mapping) for r in (await conn.execute(select(t))).all()]
+                raw[t.name] = list((await conn.execute(select(t))).all())
         name = f"aiskra-{now:%Y%m%d-%H%M%S}.json.gz"
         path = self._dir / name
-        payload = {"format": FORMAT, "created_at": now.isoformat(), "tables": dump}
-        with gzip.open(path, "wt", encoding="utf-8") as f:
-            json.dump(payload, f, ensure_ascii=False, default=_encode)
-        return self._info(path, len(dump), sum(len(v) for v in dump.values()))
+        rows = await asyncio.to_thread(_write, path, now, raw)
+        return self._info(path, len(raw), rows)
 
     def list(self) -> list[BackupInfo]:
         if not self._dir.is_dir():
@@ -111,12 +133,8 @@ class FileBackupStore:
 
     async def restore(self, name: str) -> BackupInfo:
         path = self.path(name)
-        with gzip.open(path, "rt", encoding="utf-8") as f:
-            payload = json.load(f)
-        if payload.get("format") != FORMAT:
-            raise ValueError("Неизвестный формат копии")
-        data: dict[str, list[dict[str, Any]]] = payload["tables"]
         tables = _tables()
+        data = await asyncio.to_thread(_read, path, tables)
         rows = 0
         async with self._engine.begin() as conn:
             # сессии входа ссылаются на пользователей — все выходят из системы
@@ -124,7 +142,7 @@ class FileBackupStore:
             for t in reversed(tables):
                 await conn.execute(delete(t))
             for t in tables:
-                batch = [_decode(t, r) for r in data.get(t.name, [])]
+                batch = data[t.name]
                 for i in range(0, len(batch), 500):
                     await conn.execute(insert(t), batch[i : i + 500])
                 rows += len(batch)
