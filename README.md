@@ -1,5 +1,7 @@
 # АИскра — ИИ-тренажёр оператора 112 и диспетчера ДДС
 
+[![ci](https://github.com/Fosh1er/MCHS_hack_AIskra/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Fosh1er/MCHS_hack_AIskra/actions/workflows/ci.yml) [![nightly](https://github.com/Fosh1er/MCHS_hack_AIskra/actions/workflows/nightly.yml/badge.svg?branch=main)](https://github.com/Fosh1er/MCHS_hack_AIskra/actions/workflows/nightly.yml)
+
 Хакатон «Лидеры цифровой трансформации 2026», задача №9: Департамент ГОЧСиПБ Москвы, ГБУ «Система 112».
 
 АИскра — учебная среда для операторов службы 112 и диспетчеров дежурно-диспетчерских служб (ДДС). Обучающийся работает в точной копии рабочих мест АРМ-112 и АРМ ДДС: принимает учебный вызов, разговаривает с ИИ-заявителем, заполняет карточку, ведёт статусы службы. Преподаватель собирает банк сценариев, проводит занятия, видит работу группы в реальном времени и получает отчёт с автооценкой. Система работает в изолированном контуре: ИИ — локальная модель или офлайн-режим, реальные вызовы и персональные данные не используются.
@@ -153,11 +155,13 @@ make fe-dev                        # во втором терминале: http:
 ## Проверки
 
 ```bash
-make be-check     # ruff, mypy --strict, import-linter, pytest (≈215 тестов, включая сквозной сценарий)
+make be-check     # ruff, mypy --strict, import-linter, pytest (≈480 тестов, включая сквозной сценарий)
 make fe-build     # проверка типов TypeScript и сборка
 ```
 
 Нагрузочный тест (100 пользователей, 20 активных сессий) — `backend/tools/loadtest.py`, методика и результаты — [docs/performance](docs/performance/Производительность.md).
+
+**CI (GitHub Actions, F6.4).** На каждый push в `main` и PR в `main` — [`ci.yml`](.github/workflows/ci.yml): `make be-check` и `make fe-build`; сборка `docker compose` с PostgreSQL в режиме `demo` (миграции с нуля и `alembic check`, справочники, адреса, `demo-seed`), проверки nginx — `/health` по https, CSP с `media-src 'self' blob:`, 401 без сессии, `/voice-lab`; смоук `tools/browser_smoke.py` в Chromium и Firefox. Ночью и вручную — [`nightly.yml`](.github/workflows/nightly.yml): 20 прогонов pytest подряд с отчётом о падениях и уменьшенный нагрузочный тест на PostgreSQL с порогами p95 ≤ 2 с и 5xx = 0. Пароли стенда генерируются в прогоне, ИИ — офлайн (`fake`), секреты репозитория не нужны.
 
 ## Структура репозитория
 

@@ -6,6 +6,9 @@ inputs:
   load-users:
     description: учётки load001…loadNNN для нагрузочного теста (0 — не создавать)
     default: "0"
+  history-lessons:
+    description: прошедших занятий tools/demo_history.py (0 — без истории); смоуку нужны карточки в очереди ДДС
+    default: "0"
 outputs:
   demo-password:
     description: пароль демо-учёток (замаскирован в журнале)
@@ -56,3 +59,8 @@ runs:
         args=()
         [ "${{ inputs.load-users }}" != "0" ] && args=(--load-users "${{ inputs.load-users }}")
         docker compose exec -T backend python -m aiskra.cli demo-seed "${args[@]}"
+
+    - name: Демо-история (tools/demo_history.py)
+      if: inputs.history-lessons != '0'
+      shell: bash
+      run: docker compose exec -T backend python tools/demo_history.py --lessons "${{ inputs.history-lessons }}"

@@ -48,6 +48,8 @@ jobs:
 
       - name: Стенд в docker compose
         uses: ./.github/actions/compose-stand
+        with:
+          history-lessons: "2"
 
       - name: nginx — /health по https (8443)
         run: |
