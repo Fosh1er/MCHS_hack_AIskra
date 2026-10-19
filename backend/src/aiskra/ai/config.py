@@ -102,6 +102,7 @@ class SpeechConfig(BaseModel):
     base_url: str | None = None
     api_key_env: str | None = None
     model: str = "whisper-1"
+    fallback_model: str | None = None  # F3: распознавание резервной моделью при сбое основной (тот же сервер и ключ)
     language: str = "ru"
     timeout_s: float = 30.0
     cache_ttl: int = 30 * 86_400
@@ -116,6 +117,18 @@ class SpeechConfig(BaseModel):
     @classmethod
     def _ttl(cls, v: int | str) -> int:
         return parse_duration(v)
+
+
+class TTSFallbackConfig(BaseModel):
+    """Резервная модель синтеза (F3): тот же сервер и ключ, другая модель. Срабатывает, когда основная не ответила."""
+
+    model: str
+    voice: str = ""
+    voices: dict[str, str] = Field(default_factory=dict)
+    style: Literal["google", "openai", "none"] = "none"
+    response_format: Literal["mp3", "wav", "pcm"] = "mp3"
+    pcm_rate: int = Field(default=24_000, ge=8_000, le=48_000)
+    timeout_s: float = 20.0
 
 
 class TTSConfig(SpeechConfig):
@@ -139,6 +152,12 @@ class TTSConfig(SpeechConfig):
     cache_mb: int = Field(default=64, ge=0)
     max_concurrency: int = Field(default=2, ge=1)
     timeout_s: float = 20.0
+    fallback: TTSFallbackConfig | None = None  # F3: резервная модель при сбое основной
+
+    @field_validator("fallback", mode="before")
+    @classmethod
+    def _no_fallback(cls, v: object) -> object:
+        return None if not v or (isinstance(v, dict) and not v.get("model")) else v
 
 
 class AIConfig(BaseModel):
