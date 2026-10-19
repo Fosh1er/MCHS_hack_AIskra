@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Icon, IncomingCall } from '@smena112/ui-kit';
 import { useServices } from '../../shared/api/dictionaries';
 import type { CardView } from '../../shared/api/incidents';
-import { endCall, startDdsCall, useCardCalls, type CallView } from '../../shared/api/training';
+import { endCall, startDdsCall, useCardCalls, useSpeechStatus, type CallView } from '../../shared/api/training';
 import { CallPanel } from '../../shared/ui/CallPanel';
 
 const REPORT_AFTER_MS = 12_000; // через сколько старший группы перезванивает с докладом после смены статуса
@@ -19,6 +19,7 @@ interface Active { id: string; title: string; party: string }
 export function DdsSoftphone({ card, service, status }: { card: CardView; service: string; status: string }) {
   const catalog = useServices();
   const calls = useCardCalls(card.id);
+  const tts = useSpeechStatus().data?.tts ?? false; // запись звонка (п. 8.7) собирается серверным синтезом
   const [active, setActive] = useState<Active | null>(null);
   const [ring, setRing] = useState<string | null>(null); // статус, по которому звонит старший группы
   // на планшете и небольшом ноутбуке (до 1280) панель закрыла бы карточку — по умолчанию свёрнута (6.3)
@@ -101,6 +102,7 @@ export function DdsSoftphone({ card, service, status }: { card: CardView; servic
                     {hhmm(c.started_at)} · {c.party === 'service' ? (others.find((s) => s.code === c.target_service)?.short ?? 'служба') : PARTY_TITLE[c.party]}
                     {c.ended_at && c.answered_at ? ` · ${Math.round((new Date(c.ended_at).getTime() - new Date(c.answered_at).getTime()) / 1000)} с` : ''}
                     {c.status !== 'ended' && <button type="button" className="ipphone__hang" onClick={() => { void endCall(c.id).then(() => calls.refetch()); }}>сбросить</button>}
+                    {c.status === 'ended' && tts && <a className="ipphone__hang" href={`/api/v1/training/calls/${c.id}/recording`} download title="Запись звонка (WAV): реплики обеих сторон синтезом">запись</a>}
                   </div>
                 ))}
               </div>
