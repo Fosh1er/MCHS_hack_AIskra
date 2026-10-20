@@ -3953,6 +3953,98 @@
     }
    }
   },
+  "/api/v1/training/dds-phonebook/{service_code}": {
+   "get": {
+    "tags": [
+     "training"
+    ],
+    "summary": "Телефонная книга ДДС: абоненты IP-телефона службы (п. 2.3)",
+    "operationId": "get_phonebook_api_v1_training_dds_phonebook__service_code__get",
+    "parameters": [
+     {
+      "name": "service_code",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Service Code"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/PhonebookOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "put": {
+    "tags": [
+     "training"
+    ],
+    "summary": "Задать телефонную книгу ДДС целиком: не больше 10 абонентов, номера не повторяются",
+    "operationId": "save_phonebook_api_v1_training_dds_phonebook__service_code__put",
+    "parameters": [
+     {
+      "name": "service_code",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Service Code"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/PhonebookIn"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/PhonebookOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/training/calls/{call_id}/replicas": {
    "post": {
     "tags": [
@@ -5222,6 +5314,47 @@
        "application/json": {
         "schema": {
          "$ref": "#/components/schemas/FeedResult"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/training/self-training/dds": {
+   "post": {
+    "tags": [
+     "training"
+    ],
+    "summary": "Самостоятельная тренировка ДДС: учебная карточка вне занятия для своей службы",
+    "operationId": "dds_self_card_api_v1_training_self_training_dds_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/SelfCardIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/SelfCardIssued"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
         }
        }
       }
@@ -7951,6 +8084,18 @@
        }
       ],
       "title": "Repeat Of"
+     },
+     "contact": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Contact"
      }
     },
     "type": "object",
@@ -8812,6 +8957,34 @@
     ],
     "title": "ChangedOut"
    },
+   "ContactRole": {
+    "type": "string",
+    "enum": [
+     "head",
+     "response_chief",
+     "brigade_chief",
+     "brigade_specialist",
+     "applicant"
+    ],
+    "title": "ContactRole"
+   },
+   "ContactRoleOut": {
+    "properties": {
+     "code": {
+      "$ref": "#/components/schemas/ContactRole"
+     },
+     "title": {
+      "type": "string",
+      "title": "Title"
+     }
+    },
+    "type": "object",
+    "required": [
+     "code",
+     "title"
+    ],
+    "title": "ContactRoleOut"
+   },
    "CreateSessionIn": {
     "properties": {
      "title": {
@@ -8930,6 +9103,19 @@
       "title": "Incoming",
       "description": "Входящий доклад старшего группы",
       "default": false
+     },
+     "number": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 32
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Number",
+      "description": "Набранный номер: абонент книги ДДС или заявитель из карточки"
      }
     },
     "additionalProperties": false,
@@ -8960,6 +9146,11 @@
       },
       "type": "array",
       "title": "Next Statuses"
+     },
+     "self_training": {
+      "type": "boolean",
+      "title": "Self Training",
+      "default": false
      }
     },
     "type": "object",
@@ -9414,6 +9605,18 @@
       },
       "type": "array",
       "title": "Accounts"
+     },
+     "admin_login": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Admin Login",
+      "description": "Учётка администратора для экспертов (вход формой)"
      },
      "password": {
       "anyOf": [
@@ -11300,6 +11503,14 @@
       "type": "array",
       "title": "Permissions"
      },
+     "features": {
+      "additionalProperties": {
+       "type": "boolean"
+      },
+      "type": "object",
+      "title": "Features",
+      "description": "Включённые возможности: role_112"
+     },
      "expires_at": {
       "type": "string",
       "format": "date-time",
@@ -11573,6 +11784,14 @@
       },
       "type": "array",
       "title": "Permissions"
+     },
+     "features": {
+      "additionalProperties": {
+       "type": "boolean"
+      },
+      "type": "object",
+      "title": "Features",
+      "description": "Включённые возможности: role_112"
      }
     },
     "type": "object",
@@ -12433,6 +12652,129 @@
      "new_password"
     ],
     "title": "PasswordResetIn"
+   },
+   "PhonebookEntryIn": {
+    "properties": {
+     "role": {
+      "$ref": "#/components/schemas/ContactRole"
+     },
+     "name": {
+      "type": "string",
+      "maxLength": 200,
+      "title": "Name",
+      "default": ""
+     },
+     "number": {
+      "type": "string",
+      "maxLength": 32,
+      "title": "Number",
+      "default": ""
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "role"
+    ],
+    "title": "PhonebookEntryIn"
+   },
+   "PhonebookEntryOut": {
+    "properties": {
+     "role": {
+      "$ref": "#/components/schemas/ContactRole"
+     },
+     "title": {
+      "type": "string",
+      "title": "Title"
+     },
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "number": {
+      "type": "string",
+      "title": "Number"
+     }
+    },
+    "type": "object",
+    "required": [
+     "role",
+     "title",
+     "name",
+     "number"
+    ],
+    "title": "PhonebookEntryOut"
+   },
+   "PhonebookIn": {
+    "properties": {
+     "entries": {
+      "items": {
+       "$ref": "#/components/schemas/PhonebookEntryIn"
+      },
+      "type": "array",
+      "maxItems": 50,
+      "title": "Entries",
+      "description": "Абоненты службы, не больше 10"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "entries"
+    ],
+    "title": "PhonebookIn"
+   },
+   "PhonebookOut": {
+    "properties": {
+     "service_code": {
+      "type": "string",
+      "title": "Service Code"
+     },
+     "configured": {
+      "type": "boolean",
+      "title": "Configured",
+      "description": "Книга задана — телефон ДДС показывает её абонентов и номеронабиратель"
+     },
+     "entries": {
+      "items": {
+       "$ref": "#/components/schemas/PhonebookEntryOut"
+      },
+      "type": "array",
+      "title": "Entries"
+     },
+     "max_entries": {
+      "type": "integer",
+      "title": "Max Entries"
+     },
+     "roles": {
+      "items": {
+       "$ref": "#/components/schemas/ContactRoleOut"
+      },
+      "type": "array",
+      "title": "Roles"
+     },
+     "updated_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Updated At"
+     }
+    },
+    "type": "object",
+    "required": [
+     "service_code",
+     "configured",
+     "entries",
+     "max_entries",
+     "roles"
+    ],
+    "title": "PhonebookOut"
    },
    "PhonesIn": {
     "properties": {
@@ -13910,6 +14252,57 @@
      "sections"
     ],
     "title": "SectionsReviewed"
+   },
+   "SelfCardIn": {
+    "properties": {
+     "service_code": {
+      "type": "string",
+      "maxLength": 32,
+      "minLength": 1,
+      "title": "Service Code",
+      "description": "Код службы ДДС"
+     }
+    },
+    "type": "object",
+    "required": [
+     "service_code"
+    ],
+    "title": "SelfCardIn"
+   },
+   "SelfCardIssued": {
+    "properties": {
+     "card_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Card Id"
+     },
+     "card_number": {
+      "type": "integer",
+      "title": "Card Number"
+     },
+     "scenario_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Scenario Id"
+     },
+     "generated": {
+      "type": "boolean",
+      "title": "Generated"
+     },
+     "waiting": {
+      "type": "integer",
+      "title": "Waiting"
+     }
+    },
+    "type": "object",
+    "required": [
+     "card_id",
+     "card_number",
+     "scenario_id",
+     "generated",
+     "waiting"
+    ],
+    "title": "SelfCardIssued"
    },
    "ServiceRow": {
     "properties": {
