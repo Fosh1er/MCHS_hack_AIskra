@@ -1,6 +1,6 @@
 /** Вход в АРМ ДДС (п. 2.1). В реальном АРМ служба привязана к учётной записи (dds/image1), в тренажёре её задаёт
- *  занятие (4.2): обучающемуся доступна только служба, за которую он диспетчер на идущем занятии (ТЗ 2.7, 2.8 —
- *  сервер отвечает 403 на чужую). Преподаватель выбирает любую службу. */
+ *  занятие (4.2): диспетчеру на идущем занятии доступна только его служба (ТЗ 2.7, 2.8 — сервер отвечает 403 на
+ *  чужую). Вне занятия — свободная практика: любая служба, только карточки вне занятий. Преподаватель — любая. */
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PERMISSIONS, useMe } from '../../shared/api/auth';
@@ -33,8 +33,8 @@ export function DdsSelectPage() {
   useScreenTour('dds-select', !!services.data);
   const trainee = me.permissions.includes(PERMISSIONS.trainingParticipate);
   const my = useMySession(trainee);
-  // обучающийся — только служба своего идущего занятия; null — сейчас он не диспетчер ни на одном занятии
-  const assigned = trainee ? (my.data?.role === 'dds' ? my.data.dds_service_code : null) : undefined;
+  // диспетчер на идущем занятии — только своя служба; вне занятия (undefined) — любая, свободная практика
+  const assigned = trainee && my.data?.role === 'dds' ? my.data.dds_service_code ?? undefined : undefined;
   const [q, setQ] = useState('');
   const last = assigned === undefined ? lastDds() : assigned;
   const filtered = useMemo(() => {
@@ -62,8 +62,8 @@ export function DdsSelectPage() {
       <div className="arm-list">
         {services.isError && <div className="arm-empty">Не удалось загрузить службы: {services.error.message}</div>}
         {trainee && my.isSuccess && !assigned && (
-          <div className="arm-empty">АРМ ДДС открывается на занятии: преподаватель назначает вас диспетчером службы.
-            Сейчас вы не диспетчер ни на одном идущем занятии.</div>
+          <div className="arm-empty">Свободная практика: вы не диспетчер на идущем занятии — в журнале службы видны
+            карточки, не привязанные к занятиям.</div>
         )}
         {GROUPS.map((g) => {
           const items = filtered.filter((s) => g.kinds.includes(s.kind));

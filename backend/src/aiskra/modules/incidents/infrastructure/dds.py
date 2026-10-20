@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import ColumnElement, column, func, select, table, true, tuple_, update
+from sqlalchemy import ColumnElement, column, false, func, or_, select, table, true, tuple_, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from aiskra.modules.incidents.application.ports.dds import BrigadeOption, DdsFilter, DdsJournalRow, DdsServiceState
@@ -106,10 +106,10 @@ class SqlDdsRepository:
         ]
 
     async def timer_states(
-        self, service_code: str, *, paused: bool, session_ids: list[UUID] | None = None
+        self, service_code: str, *, paused: bool, session_ids: list[UUID | None] | None = None
     ) -> list[DdsServiceState]:
         cond = CS.pause_started_at.is_not(None) if paused else CS.current_status.in_(WAITING)
-        scope = C.session_id.in_(session_ids) if session_ids is not None else true()
+        scope = in_sessions(session_ids) if session_ids is not None else true()
         rows = await self._s.execute(
             select(
                 CS.card_id,
@@ -181,6 +181,15 @@ class SqlDdsRepository:
         await self._s.flush()
 
 
+def in_sessions(ids: list[UUID | None]) -> ColumnElement[bool]:
+    """Карточки этих занятий; None в списке — и карточки вне занятий (свободная практика ДДС)."""
+    known = [i for i in ids if i is not None]
+    parts = [C.session_id.in_(known)] if known else []
+    if None in ids:
+        parts.append(C.session_id.is_(None))
+    return or_(*parts) if parts else false()
+
+
 class SqlDdsReader:
     def __init__(self, session: AsyncSession) -> None:
         self._s = session
@@ -198,7 +207,7 @@ class SqlDdsReader:
         if flt.q:
             scope = scope.where(C.search_key.like(f"%{search_key(flt.q)}%"))
         if flt.session_ids is not None:  # обучающийся — только карточки своих занятий (ТЗ 2.7, 2.8)
-            scope = scope.where(C.session_id.in_(flt.session_ids))
+            scope = scope.where(in_sessions(flt.session_ids))
         total = int((await self._s.execute(select(func.count()).select_from(scope.subquery()))).scalar_one())
         page_ids = (
             (

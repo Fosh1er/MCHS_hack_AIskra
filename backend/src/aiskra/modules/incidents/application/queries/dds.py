@@ -29,22 +29,24 @@ def ensure_dds_reader(actor: Principal) -> None:
         raise PermissionDeniedError("АРМ ДДС доступен обучающимся и преподавателям")
 
 
-async def dds_scope(posts: DdsPosts, actor: Principal, service_code: str) -> list[UUID] | None:
+async def dds_scope(posts: DdsPosts, actor: Principal, service_code: str) -> list[UUID | None] | None:
     """Чьи карточки службы видит пользователь (ТЗ 2.7, 2.8). Преподаватель — все занятия и карточки вне занятий
-    (None). Обучающийся — только карточки занятий, где он сейчас диспетчер этой службы: своих и системных карточек
-    занятия. Чужая служба или вне занятия — 403: код службы в адресе ничего не открывает."""
+    (None). Обучающийся-диспетчер на идущем занятии — только карточки занятий, где он диспетчер этой службы; другая
+    служба во время занятия — 403. Вне занятия (свободная практика, демо-стенд) — любая служба, но только карточки,
+    не привязанные ни к какому занятию (`[None]`): карточки чужих занятий код службы в адресе не открывает."""
     ensure_dds_reader(actor)
     if actor.can(Permission.RESULTS_READ_ALL):
         return None
-    sessions = [p.session_id for p in await posts.running(actor.user_id) if p.service_code == service_code]
-    if not sessions:
-        raise PermissionDeniedError(
-            "АРМ ДДС этой службы открыт только её диспетчеру на идущем занятии", code="dds_not_assigned"
-        )
-    return sessions
+    running = await posts.running(actor.user_id)
+    sessions: list[UUID | None] = [p.session_id for p in running if p.service_code == service_code]
+    if sessions:
+        return sessions
+    if running:
+        raise PermissionDeniedError("На занятии АРМ ДДС открыт только для вашей службы", code="dds_not_assigned")
+    return [None]
 
 
-def ensure_in_scope(state: DdsServiceState | None, sessions: list[UUID] | None) -> DdsServiceState:
+def ensure_in_scope(state: DdsServiceState | None, sessions: list[UUID | None] | None) -> DdsServiceState:
     """Карточка, не направленная в службу, черновик 112 или карточка другого занятия для ДДС «не существует»."""
     if state is None or state.card_status == "draft" or (sessions is not None and state.session_id not in sessions):
         raise NotFoundError("Карточка не поступала в эту службу", code="dds_card_not_found")
