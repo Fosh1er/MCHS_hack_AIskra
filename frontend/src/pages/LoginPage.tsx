@@ -103,6 +103,11 @@ function DemoPanel({ data, onEnter }: { data: DemoAccounts; onEnter: (user: Me) 
           </li>
         ))}
       </ul>
+      {data.admin_login && data.password && (
+        <p className="arm-demo__note">
+          Администратор (настройки, включение роли оператора 112): логин <code>{data.admin_login}</code> · пароль <code>{data.password}</code> — вход формой выше.
+        </p>
+      )}
       {demoLogin.isError && <div className="arm-login__error" role="alert">{demoLogin.error.message}</div>}
     </section>
   );

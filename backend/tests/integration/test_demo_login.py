@@ -78,7 +78,7 @@ def test_accounts_listed_without_passwords(demo: TestClient) -> None:
         "arm_number": "101",
     }
     assert body["password"] == DEMO_PASSWORD  # рекомендации экспертов: пароль по ролям на главной панели
-    assert PASSWORD not in r.text and "admin" not in r.text  # пароли обычных учёток и админ — никогда
+    assert PASSWORD not in r.text and body["admin_login"] is None  # пароль обычных учёток — никогда; admin-demo нет
 
 
 def test_demo_login_opens_regular_session_and_is_audited(demo: TestClient, demo_settings: Settings) -> None:
@@ -109,6 +109,24 @@ def test_only_demo_accounts_can_enter(demo: TestClient, who: str) -> None:
 def test_bad_body_is_422(demo: TestClient) -> None:
     assert demo.post(DEMO_LOGIN, json={"login": ""}).status_code == 422
     assert demo.post(DEMO_LOGIN, json={}).status_code == 422
+
+
+def test_admin_demo_shown_as_line_without_one_click(demo_settings: Settings) -> None:
+    """Рекомендации экспертов: учётка администратора на входе (проверить п. 5), но без входа одной кнопкой."""
+    asyncio.run(
+        create_user(
+            demo_settings,
+            login="admin-demo",
+            full_name="Администратор (демо)",
+            role=Role.ADMIN,
+            password=PASSWORD,
+            operator_number=None,
+        )
+    )
+    with stand(demo_settings) as c:
+        body = c.get(ACCOUNTS).json()
+        assert body["admin_login"] == "admin-demo" and "admin-demo" not in [a["login"] for a in body["accounts"]]
+        assert c.post(DEMO_LOGIN, json={"login": "admin-demo"}).status_code == 404
 
 
 def test_prod_shows_demo_accounts_with_password(demo_settings: Settings) -> None:

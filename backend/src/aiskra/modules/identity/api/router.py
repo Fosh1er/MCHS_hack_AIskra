@@ -113,6 +113,7 @@ async def demo_accounts(
             for a in result.accounts
         ],
         password=result.password,
+        admin_login=result.admin_login,
     )
 
 

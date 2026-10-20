@@ -72,7 +72,7 @@ export interface DemoAccount {
   hint: string[];
   arm_number: string | null;
 }
-export interface DemoAccounts { accounts: DemoAccount[]; password: string | null }
+export interface DemoAccounts { accounts: DemoAccount[]; password: string | null; admin_login?: string | null }
 
 /** null — демо-входа нет (режим prod отвечает 404 или учёток нет): страница входа как обычно. */
 export const useDemoAccounts = () =>

@@ -33,6 +33,7 @@ class DemoAccountOut(BaseModel):
 
 class DemoAccountsOut(BaseModel):
     accounts: list[DemoAccountOut]
+    admin_login: str | None = Field(default=None, description="Учётка администратора для экспертов (вход формой)")
     password: str | None = Field(
         default=None, description="Пароль демо-учёток — только при AISKRA_DEMO_SHOW_PASSWORD=true"
     )

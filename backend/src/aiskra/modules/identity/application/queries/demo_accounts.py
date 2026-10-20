@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from aiskra.modules.identity.application.ports.demo import DemoPolicy
+from aiskra.modules.identity.application.ports.demo import DEMO_ADMIN_LOGIN, DemoPolicy
 from aiskra.modules.identity.application.ports.features import FeatureSwitches
 from aiskra.modules.identity.application.ports.reader import UserReader
 from aiskra.modules.identity.domain.user import UserStatus
@@ -35,7 +35,8 @@ class DemoAccountView:
 @dataclass(frozen=True, kw_only=True)
 class DemoAccounts:
     accounts: list[DemoAccountView]
-    password: str | None  # None — пароль не показывается (по умолчанию)
+    password: str | None  # None — пароль не показывается
+    admin_login: str | None = None  # учётка администратора для экспертов — строкой на входе, вход формой
 
 
 class ListDemoAccountsHandler:
@@ -66,4 +67,11 @@ class ListDemoAccountsHandler:
             if (user := found.get(spec.login)) is not None
             and (role_112 or "112" not in (spec.title or ""))  # роль 112 скрыта — её демо-учёток нет на входе
         ]
-        return DemoAccounts(accounts=accounts, password=self._demo.password if accounts else None)
+        admin = next(iter(await self._reader.by_logins([DEMO_ADMIN_LOGIN])), None)
+        admin_login = (
+            admin.login
+            if admin is not None and admin.status == UserStatus.ACTIVE.value and admin.role == Role.ADMIN.value
+            else None
+        )
+        password = self._demo.password if accounts else None
+        return DemoAccounts(accounts=accounts, password=password, admin_login=admin_login if password else None)

@@ -26,6 +26,7 @@ from aiskra.modules.dictionaries.application.commands.import_dictionaries import
 from aiskra.modules.dictionaries.infrastructure.models import AddressModel, IncidentTypeModel
 from aiskra.modules.identity.application.commands.create_user import CreateUser
 from aiskra.modules.identity.application.commands.groups import SaveGroup, SaveGroupHandler
+from aiskra.modules.identity.application.ports.demo import DEMO_ADMIN_LOGIN
 from aiskra.modules.identity.application.ports.groups import GroupMember
 from aiskra.modules.identity.infrastructure.groups import SqlGroupStore
 from aiskra.modules.identity.infrastructure.models import UserModel
@@ -248,6 +249,22 @@ async def seed(
                 )
                 ids[u.login] = created.id
                 print(f"Учётка: {u.login} — {u.full_name} ({u.role.label})")
+
+        async with factory() as s:  # рекомендации экспертов: администратор для проверки — строкой на входе
+            if (
+                await s.execute(select(UserModel).where(UserModel.login == DEMO_ADMIN_LOGIN))
+            ).scalars().first() is None:
+                await build_create_user_handler(build_identity_adapters(settings), s)(
+                    CreateUser(
+                        actor=None,
+                        login=DEMO_ADMIN_LOGIN,
+                        full_name="Администратор (демо)",
+                        role=Role.ADMIN,
+                        password=password,
+                        operator_number=None,
+                    )
+                )
+                print(f"Учётка: {DEMO_ADMIN_LOGIN} — администратор для экспертов (вход формой)")
 
         if load_users:  # учётки для нагрузочного теста (6.1): load001…loadNNN, обучающиеся
             async with factory() as s:
