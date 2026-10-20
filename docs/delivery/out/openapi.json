@@ -5845,7 +5845,7 @@
     "tags": [
      "assessment"
     ],
-    "summary": "Экспертная оценка поверх автооценки",
+    "summary": "Экспертная оценка поверх автооценки: только карточки своего занятия, порог — из настроек занятия",
     "operationId": "override_api_v1_assessment__assessment_id__override_post",
     "parameters": [
      {
@@ -12245,13 +12245,6 @@
       "minLength": 3,
       "title": "Comment",
       "description": "Причина правки — видна обучающемуся"
-     },
-     "threshold": {
-      "type": "number",
-      "maximum": 100.0,
-      "minimum": 0.0,
-      "title": "Threshold",
-      "default": 70
      }
     },
     "additionalProperties": false,

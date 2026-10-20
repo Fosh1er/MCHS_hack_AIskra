@@ -9,7 +9,7 @@ import pytest
 from playwright.sync_api import Page, expect
 
 from tests.e2e.conftest import Session
-from tests.e2e.helpers import COMPOSER, api_card_with_call, ask
+from tests.e2e.helpers import COMPOSER, api_card_with_call, ask, finish_running_sessions, start_session
 
 pytestmark = pytest.mark.e2e
 DISPATCHERS = {"S101": "dds1", "S103": "dds2"}  # демо-диспетчеры: пожарная и скорая
@@ -33,8 +33,19 @@ def set_status(page: Page, value: str, comment: str, *, order: str | None = None
 
 def test_dds_queue_statuses_brigade_call_recording(ui: Session) -> None:
     stand = ui.stand
+    # АРМ ДДС обучающемуся открыт только на занятии и только за свою службу (ТЗ 2.7, 2.8)
+    finish_running_sessions(stand)
+    sid = start_session(stand, [(login, "dds", code) for code, login in DISPATCHERS.items()])
+    try:
+        _queue_statuses_brigade_call_recording(ui, sid)
+    finally:
+        finish_running_sessions(stand)
+
+
+def _queue_statuses_brigade_call_recording(ui: Session, sid: str) -> None:
+    stand = ui.stand
     for _ in range(8):  # карточка оператора, которая придёт в службу демо-диспетчера (сценарий случайный)
-        card = api_card_with_call(stand.client("op2"), stand)
+        card = api_card_with_call(stand.client("op2"), stand, sid)
         SERVICE = next((s for s in DISPATCHERS if s in card["services"]), "")
         if SERVICE:
             break

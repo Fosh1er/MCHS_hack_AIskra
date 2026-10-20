@@ -26,7 +26,7 @@ function OverrideForm({ card, sessionId, threshold, onClose }: { card: CardResul
       <label>Комментарий обучающемуся (обязательно)<textarea rows={2} value={comment} onChange={(e) => setComment(e.target.value)} /></label>
       <div className="cab-filters">
         <Button size="sm" variant="primary" disabled={ov.isPending || comment.trim().length < 3}
-          onClick={() => ov.mutate({ id: card.assessment_id!, score, comment, threshold }, { onSuccess: onClose })}>сохранить оценку</Button>
+          onClick={() => ov.mutate({ id: card.assessment_id!, score, comment }, { onSuccess: onClose })}>сохранить оценку</Button>
         <Button size="sm" variant="ghost" onClick={onClose}>отмена</Button>
         <span className="cab-filters__label">{score >= threshold ? 'зачтено' : 'не зачтено'} при пороге {threshold}</span>
       </div>

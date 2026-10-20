@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import ColumnElement, column, func, select, table, tuple_, update
+from sqlalchemy import ColumnElement, column, false, func, or_, select, table, true, tuple_, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from aiskra.modules.incidents.application.ports.dds import BrigadeOption, DdsFilter, DdsJournalRow, DdsServiceState
@@ -49,6 +49,7 @@ class SqlDdsRepository:
                     CS.paused_ms,
                     CS.pause_started_at,
                     CS.brigades,
+                    C.session_id,
                 )
                 .select_from(CS)
                 .join(C, C.id == CS.card_id)
@@ -58,7 +59,7 @@ class SqlDdsRepository:
         ).first()
         if found is None:
             return None
-        number, card_status, current, short, paused_ms, pause_started_at, brigades = found
+        number, card_status, current, short, paused_ms, pause_started_at, brigades, session_id = found
         return DdsServiceState(
             card_id=card_id,
             card_number=number,
@@ -69,6 +70,7 @@ class SqlDdsRepository:
             paused_ms=paused_ms,
             pause_started_at=as_utc(pause_started_at),
             brigades=list(brigades or []),
+            session_id=session_id,
         )
 
     async def brigades(self, service_code: str, *, exclude_card: UUID | None = None) -> list[BrigadeOption]:
@@ -103,8 +105,11 @@ class SqlDdsRepository:
             for code, sign, name, kind, crew in rows
         ]
 
-    async def timer_states(self, service_code: str, *, paused: bool) -> list[DdsServiceState]:
+    async def timer_states(
+        self, service_code: str, *, paused: bool, session_ids: list[UUID | None] | None = None
+    ) -> list[DdsServiceState]:
         cond = CS.pause_started_at.is_not(None) if paused else CS.current_status.in_(WAITING)
+        scope = in_sessions(session_ids) if session_ids is not None else true()
         rows = await self._s.execute(
             select(
                 CS.card_id,
@@ -114,10 +119,11 @@ class SqlDdsRepository:
                 CS.paused_ms,
                 CS.pause_started_at,
                 _services.c.short_name,
+                C.session_id,
             )
             .join(C, C.id == CS.card_id)
             .outerjoin(_services, _services.c.code == CS.service_code)
-            .where(CS.service_code == service_code, cond)
+            .where(CS.service_code == service_code, cond, scope)
         )
         return [
             DdsServiceState(
@@ -129,8 +135,9 @@ class SqlDdsRepository:
                 current_status=current,
                 paused_ms=ms,
                 pause_started_at=as_utc(started),
+                session_id=session_id,
             )
-            for cid, number, card_status, current, ms, started, short in rows.all()
+            for cid, number, card_status, current, ms, started, short, session_id in rows.all()
         ]
 
     async def set_pause(
@@ -174,6 +181,15 @@ class SqlDdsRepository:
         await self._s.flush()
 
 
+def in_sessions(ids: list[UUID | None]) -> ColumnElement[bool]:
+    """Карточки этих занятий; None в списке — и карточки вне занятий (свободная практика ДДС)."""
+    known = [i for i in ids if i is not None]
+    parts = [C.session_id.in_(known)] if known else []
+    if None in ids:
+        parts.append(C.session_id.is_(None))
+    return or_(*parts) if parts else false()
+
+
 class SqlDdsReader:
     def __init__(self, session: AsyncSession) -> None:
         self._s = session
@@ -186,8 +202,12 @@ class SqlDdsReader:
         if flt.statuses:
             conditions.append(CS.current_status.in_(flt.statuses))
         scope = select(CS.card_id).where(*conditions)
+        if flt.q or flt.session_ids is not None:
+            scope = scope.join(C, C.id == CS.card_id)
         if flt.q:
-            scope = scope.join(C, C.id == CS.card_id).where(C.search_key.like(f"%{search_key(flt.q)}%"))
+            scope = scope.where(C.search_key.like(f"%{search_key(flt.q)}%"))
+        if flt.session_ids is not None:  # обучающийся — только карточки своих занятий (ТЗ 2.7, 2.8)
+            scope = scope.where(in_sessions(flt.session_ids))
         total = int((await self._s.execute(select(func.count()).select_from(scope.subquery()))).scalar_one())
         page_ids = (
             (

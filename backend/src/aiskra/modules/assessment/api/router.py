@@ -141,16 +141,17 @@ class OverrideIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
     score: float = Field(ge=0, le=100)
     comment: str = Field(min_length=3, max_length=1000, description="Причина правки — видна обучающемуся")
-    threshold: float = Field(default=PASS_THRESHOLD, ge=0, le=100)
 
 
 @router.post(
-    "/{assessment_id}/override", response_model=AssessmentRecord, summary="Экспертная оценка поверх автооценки"
+    "/{assessment_id}/override",
+    response_model=AssessmentRecord,
+    summary="Экспертная оценка поверх автооценки: только карточки своего занятия, порог — из настроек занятия",
 )
 async def override(
     assessment_id: UUID,
     body: OverrideIn,
-    actor: Checker,
+    actor: Annotated[Principal, Depends(require(Permission.RESULTS_OVERRIDE))],
     meta: Meta,
     handler: Annotated[OverrideAssessmentHandler, Depends(deps.provide_override)],
 ) -> AssessmentRecord:
@@ -160,7 +161,6 @@ async def override(
             assessment_id=assessment_id,
             score=body.score,
             comment=body.comment,
-            threshold=body.threshold,
             meta=meta,
         )
     )

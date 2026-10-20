@@ -23,7 +23,14 @@ from aiskra.ai.adapters.factory import build_router, build_stt, build_tts
 from aiskra.ai.config import load_ai_config
 from aiskra.ai.router import ModelRouter
 from aiskra.integration.assessment_sources import IncidentAttempts
-from aiskra.integration.session_sources import IncidentSystemCards, SessionFactsReader, SessionProgress, SqlScenarioBank
+from aiskra.integration.session_sources import (
+    CardLessonsReader,
+    IncidentSystemCards,
+    SessionFactsReader,
+    SessionProgress,
+    SqlScenarioBank,
+    TrainingDdsPosts,
+)
 from aiskra.integration.system_sources import (
     SystemRetentionPolicy,
     SystemServiceSwitches,
@@ -531,27 +538,39 @@ def _wire_incidents(app: FastAPI) -> None:
     # п. 2.1, 2.2: АРМ ДДС
     def dds_received(session: Session) -> MarkServiceReceivedHandler:
         return MarkServiceReceivedHandler(
-            SqlDdsRepository(session), SqlAuditRecorder(session), SqlAlchemyUnitOfWork(session), clock
+            SqlDdsRepository(session),
+            TrainingDdsPosts(session),
+            SqlAuditRecorder(session),
+            SqlAlchemyUnitOfWork(session),
+            clock,
         )
 
     def dds_status(session: Session) -> ChangeServiceStatusHandler:
         return ChangeServiceStatusHandler(
-            SqlDdsRepository(session), SqlAuditRecorder(session), SqlAlchemyUnitOfWork(session), clock
+            SqlDdsRepository(session),
+            TrainingDdsPosts(session),
+            SqlAuditRecorder(session),
+            SqlAlchemyUnitOfWork(session),
+            clock,
         )
 
     def dds_timer(session: Session) -> SetDdsTimerPausedHandler:
         return SetDdsTimerPausedHandler(
-            SqlDdsRepository(session), SqlAuditRecorder(session), SqlAlchemyUnitOfWork(session), clock
+            SqlDdsRepository(session),
+            TrainingDdsPosts(session),
+            SqlAuditRecorder(session),
+            SqlAlchemyUnitOfWork(session),
+            clock,
         )
 
     def dds_journal(session: Session) -> SearchDdsJournalHandler:
-        return SearchDdsJournalHandler(SqlDdsReader(session))
+        return SearchDdsJournalHandler(SqlDdsReader(session), TrainingDdsPosts(session))
 
     def dds_card(session: Session) -> GetDdsCardHandler:
-        return GetDdsCardHandler(SqlCardReader(session))
+        return GetDdsCardHandler(SqlCardReader(session), SqlDdsRepository(session), TrainingDdsPosts(session))
 
     def dds_brigades(session: Session) -> ListDdsBrigadesHandler:
-        return ListDdsBrigadesHandler(SqlDdsRepository(session))
+        return ListDdsBrigadesHandler(SqlDdsRepository(session), TrainingDdsPosts(session))
 
     ov[incidents_deps.provide_dds_journal] = dds_journal
     ov[incidents_deps.provide_dds_card] = dds_card
@@ -860,7 +879,10 @@ def _wire_assessment(app: FastAPI, services: Services) -> None:
 
     def override(session: Session) -> OverrideAssessmentHandler:
         return OverrideAssessmentHandler(
-            SqlAssessmentRepository(session), SqlAuditRecorder(session), SqlAlchemyUnitOfWork(session)
+            SqlAssessmentRepository(session),
+            CardLessonsReader(session),
+            SqlAuditRecorder(session),
+            SqlAlchemyUnitOfWork(session),
         )
 
     def report(session: Session) -> GetSessionReportHandler:

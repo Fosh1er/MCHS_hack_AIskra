@@ -40,8 +40,37 @@ def as_user(make: Callable[[], TestClient], user: str) -> TestClient:
     return c
 
 
-def new_card(c: TestClient, *, extra_services: list[str] = (), **overrides: Any) -> dict[str, Any]:  # type: ignore[assignment]
-    card = c.post("/api/v1/incidents/cards", json={"aon": "+7 (917) 980-54-13"}).json()
+def start_lesson(
+    make: Callable[[], TestClient],
+    *,
+    dds: dict[str, str],
+    operators: tuple[str, ...] = ("student",),
+    teacher: str = "teacher",
+) -> str:
+    """Идущее занятие: операторы 112 и диспетчеры ДДС `{логин: служба}`. АРМ ДДС обучающемуся открыт только на
+    занятии и только за свою службу (ТЗ 2.7, 2.8)."""
+    t = as_user(make, teacher)
+    people = {s["login"]: s["id"] for s in t.get("/api/v1/training/students").json()}
+    participants = [{"student_id": people[u], "role": "112"} for u in operators]
+    participants += [{"student_id": people[u], "role": "dds", "dds_service_code": code} for u, code in dds.items()]
+    r = t.post(
+        "/api/v1/training/sessions",
+        json={"title": "Занятие ДДС", "mode": "mixed", "card_source": "trainee", "participants": participants},
+    )
+    assert r.status_code == 201, r.text
+    session_id: str = r.json()["id"]
+    assert t.post(f"/api/v1/training/sessions/{session_id}/start").status_code == 200
+    return session_id
+
+
+def new_card(
+    c: TestClient,
+    *,
+    extra_services: list[str] = (),  # type: ignore[assignment]
+    session_id: str | None = None,
+    **overrides: Any,
+) -> dict[str, Any]:
+    card = c.post("/api/v1/incidents/cards", json={"aon": "+7 (917) 980-54-13", "session_id": session_id}).json()
     services = [
         {"code": s["code"], "is_main": s["main"], "added_by": "auto"}
         for s in resolve(c, incident_type=[FIRE_FLAT], flag=["victims"], district="basmannyy")["services"]

@@ -122,11 +122,12 @@ export function useEvaluateSession(id: string) {
   });
 }
 
+/** Экспертная правка (ТЗ 2.5): только оценки своего занятия; порог «зачтено» сервер берёт из настроек занятия. */
 export function useOverride(sessionId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, score, comment, threshold }: { id: string; score: number; comment: string; threshold?: number }) =>
-      http<Assessment>(`${A}/${id}/override`, { method: 'POST', body: JSON.stringify({ score, comment, threshold }) }),
+    mutationFn: ({ id, score, comment }: { id: string; score: number; comment: string }) =>
+      http<Assessment>(`${A}/${id}/override`, { method: 'POST', body: JSON.stringify({ score, comment }) }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['report', sessionId] });
       qc.invalidateQueries({ queryKey: ['assessment'] });

@@ -1,9 +1,11 @@
-/** Вход в АРМ ДДС (п. 2.1): обучающийся выбирает, за какую службу работает на занятии.
- *  В реальном АРМ служба привязана к учётной записи (dds/image1); в тренажёре её позже задаст назначение (4.2). */
+/** Вход в АРМ ДДС (п. 2.1). В реальном АРМ служба привязана к учётной записи (dds/image1), в тренажёре её задаёт
+ *  занятие (4.2): диспетчеру на идущем занятии доступна только его служба (ТЗ 2.7, 2.8 — сервер отвечает 403 на
+ *  чужую). Вне занятия — свободная практика: любая служба, только карточки вне занятий. Преподаватель — любая. */
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useMe } from '../../shared/api/auth';
+import { PERMISSIONS, useMe } from '../../shared/api/auth';
 import { useServices, type ServiceRow } from '../../shared/api/dictionaries';
+import { useMySession } from '../../shared/api/training';
 import { useScreenTour } from '../../shared/onboarding/OnboardingProvider';
 import { ArmTopBar } from '../../shared/ui/ArmTopBar';
 import { ARM_MENU } from '../../shared/ui/armMenu';
@@ -29,12 +31,17 @@ export function DdsSelectPage() {
   const navigate = useNavigate();
   const services = useServices();
   useScreenTour('dds-select', !!services.data);
+  const trainee = me.permissions.includes(PERMISSIONS.trainingParticipate);
+  const my = useMySession(trainee);
+  // диспетчер на идущем занятии — только своя служба; вне занятия (undefined) — любая, свободная практика
+  const assigned = trainee && my.data?.role === 'dds' ? my.data.dds_service_code ?? undefined : undefined;
   const [q, setQ] = useState('');
-  const last = lastDds();
+  const last = assigned === undefined ? lastDds() : assigned;
   const filtered = useMemo(() => {
     const t = norm(q.trim());
-    return (services.data ?? []).filter((s) => !t || norm(`${s.short} ${s.full}`).includes(t));
-  }, [services.data, q]);
+    return (services.data ?? []).filter((s) => (assigned === undefined || s.code === assigned)
+      && (!t || norm(`${s.short} ${s.full}`).includes(t)));
+  }, [services.data, q, assigned]);
   const open = (s: ServiceRow) => { rememberDds(s.code); navigate(`/arm/dds/${encodeURIComponent(s.code)}`); };
   const lastRow = services.data?.find((s) => s.code === last);
 
@@ -54,6 +61,10 @@ export function DdsSelectPage() {
       </div>
       <div className="arm-list">
         {services.isError && <div className="arm-empty">Не удалось загрузить службы: {services.error.message}</div>}
+        {trainee && my.isSuccess && !assigned && (
+          <div className="arm-empty">Свободная практика: вы не диспетчер на идущем занятии — в журнале службы видны
+            карточки, не привязанные к занятиям.</div>
+        )}
         {GROUPS.map((g) => {
           const items = filtered.filter((s) => g.kinds.includes(s.kind));
           if (!items.length) return null;

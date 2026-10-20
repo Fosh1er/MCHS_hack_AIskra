@@ -57,6 +57,31 @@ def skip_tour(page: Page) -> None:
         time.sleep(0.5)
 
 
+def start_dds_lesson(request: Any, web: str, password: str, insecure: bool) -> tuple[Any, str]:
+    """Занятие «Действия ДДС» для dds1 («Служба 101») от имени преподавателя: смоук проверяет работу диспетчера на
+    занятии (ТЗ 2.7, 2.8 — своя служба и карточки своего занятия), карточки системы поступают потоком занятия.
+    Вне занятия — свободная практика по карточкам вне занятий (`integration/test_dds_practice.py`)."""
+    api = request.new_context(base_url=web, ignore_https_errors=insecure)
+    r = api.post("/api/v1/auth/login", data={"login": "teacher", "password": password})
+    assert r.ok, f"вход преподавателя: {r.status} {r.text()[:200]}"
+    people = {s["login"]: s["id"] for s in api.get("/api/v1/training/students").json()}
+    r = api.post(
+        "/api/v1/training/sessions",
+        data={
+            "title": "смоук: dds1",
+            "mode": "dds_actions",
+            "card_source": "generated",
+            "participants": [{"student_id": people["dds1"], "role": "dds", "dds_service_code": "S101"}],
+            "settings": {"feed_interval_s": 5, "max_waiting": 3},
+        },
+    )
+    assert r.status == 201, f"занятие: {r.status} {r.text()[:200]}"
+    sid: str = r.json()["id"]
+    r = api.post(f"/api/v1/training/sessions/{sid}/start")
+    assert r.ok, f"старт занятия: {r.status} {r.text()[:200]}"
+    return api, sid
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--browser", choices=["firefox", "chromium", "chrome"], default="firefox")
@@ -74,6 +99,7 @@ def main() -> None:
         engine = p.firefox if args.browser == "firefox" else p.chromium
         browser = engine.launch(channel="chrome") if args.browser == "chrome" else engine.launch()
         report["version"] = browser.version
+        lesson, lesson_id = start_dds_lesson(p.request, args.web, password, args.insecure)
 
         def context(user: str) -> Page:
             page = browser.new_context(
@@ -170,6 +196,8 @@ def main() -> None:
         step("открыть карточку ДДС", open_dds_card)
         page.screenshot(path=str(out / "dds1_card.png"))
         page.context.close()
+        lesson.post(f"/api/v1/training/sessions/{lesson_id}/finish")
+        lesson.dispose()
         browser.close()
 
     ok_pages = sum(1 for x in report["pages"] if x["ok"])

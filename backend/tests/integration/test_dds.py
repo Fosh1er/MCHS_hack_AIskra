@@ -7,7 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from tests.integration.test_journal import app_client as journal_app_client  # noqa: F401 — та же фикстура
-from tests.integration.test_journal import as_user, new_card
+from tests.integration.test_journal import as_user, new_card, start_lesson
 
 DDS = "DDS_BASMANNYY"  # ДДС района — подбирается по адресу «Басманный»
 
@@ -15,6 +15,12 @@ DDS = "DDS_BASMANNYY"  # ДДС района — подбирается по а�
 @pytest.fixture(scope="module")
 def app_client(journal_app_client: Callable[[], TestClient]) -> Iterator[Callable[[], TestClient]]:  # noqa: F811
     yield journal_app_client
+
+
+@pytest.fixture(scope="module")
+def lesson(app_client: Callable[[], TestClient]) -> str:
+    """Идущее занятие: «student» — оператор 112, «petrov» — диспетчер ДДС района."""
+    return start_lesson(app_client, dds={"petrov": DDS})
 
 
 def dds_journal(c: TestClient, service: str = DDS, **params: Any) -> dict[str, Any]:
@@ -33,10 +39,10 @@ def set_status(
     )
 
 
-def test_card_flows_from_112_to_dds(app_client: Callable[[], TestClient]) -> None:
+def test_card_flows_from_112_to_dds(app_client: Callable[[], TestClient], lesson: str) -> None:
     operator = as_user(app_client, "student")
     dds = as_user(app_client, "petrov")
-    card = new_card(operator)
+    card = new_card(operator, session_id=lesson)
     # черновик в ДДС не попадает
     operator.post("/api/v1/incidents/cards", json={"aon": ""})
 
@@ -78,24 +84,25 @@ def test_card_flows_from_112_to_dds(app_client: Callable[[], TestClient]) -> Non
     assert {"Карточка получена службой (ДДС)", "Изменение статуса службы (ДДС)"} <= {e["event_title"] for e in events}
 
 
-def test_rejection_needs_comment_and_is_final(app_client: Callable[[], TestClient]) -> None:
+def test_rejection_needs_comment_and_is_final(app_client: Callable[[], TestClient], lesson: str) -> None:
     operator = as_user(app_client, "student")
     dds = as_user(app_client, "petrov")
-    card = new_card(operator)
+    card = new_card(operator, session_id=lesson)
     assert set_status(dds, card["id"], "rejected").status_code == 422
     assert set_status(dds, card["id"], "rejected", comment="не наша территория").json()["status"] == "rejected"
     view = dds.get(f"/api/v1/incidents/dds/{DDS}/cards/{card['id']}").json()
     assert view["next_statuses"] == []
 
 
-def test_visibility_and_roles(app_client: Callable[[], TestClient]) -> None:
+def test_visibility_and_roles(app_client: Callable[[], TestClient], lesson: str) -> None:
     operator = as_user(app_client, "student")
-    card = new_card(operator)
-    dds = as_user(app_client, "petrov")
+    card = new_card(operator, session_id=lesson)
+    dds, teacher = as_user(app_client, "petrov"), as_user(app_client, "teacher")
     # служба, в которую карточка не направлялась
-    assert dds.get(f"/api/v1/incidents/dds/S104/cards/{card['id']}").status_code == 404
-    assert set_status(dds, card["id"], "accepted", "1", "x", service="S104").status_code == 404
-    teacher = as_user(app_client, "teacher")
+    assert teacher.get(f"/api/v1/incidents/dds/S104/cards/{card['id']}").status_code == 404
+    # не своя служба: диспетчер занятия работает только за назначенную (ТЗ 2.7)
+    assert dds.get(f"/api/v1/incidents/dds/S104/cards/{card['id']}").status_code == 403
+    assert set_status(dds, card["id"], "accepted", "1", "x", service="S104").status_code == 403
     view = teacher.get(f"/api/v1/incidents/dds/{DDS}/cards/{card['id']}").json()
     assert view["next_statuses"] == []  # преподаватель смотрит, статусы ставит обучающийся
     assert set_status(teacher, card["id"], "accepted", "1", "x").status_code == 403
@@ -103,10 +110,49 @@ def test_visibility_and_roles(app_client: Callable[[], TestClient]) -> None:
     assert admin.get(f"/api/v1/incidents/dds/{DDS}/journal").status_code == 403
 
 
-def test_dds_journal_order_count_and_filter(app_client: Callable[[], TestClient]) -> None:
+def test_trainee_sees_only_own_lesson_and_service(app_client: Callable[[], TestClient], lesson: str) -> None:
+    """ТЗ 2.7, 2.8: код службы в адресе ничего не открывает. Обучающийся видит карточки только той службы, за которую
+    отвечает в идущем занятии, и только карточки этого занятия; преподаватель — все."""
+    operator, dds, teacher = (as_user(app_client, u) for u in ("student", "petrov", "teacher"))
+    own = new_card(operator, session_id=lesson)
+    outside = new_card(operator)  # та же служба, но карточка вне занятия
+    other_lesson = start_lesson(app_client, dds={"student": DDS}, operators=())
+    foreign = new_card(operator, session_id=other_lesson)  # та же служба, другое занятие
+
+    ids = {r["id"] for r in dds_journal(dds, page_size=100)["items"]}
+    assert own["id"] in ids and outside["id"] not in ids and foreign["id"] not in ids
+    all_ids = {r["id"] for r in dds_journal(teacher, page_size=100)["items"]}
+    assert {own["id"], outside["id"], foreign["id"]} <= all_ids  # преподаватель — как раньше
+
+    base = f"/api/v1/incidents/dds/{DDS}"
+    for card in (outside, foreign):
+        assert dds.get(f"{base}/cards/{card['id']}").status_code == 404
+        assert dds.post(f"{base}/cards/{card['id']}/received").status_code == 404
+        assert set_status(dds, card["id"], "accepted", "1", "x").status_code == 404
+        assert dds.post(f"{base}/timer", json={"paused": True, "card_id": card["id"]}).status_code == 404
+        assert teacher.get(f"{base}/cards/{card['id']}").status_code == 200
+    assert dds.get(f"{base}/cards/{own['id']}").status_code == 200
+    assert dds.post(f"{base}/cards/{own['id']}/received").status_code == 200
+    # диспетчер другого занятия той же службы видит своё и не видит чужое
+    other = as_user(app_client, "student")
+    assert other.get(f"{base}/cards/{foreign['id']}").status_code == 200
+    assert other.get(f"{base}/cards/{own['id']}").status_code == 404
+
+    # чужая служба и обучающийся вне роли ДДС — 403 на все маршруты
+    for c, service in ((dds, "S101"), (as_user(app_client, "admin"), DDS)):
+        assert c.get(f"/api/v1/incidents/dds/{service}/journal").status_code == 403
+    r = dds.get("/api/v1/incidents/dds/S101/journal")
+    assert r.json()["error"] == "dds_not_assigned"
+    for path in ("cards/" + own["id"], "brigades"):
+        assert dds.get(f"/api/v1/incidents/dds/S101/{path}").status_code == 403
+    assert dds.post("/api/v1/incidents/dds/S101/timer", json={"paused": True}).status_code == 403
+    assert dds.post(f"/api/v1/incidents/dds/S101/cards/{own['id']}/received").status_code == 403
+
+
+def test_dds_journal_order_count_and_filter(app_client: Callable[[], TestClient], lesson: str) -> None:
     """6.1: журнал ДДС считает и сортирует по копии времени сохранения в строке службы — новые сверху."""
     operator, dds = as_user(app_client, "student"), as_user(app_client, "petrov")
-    first, second = new_card(operator), new_card(operator)
+    first, second = new_card(operator, session_id=lesson), new_card(operator, session_id=lesson)
     rows = dds_journal(dds, page_size=100)["items"]
     numbers = [r["number"] for r in rows]
     assert numbers.index(second["number"]) < numbers.index(first["number"])  # новые сверху
@@ -118,11 +164,11 @@ def test_dds_journal_order_count_and_filter(app_client: Callable[[], TestClient]
     assert page2["total"] == total and len(page2["items"]) == max(0, min(10, total - 10))
 
 
-def test_brigades_directory_and_choice(app_client: Callable[[], TestClient]) -> None:
+def test_brigades_directory_and_choice(app_client: Callable[[], TestClient], lesson: str) -> None:
     """П. 5.5: справочник сил своей службы, выбор при «Принята», занятость на другой карточке, история и аудит."""
     operator = as_user(app_client, "student")
     dds = as_user(app_client, "petrov")
-    first, second = new_card(operator), new_card(operator)
+    first, second = new_card(operator, session_id=lesson), new_card(operator, session_id=lesson)
 
     options = dds.get(f"/api/v1/incidents/dds/{DDS}/brigades").json()
     codes = [o["code"] for o in options]
