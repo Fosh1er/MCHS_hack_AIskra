@@ -36,10 +36,11 @@ def test_seed_on_clean_db_creates_branching_scenarios(tmp_path: Path) -> None:
     asyncio.run(seed(settings, password="Seed-Pass-2026", scenarios=2, materials_dir=None))
     snapshots = asyncio.run(_branching(settings))
     assert sum(1 for b in snapshots if b) == templates
-    assert len(snapshots) == 2 + templates + len(HOUSEHOLD)
+    # случайный сценарий может совпасть по коду с бытовым — тогда бытовой засев его не дублирует
+    assert templates + len(HOUSEHOLD) <= len(snapshots) <= 2 + templates + len(HOUSEHOLD)
 
     asyncio.run(seed(settings, password="Seed-Pass-2026", scenarios=2, materials_dir=None))  # повтор — без дублей
-    assert len(asyncio.run(_branching(settings))) == 2 + templates + len(HOUSEHOLD)
+    assert len(asyncio.run(_branching(settings))) == len(snapshots)
 
 
 async def _approved(settings: Settings) -> list[tuple[str | None, int | None, list[str]]]:
