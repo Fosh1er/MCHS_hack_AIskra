@@ -911,6 +911,14 @@
 .arm112--alt .arm112-hint { display: inline-block; }
 .arm112-rel { position: relative; }
 
+/* iPad горизонтально (1101–1279 px): три телефона в одну строку не помещаются — шапка карточки в две строки,
+   как на узких экранах; остальная карточка не меняется */
+@media (max-width: 1279px) {
+  .arm112 { height: auto; min-height: 100vh; overflow: visible; }
+  .arm112__top { height: auto; flex-wrap: wrap; }
+  .arm112__top > * { min-width: 240px; }
+}
+
 @media (max-width: 1100px) {
   .arm112 { height: auto; min-height: 100vh; overflow: visible; }
   .arm112__top { height: auto; flex-wrap: wrap; }
@@ -932,10 +940,23 @@
 .arm112 .arm-phone__icons .i { width: 24px; height: 24px; }
 .arm112 .arm-phone__field { padding: 8px 12px; }
 .arm112 .arm-phone__label { font-size: 13.5px; }
-.arm112 .arm-phone__input { font-size: 23px; }
+/* Номер телефона — целиком в ячейке на любом экране от 1000 px (MacBook, iPad): шрифт по ширине ячейки, не крупнее
+   23 px стенда. «+7 (954) 684-38-81» занимает ≈ 8,9 кегля — отсюда делитель 9,2 (с запасом); у полей с кнопкой «АОН»
+   из ширины вычитается место под кнопку. Номер не переносится на вторую строку. */
+.arm112 .arm-phone__field { container-type: inline-size; }
+.arm112 .arm-phone__input { --phone-extra: 0px; font-size: clamp(9.5px, calc((100cqi - var(--phone-extra)) / 9.2), 23px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.arm112 .arm-phone__row:has(.arm-aonbtn) .arm-phone__input { --phone-extra: 54px; }
 .arm112 .arm-phone__tools .i { width: 16px; height: 16px; }
 .arm112 .arm-aonbtn { height: 23px; font-size: 12px; }
 .arm112 .arm-idbox { width: 260px !important; padding: 10px 12px; }
+/* MacBook и iPad (уже 1600 px): блок вызова и колонки иконок у́же — ширина достаётся трём телефонам.
+   Блок номера карточки не трогаем: при меньшей ширине номер переносится и строка «Опер.» обрезается. */
+@media (max-width: 1600px) {
+  .arm112 .arm-callctl { width: 270px; }
+  .arm112 .arm-callctl__hang { width: 58px; }
+  .arm112 .arm-phone__icons { width: 32px; }
+  .arm112 .arm-phone__icons .i { width: 20px; height: 20px; }
+}
 .arm112 .arm-idbox__title { font-size: 19px; }
 .arm112 .arm-idbox__meta { font-size: 13.5px; }
 .arm112 .arm-timer { width: 119px; }
