@@ -19,6 +19,7 @@ from aiskra.main import create_app
 from aiskra.shared.security import Role
 from tests.integration.conftest import PASSWORD, create_schema, login, make_settings, seed_users
 from tests.integration.test_assessment import fill_from_reference
+from tests.integration.test_journal import start_lesson
 
 T = "/api/v1/training"
 DB: dict[str, Path] = {}
@@ -103,7 +104,8 @@ def save_card(student: TestClient, card_id: str, ref: dict[str, Any], aon: str) 
 
 def test_good_operator_gets_favorable_outcome(app_client: Callable[[], TestClient], scenario: dict[str, Any]) -> None:
     student, teacher = as_user(app_client, "student"), as_user(app_client, "teacher")
-    call_id, card_id, ref, aon = incoming(student, teacher)
+    lesson = start_lesson(app_client, dds={"petrov": "S101"}, operators=())  # АРМ ДДС — только на занятии (ТЗ 2.7)
+    call_id, card_id, ref, aon = incoming(student, teacher, lesson)
     view = student.get(f"{T}/calls/{call_id}").json()
     assert view["branching"] is True and view["branch"]["node"] == "start" and view["branch"]["outcome"] is None
 

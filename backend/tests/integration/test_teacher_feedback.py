@@ -163,3 +163,54 @@ def test_next_draft_remembers_previous_feedback(app_client: Callable[[], TestCli
     d = teacher.post(f"{A}/sessions/{second}/students/{uid}/feedback/draft").json()
     assert d["previous"]["session_title"] == "Отзыв: пожары"
     assert d["previous"]["text"] == "Подтяните адрес: дом — из справочника."
+
+
+def test_expert_override_own_lesson_and_lesson_threshold(app_client: Callable[[], TestClient]) -> None:
+    """ТЗ 2.5: правка оценки — только преподавателю занятия этой карточки (чужое занятие и карточка вне занятия —
+    404), порог «зачтено» — из настроек занятия, клиент его не передаёт."""
+    teacher, student = as_user(app_client, "teacher"), as_user(app_client, "student")
+    people = {s["login"]: s["id"] for s in teacher.get("/api/v1/training/students").json()}
+    body = {
+        "title": "Правка: строгий порог",
+        "mode": "cards_112",
+        "card_source": "generated",
+        "groups": [1],
+        "participants": [{"student_id": people["student"], "role": "112"}],
+        "settings": {"threshold": 90},
+    }
+    session_id = teacher.post("/api/v1/training/sessions", json=body).json()["id"]
+    assert teacher.post(f"/api/v1/training/sessions/{session_id}/start").status_code == 200
+
+    def saved_card(session: str | None) -> str:
+        call = student.post("/api/v1/training/calls/incoming", json={"groups": [1]}).json()
+        ref = teacher.get(f"/api/v1/training/scenarios/{call['scenario_id']}").json()["reference_card"]
+        card = student.post(
+            "/api/v1/incidents/cards",
+            json={"aon": call["aon"], "scenario_id": call["scenario_id"], "session_id": session},
+        ).json()
+        services = [{"code": s["code"], "is_main": s["main"], "added_by": "auto"} for s in ref["services"]]
+        r = student.post(
+            f"/api/v1/incidents/cards/{card['id']}/save",
+            json={"data": fill_from_reference(ref, call["aon"]), "services": services},
+        )
+        assert r.status_code == 200, r.text
+        return str(card["id"])
+
+    saved_card(session_id)
+    assert teacher.post(f"{A}/sessions/{session_id}/evaluate").json()["assessed"] == 1
+    report = teacher.get(f"{A}/sessions/{session_id}/report").json()
+    assessment_id = report["students"][0]["cards"][0]["assessment_id"]
+    url = f"{A}/{assessment_id}/override"
+    fix = {"score": 80, "comment": "Адрес уточнён не сразу"}
+
+    assert as_user(app_client, "teacher2").post(url, json=fix).status_code == 404  # чужое занятие
+    assert student.post(url, json=fix).status_code == 403
+    assert as_user(app_client, "admin").post(url, json=fix).status_code == 403
+    assert teacher.post(url, json={**fix, "threshold": 50}).status_code == 422  # порог клиент не задаёт
+    r = teacher.post(url, json=fix)
+    assert r.status_code == 200, r.text
+    assert r.json()["score"] == 80 and r.json()["passed"] is False  # порог занятия 90, а не 70 по умолчанию
+
+    # карточка вне занятия: оценку видно автору, но правит эксперт только в своём занятии
+    free = student.post(f"{A}/cards/{saved_card(None)}/evaluate", json={"role": "112"}).json()
+    assert teacher.post(f"{A}/{free['id']}/override", json=fix).status_code == 404

@@ -7,7 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from tests.integration.test_journal import app_client as journal_app_client  # noqa: F401
-from tests.integration.test_journal import as_user, new_card
+from tests.integration.test_journal import as_user, new_card, start_lesson
 
 DDS = "DDS_BASMANNYY"
 
@@ -143,7 +143,8 @@ def dds_call(c: TestClient, card_id: str, party: str, target: str | None = None)
 
 
 def test_dds_calls_brigade_applicant_service(app_client: Callable[[], TestClient]) -> None:
-    card = new_card(as_user(app_client, "student"))
+    lesson = start_lesson(app_client, dds={"petrov": DDS}, operators=())
+    card = new_card(as_user(app_client, "student"), session_id=lesson)
     dds = as_user(app_client, "petrov")
     dds.post(
         f"/api/v1/incidents/dds/{DDS}/cards/{card['id']}/status",

@@ -10,8 +10,10 @@ from aiskra.modules.incidents.application.ports.dds import (
     BrigadeOption,
     DdsFilter,
     DdsJournalRow,
+    DdsPosts,
     DdsReader,
     DdsRepository,
+    DdsServiceState,
 )
 from aiskra.modules.incidents.domain.dds import ServiceStatus, next_statuses
 from aiskra.shared.application import Query
@@ -25,6 +27,28 @@ def ensure_dds_reader(actor: Principal) -> None:
     """Реестр ДДС видят обучающийся (работает за службу) и преподаватель (контроль)."""
     if not (actor.can(Permission.TRAINING_PARTICIPATE) or actor.can(Permission.RESULTS_READ_ALL)):
         raise PermissionDeniedError("АРМ ДДС доступен обучающимся и преподавателям")
+
+
+async def dds_scope(posts: DdsPosts, actor: Principal, service_code: str) -> list[UUID] | None:
+    """Чьи карточки службы видит пользователь (ТЗ 2.7, 2.8). Преподаватель — все занятия и карточки вне занятий
+    (None). Обучающийся — только карточки занятий, где он сейчас диспетчер этой службы: своих и системных карточек
+    занятия. Чужая служба или вне занятия — 403: код службы в адресе ничего не открывает."""
+    ensure_dds_reader(actor)
+    if actor.can(Permission.RESULTS_READ_ALL):
+        return None
+    sessions = [p.session_id for p in await posts.running(actor.user_id) if p.service_code == service_code]
+    if not sessions:
+        raise PermissionDeniedError(
+            "АРМ ДДС этой службы открыт только её диспетчеру на идущем занятии", code="dds_not_assigned"
+        )
+    return sessions
+
+
+def ensure_in_scope(state: DdsServiceState | None, sessions: list[UUID] | None) -> DdsServiceState:
+    """Карточка, не направленная в службу, черновик 112 или карточка другого занятия для ДДС «не существует»."""
+    if state is None or state.card_status == "draft" or (sessions is not None and state.session_id not in sessions):
+        raise NotFoundError("Карточка не поступала в эту службу", code="dds_card_not_found")
+    return state
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -46,11 +70,12 @@ class DdsJournalPage:
 
 
 class SearchDdsJournalHandler:
-    def __init__(self, reader: DdsReader) -> None:
+    def __init__(self, reader: DdsReader, posts: DdsPosts) -> None:
         self._reader = reader
+        self._posts = posts
 
     async def __call__(self, query: SearchDdsJournal) -> DdsJournalPage:
-        ensure_dds_reader(query.actor)
+        sessions = await dds_scope(self._posts, query.actor, query.service_code)
         if query.page_size not in PAGE_SIZES or query.page < 1:
             raise DomainError(f"Записей на странице: одно из {PAGE_SIZES}, страница с 1", code="bad_page")
         known = {s.value for s in ServiceStatus}
@@ -62,6 +87,7 @@ class SearchDdsJournalHandler:
                 service_code=query.service_code,
                 q=query.q.strip(),
                 statuses=list(query.statuses),
+                session_ids=sessions,
                 limit=query.page_size,
                 offset=(query.page - 1) * query.page_size,
             )
@@ -87,11 +113,14 @@ class DdsCardView:
 
 
 class GetDdsCardHandler:
-    def __init__(self, reader: CardReader) -> None:
+    def __init__(self, reader: CardReader, repo: DdsRepository, posts: DdsPosts) -> None:
         self._reader = reader
+        self._repo = repo
+        self._posts = posts
 
     async def __call__(self, query: GetDdsCard) -> DdsCardView:
-        ensure_dds_reader(query.actor)
+        sessions = await dds_scope(self._posts, query.actor, query.service_code)
+        ensure_in_scope(await self._repo.state(query.card_id, query.service_code), sessions)
         card = await self._reader.get(query.card_id)
         own = next((s for s in card.services if s.code == query.service_code), None) if card else None
         if card is None or own is None or card.status == "draft":
@@ -115,9 +144,10 @@ class ListDdsBrigades(Query):
 
 
 class ListDdsBrigadesHandler:
-    def __init__(self, repo: DdsRepository) -> None:
+    def __init__(self, repo: DdsRepository, posts: DdsPosts) -> None:
         self._repo = repo
+        self._posts = posts
 
     async def __call__(self, query: ListDdsBrigades) -> list[BrigadeOption]:
-        ensure_dds_reader(query.actor)
+        await dds_scope(self._posts, query.actor, query.service_code)
         return await self._repo.brigades(query.service_code, exclude_card=query.card_id)

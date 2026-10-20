@@ -19,6 +19,7 @@ class DdsServiceState:
     paused_ms: int | None = None  # п. 5.3: пауза таймера решения на подсказки
     pause_started_at: datetime | None = None
     brigades: list[str] = field(default_factory=list)  # п. 5.5: силы службы, работающие по карточке
+    session_id: UUID | None = None  # занятие карточки (п. 4.2); None — карточка вне занятия
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -37,8 +38,11 @@ class BrigadeOption:
 class DdsRepository(Protocol):
     async def state(self, card_id: UUID, service_code: str) -> DdsServiceState | None: ...
 
-    async def timer_states(self, service_code: str, *, paused: bool) -> list[DdsServiceState]:
-        """Карточки службы для паузы таймера (п. 5.3): `paused=False` — ждут решения, `True` — сейчас на паузе."""
+    async def timer_states(
+        self, service_code: str, *, paused: bool, session_ids: list[UUID] | None = None
+    ) -> list[DdsServiceState]:
+        """Карточки службы для паузы таймера (п. 5.3): `paused=False` — ждут решения, `True` — сейчас на паузе.
+        `session_ids` — только карточки этих занятий (None — все)."""
         ...
 
     async def set_pause(
@@ -71,6 +75,7 @@ class DdsFilter:
     service_code: str
     q: str = ""
     statuses: list[str] = field(default_factory=list)  # статусы службы; пусто — все
+    session_ids: list[UUID] | None = None  # только карточки этих занятий (обучающийся); None — все (преподаватель)
     limit: int = 15
     offset: int = 0
 
@@ -103,3 +108,19 @@ class DdsJournalRow:
 
 class DdsReader(Protocol):
     async def search(self, flt: DdsFilter) -> tuple[list[DdsJournalRow], int]: ...
+
+
+@dataclass(frozen=True)
+class DdsPost:
+    """Где обучающийся сейчас диспетчер: служба в идущем занятии (участник с ролью dds, п. 4.2)."""
+
+    session_id: UUID
+    service_code: str
+
+
+class DdsPosts(Protocol):
+    """Назначения диспетчеров ДДС — из training через `integration/` (модули друг друга не импортируют)."""
+
+    async def running(self, student_id: UUID) -> list[DdsPost]:
+        """Службы обучающегося в идущих занятиях; пусто — он сейчас не диспетчер ни на одном занятии."""
+        ...

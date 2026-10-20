@@ -1,5 +1,8 @@
 """Экспертная оценка (п. 4.3): преподаватель ставит балл и комментарий поверх автооценки. Правка пишется в
-expert_overrides и в аудит (ТЗ: изменение оценок только с фиксацией в журнале аудита)."""
+expert_overrides и в аудит (ТЗ: изменение оценок только с фиксацией в журнале аудита).
+
+Править можно только оценку карточки своего занятия (ТЗ 2.5, как отзыв `SaveFeedback`): чужое занятие или карточка
+вне занятия — 404. Порог «зачтено» — из настроек занятия, клиент его не задаёт."""
 
 from __future__ import annotations
 
@@ -8,6 +11,8 @@ from typing import Protocol
 from uuid import UUID
 
 from aiskra.modules.assessment.application.ports.attempts import AssessmentRecord
+from aiskra.modules.assessment.application.ports.reports import CardLessons
+from aiskra.modules.assessment.domain.scoring import PASS_THRESHOLD
 from aiskra.shared.application import Command, UnitOfWork
 from aiskra.shared.audit import AuditEntry, AuditEvent, AuditRecorder, RequestMeta
 from aiskra.shared.errors import DomainError, NotFoundError
@@ -28,13 +33,13 @@ class OverrideAssessment(Command):
     assessment_id: UUID
     score: float
     comment: str
-    threshold: float = 70
     meta: RequestMeta = field(default_factory=RequestMeta)
 
 
 class OverrideAssessmentHandler:
-    def __init__(self, store: OverrideStore, audit: AuditRecorder, uow: UnitOfWork) -> None:
+    def __init__(self, store: OverrideStore, lessons: CardLessons, audit: AuditRecorder, uow: UnitOfWork) -> None:
         self._store = store
+        self._lessons = lessons
         self._audit = audit
         self._uow = uow
 
@@ -44,14 +49,16 @@ class OverrideAssessmentHandler:
         if len(cmd.comment.strip()) < 3:
             raise DomainError("Укажите причину правки (комментарий обучающемуся)", code="comment_required")
         rec = await self._store.get(cmd.assessment_id)
-        if rec is None:
+        lesson = await self._lessons.lesson_of(rec.card_id) if rec is not None else None
+        if rec is None or lesson is None or lesson.teacher_id != cmd.actor.user_id:
             raise NotFoundError("Оценка не найдена", code="assessment_not_found")
+        threshold = float(lesson.settings.get("threshold", PASS_THRESHOLD))
         try:
             await self._store.override(
                 cmd.assessment_id,
                 teacher_id=cmd.actor.user_id,
                 score=round(cmd.score, 1),
-                passed=cmd.score >= cmd.threshold,
+                passed=cmd.score >= threshold,
                 comment=cmd.comment.strip()[:1000],
                 before=rec.score,
             )

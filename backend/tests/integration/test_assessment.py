@@ -7,7 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from tests.integration.test_journal import app_client as journal_app_client  # noqa: F401
-from tests.integration.test_journal import as_user
+from tests.integration.test_journal import as_user, start_lesson
 
 
 @pytest.fixture(scope="module")
@@ -36,7 +36,12 @@ def test_112_and_dds_assessment(app_client: Callable[[], TestClient]) -> None:
     teacher = as_user(app_client, "teacher")
     call = student.post("/api/v1/training/calls/incoming", json={"groups": [1]}).json()
     ref = teacher.get(f"/api/v1/training/scenarios/{call['scenario_id']}").json()["reference_card"]
-    card = student.post("/api/v1/incidents/cards", json={"aon": call["aon"], "scenario_id": call["scenario_id"]}).json()
+    dds_code = next((s["code"] for s in ref["services"] if s["code"].startswith("DDS_")), ref["services"][0]["code"])
+    lesson = start_lesson(app_client, dds={"petrov": dds_code}, operators=())  # АРМ ДДС — только на занятии
+    card = student.post(
+        "/api/v1/incidents/cards",
+        json={"aon": call["aon"], "scenario_id": call["scenario_id"], "session_id": lesson},
+    ).json()
     student.post(f"/api/v1/training/calls/{call['call_id']}/answer", json={"card_id": card["id"]})
     for q in ("Что случилось?", "Назовите адрес", "Есть пострадавшие?"):
         student.post(f"/api/v1/training/calls/{call['call_id']}/replicas", json={"text": q})
@@ -58,7 +63,6 @@ def test_112_and_dds_assessment(app_client: Callable[[], TestClient]) -> None:
     other = as_user(app_client, "petrov")
     assert other.post(f"/api/v1/assessment/cards/{card['id']}/evaluate", json={"role": "112"}).status_code == 404
 
-    dds_code = next((s["code"] for s in ref["services"] if s["code"].startswith("DDS_")), ref["services"][0]["code"])
     base = f"/api/v1/incidents/dds/{dds_code}/cards/{card['id']}"
     other.post(f"{base}/received")
     other.post(f"{base}/status", json={"status": "accepted", "order_no": "5", "comment": "Направлена бригада"})

@@ -1,15 +1,16 @@
 """Команды АРМ ДДС (п. 2.2): «Получена службой» при открытии карточки и смена статуса своей службы.
 
-Кто работает за ДДС, решает учебный процесс: обучающийся выбирает службу при входе в АРМ ДДС (позже — назначение
-преподавателя, 4.2). Права проверяет API (`training.participate`), здесь — что служба есть в карточке и правила
-переходов (`domain/dds.py`)."""
+Кто работает за ДДС, решает занятие (п. 4.2): участник с ролью dds и службой. API проверяет право
+`training.participate`, здесь — что обучающийся сейчас диспетчер этой службы и карточка из его занятия
+(`queries/dds.py:dds_scope`, ТЗ 2.7, 2.8), что служба есть в карточке и правила переходов (`domain/dds.py`)."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from uuid import UUID
 
-from aiskra.modules.incidents.application.ports.dds import DdsRepository, DdsServiceState
+from aiskra.modules.incidents.application.ports.dds import DdsPosts, DdsRepository, DdsServiceState
+from aiskra.modules.incidents.application.queries.dds import dds_scope, ensure_in_scope
 from aiskra.modules.incidents.domain.dds import (
     TITLES,
     WAITING,
@@ -21,16 +22,16 @@ from aiskra.modules.incidents.domain.dds import (
 from aiskra.modules.incidents.domain.timer_pause import end_pause, start_pause
 from aiskra.shared.application import Clock, Command, UnitOfWork
 from aiskra.shared.audit import AuditEntry, AuditEvent, AuditRecorder, RequestMeta
-from aiskra.shared.errors import DomainError, NotFoundError
+from aiskra.shared.errors import DomainError
 from aiskra.shared.security import Principal
 
 
-async def load_state(repo: DdsRepository, card_id: UUID, service_code: str) -> DdsServiceState:
-    """Карточка, не направленная в эту службу, или черновик 112 для ДДС «не существует»."""
-    state = await repo.state(card_id, service_code)
-    if state is None or state.card_status == "draft":
-        raise NotFoundError("Карточка не поступала в эту службу", code="dds_card_not_found")
-    return state
+async def load_state(
+    repo: DdsRepository, posts: DdsPosts, actor: Principal, card_id: UUID, service_code: str
+) -> DdsServiceState:
+    """Строка службы в карточке, если пользователю можно работать с ней (`dds_scope`), иначе 403 / 404."""
+    sessions = await dds_scope(posts, actor, service_code)
+    return ensure_in_scope(await repo.state(card_id, service_code), sessions)
 
 
 def _entry(
@@ -49,11 +50,17 @@ def _entry(
 
 
 class _Base:
-    def __init__(self, repo: DdsRepository, audit: AuditRecorder, uow: UnitOfWork, clock: Clock) -> None:
+    def __init__(
+        self, repo: DdsRepository, posts: DdsPosts, audit: AuditRecorder, uow: UnitOfWork, clock: Clock
+    ) -> None:
         self._repo = repo
+        self._posts = posts
         self._audit = audit
         self._uow = uow
         self._clock = clock
+
+    async def _state(self, actor: Principal, card_id: UUID, service_code: str) -> DdsServiceState:
+        return await load_state(self._repo, self._posts, actor, card_id, service_code)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -68,7 +75,7 @@ class MarkServiceReceivedHandler(_Base):
     """Идемпотентно: «Добавлена» → «Получена службой» при первом открытии карточки в ДДС (dds/image10)."""
 
     async def __call__(self, cmd: MarkServiceReceived) -> str:
-        st = await load_state(self._repo, cmd.card_id, cmd.service_code)
+        st = await self._state(cmd.actor, cmd.card_id, cmd.service_code)
         if st.current_status != ServiceStatus.ADDED:
             return st.current_status
         try:
@@ -105,7 +112,7 @@ class ChangeServiceStatus(Command):
 
 class ChangeServiceStatusHandler(_Base):
     async def __call__(self, cmd: ChangeServiceStatus) -> str:
-        st = await load_state(self._repo, cmd.card_id, cmd.service_code)
+        st = await self._state(cmd.actor, cmd.card_id, cmd.service_code)
         order_no, comment = cmd.order_no.strip(), cmd.comment.strip()
         check_transition(ServiceStatus(st.current_status), cmd.status, order_no, comment)
         brigades = list(cmd.brigades) if cmd.brigades is not None else None
@@ -167,12 +174,13 @@ class SetDdsTimerPausedHandler(_Base):
         """Возвращает, у скольких карточек службы таймер остановлен или запущен снова."""
         now = self._clock.now()
         if cmd.card_id is not None:
-            st = await load_state(self._repo, cmd.card_id, cmd.service_code)
+            st = await self._state(cmd.actor, cmd.card_id, cmd.service_code)
             if cmd.paused and st.current_status not in WAITING:
                 raise DomainError("Решение по карточке уже принято — таймер не идёт", code="dds_decided")
             states = [st] if cmd.paused or st.pause_started_at is not None else []
         else:
-            states = await self._repo.timer_states(cmd.service_code, paused=not cmd.paused)
+            sessions = await dds_scope(self._posts, cmd.actor, cmd.service_code)
+            states = await self._repo.timer_states(cmd.service_code, paused=not cmd.paused, session_ids=sessions)
         changed = 0
         try:
             for st in states:

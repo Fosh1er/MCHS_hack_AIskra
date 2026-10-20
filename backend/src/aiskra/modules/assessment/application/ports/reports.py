@@ -57,6 +57,21 @@ class SessionFactsSource(Protocol):
         ...
 
 
+@dataclass(frozen=True)
+class CardLesson:
+    """Занятие, к которому привязана карточка: кто его вёл и с какими настройками (порог «зачтено» и др.)."""
+
+    session_id: UUID
+    teacher_id: UUID
+    settings: dict[str, Any]
+
+
+class CardLessons(Protocol):
+    async def lesson_of(self, card_id: UUID) -> CardLesson | None:
+        """Занятие карточки; None — карточка заведена вне занятия."""
+        ...
+
+
 class ScenarioBank(Protocol):
     """Банк сценариев глазами аналитики: названия групп классификатора и сколько утверждённых сценариев есть."""
 

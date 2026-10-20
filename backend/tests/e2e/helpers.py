@@ -150,14 +150,18 @@ PSY_ALWAYS = {"enabled": True, "share": 1.0, "profiles": ["panic"], "intensity":
               "llm_acts": False}  # fmt: skip
 
 
-def api_card_with_call(client: httpx.Client, stand: Stand) -> dict[str, Any]:
+def api_card_with_call(client: httpx.Client, stand: Stand, session_id: str | None = None) -> dict[str, Any]:
     """Карточка 112 по учебному вызову через API (подготовка очереди ДДС): вызов, ответ, реплика, сохранение
-    с автоподбором служб по эталону сценария."""
+    с автоподбором служб по эталону сценария. `session_id` — карточка занятия: только её видит диспетчер ДДС."""
     call = client.post("/training/calls/incoming", json={}).json()
     ref = reference(stand, call["scenario_id"])
-    card = client.post(
-        "/incidents/cards", json={"aon": call["aon"], "channel": call["channel"], "scenario_id": call["scenario_id"]}
-    ).json()
+    body = {
+        "aon": call["aon"],
+        "channel": call["channel"],
+        "scenario_id": call["scenario_id"],
+        "session_id": session_id,
+    }
+    card = client.post("/incidents/cards", json=body).json()
     assert client.post(f"/training/calls/{call['call_id']}/answer", json={"card_id": card["id"]}).status_code == 200
     r = client.post(f"/training/calls/{call['call_id']}/replicas", json={"text": "Что у вас случилось?"})
     assert r.status_code == 200, r.text

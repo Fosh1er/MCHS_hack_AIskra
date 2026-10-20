@@ -1,5 +1,6 @@
 """Порты занятий поверх incidents, training и assessment: системные карточки в очередь ДДС, мониторинг прогресса
-(training) и факты занятия для отчёта (assessment)."""
+(training), факты занятия для отчёта и занятие оценённой карточки (assessment), назначения диспетчеров ДДС
+(incidents)."""
 
 from __future__ import annotations
 
@@ -10,9 +11,10 @@ from uuid import UUID
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from aiskra.modules.assessment.application.ports.reports import ReportCard, ReportParticipant, SessionFacts
+from aiskra.modules.assessment.application.ports.reports import CardLesson, ReportCard, ReportParticipant, SessionFacts
 from aiskra.modules.assessment.infrastructure.models import AssessmentModel
 from aiskra.modules.dictionaries.infrastructure.models import IncidentGroupModel, IncidentTypeModel
+from aiskra.modules.incidents.application.ports.dds import DdsPost
 from aiskra.modules.incidents.domain.card import IncidentCardData
 from aiskra.modules.incidents.domain.incident import AddedBy, CardService, IncidentCard
 from aiskra.modules.incidents.infrastructure.models import CardServiceModel, CardServiceStatusModel, IncidentCardModel
@@ -23,6 +25,7 @@ from aiskra.modules.training.domain.scenario import Scenario
 from aiskra.modules.training.domain.session import TrainingSession
 from aiskra.modules.training.domain.tone import EMOTION_TITLES, CallerTone
 from aiskra.modules.training.infrastructure.models import (
+    AssignmentModel,
     CallMessageModel,
     CallModel,
     ScenarioModel,
@@ -413,3 +416,43 @@ def _timer_start(card: IncidentCardModel) -> datetime | None:
     """Начало отсчёта таймера черновика для мониторинга: открытие плюс пауза на подсказки (п. 5.3)."""
     opened = as_utc(card.opened_at)
     return opened + timedelta(milliseconds=card.paused_ms) if opened and card.paused_ms else opened
+
+
+class TrainingDdsPosts:
+    """`DdsPosts` для АРМ ДДС (ТЗ 2.7, 2.8): за какие службы обучающийся отвечает в идущих занятиях."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._s = session
+
+    async def running(self, student_id: UUID) -> list[DdsPost]:
+        rows = await self._s.execute(
+            select(AssignmentModel.session_id, AssignmentModel.dds_service_code)
+            .join(TrainingSessionModel, TrainingSessionModel.id == AssignmentModel.session_id)
+            .where(
+                AssignmentModel.student_id == student_id,
+                AssignmentModel.role == "dds",
+                AssignmentModel.dds_service_code.is_not(None),
+                TrainingSessionModel.status == "running",
+            )
+        )
+        return [DdsPost(session_id=sid, service_code=code) for sid, code in rows.all() if sid is not None and code]
+
+
+class CardLessonsReader:
+    """`CardLessons` для экспертной правки (ТЗ 2.5): занятие карточки, его преподаватель и настройки."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._s = session
+
+    async def lesson_of(self, card_id: UUID) -> CardLesson | None:
+        found = (
+            await self._s.execute(
+                select(TrainingSessionModel.id, TrainingSessionModel.teacher_id, TrainingSessionModel.settings)
+                .join(IncidentCardModel, IncidentCardModel.session_id == TrainingSessionModel.id)
+                .where(IncidentCardModel.id == card_id)
+            )
+        ).first()
+        if found is None:
+            return None
+        session_id, teacher_id, settings = found
+        return CardLesson(session_id=session_id, teacher_id=teacher_id, settings=dict(settings or {}))
