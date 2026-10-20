@@ -13,6 +13,7 @@ import re
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
+from uuid import UUID
 
 CARD_NORM_SECONDS = 75  # опрос до карточки, доступной ДДС, в среднем 75 с — ПП РФ № 1931, п. 9 «р» (docs/research)
 DDS_NORM_SECONDS = 30  # норматив решения ДДС «Принята / Не принята» (#709, ТЗ)
@@ -32,6 +33,7 @@ WEIGHTS_112: dict[str, float] = {
     "grammar": 0.5,
     # п. 3.6: информативно, пока показатель не сверят эксперты (3.5); вес можно задать в настройках занятия
     "caller_care": 0,
+    "repeat_link": 3,  # ТЗ 4.6: повторное обращение привязано к карточке
 }
 WEIGHTS_DDS: dict[str, float] = {
     "decision": 3,
@@ -56,6 +58,7 @@ TITLES: dict[str, str] = {
     "description_meaning": "Описание: смысл (ИИ)",
     "grammar": "Грамотность",
     "caller_care": "Работа с заявителем (информативно)",
+    "repeat_link": "Повторное обращение: привязка к карточке",
     "decision": "Решение «Принята / Не принята»",
     "reaction": "Время реакции",
     "chain": "Порядок и полнота статусов",
@@ -108,6 +111,19 @@ def caller_care(f: CallerFacts) -> Criterion:
         c.errors.append(f"заявитель стал напряжённее: {f.start} → {f.end} из 10")
     if f.invalidating:
         c.errors.append("обесценивающие фразы: " + ", ".join(f"«{p}»" for p in dict.fromkeys(f.invalidating)))
+    return c
+
+
+def repeat_link(linked_to: UUID | None, targets: set[UUID], number: int | None) -> Criterion:
+    """ТЗ 4.6, Памятка АРМ-112: повторный звонок по той же беде — найти карточку по номеру и привязать новую к ней.
+    Не привязал — критическая ошибка: службы получат вторую карточку и могут выехать дважды."""
+    if linked_to is not None and linked_to in targets:
+        return Criterion("repeat_link", 1.0, note=f"привязана к карточке {number}" if number else "")
+    c = Criterion("repeat_link", 0.0, critical=True)
+    c.errors.append(
+        f"повторное обращение не привязано к карточке {number or ''}".rstrip()
+        + " — заявитель уже звонил, проверьте «Есть карточка с заявителем по этому номеру»"
+    )
     return c
 
 

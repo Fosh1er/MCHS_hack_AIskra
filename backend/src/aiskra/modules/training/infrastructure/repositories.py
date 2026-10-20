@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import random
+from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import column, func, or_, select, table
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from aiskra.modules.training.application.ports.scenarios import ScenarioRow
@@ -271,6 +272,29 @@ class SqlCallRepository:
                 )
             )
         return out
+
+    async def repeat_candidate(self, student_id: UUID, since: datetime) -> Call | None:
+        cards = table("incident_cards", column("id"), column("status"))
+        repeated = select(CallModel.repeat_of).where(CallModel.repeat_of.is_not(None))
+        row = (
+            await self._s.execute(
+                select(CallModel)
+                .join(cards, cards.c.id == CallModel.card_id)
+                .where(
+                    CallModel.student_id == student_id,
+                    CallModel.role == "112",
+                    CallModel.party == "applicant",
+                    CallModel.status == "ended",
+                    CallModel.repeat_of.is_(None),
+                    CallModel.started_at >= since,
+                    cards.c.status != "draft",
+                    CallModel.card_id.not_in(repeated),
+                )
+                .order_by(CallModel.started_at.desc())
+                .limit(1)
+            )
+        ).scalar_one_or_none()
+        return self._entity(row) if row else None
 
     async def calls_of_card(self, card_id: UUID, student_id: UUID | None) -> list[Call]:
         stmt = select(CallModel).where(CallModel.card_id == card_id)

@@ -22,6 +22,7 @@ from aiskra.modules.incidents.api.schemas import (
     CreatedOut,
     DdsTimerIn,
     DdsTimerOut,
+    LinkIn,
     OpenCardIn,
     SaveCardIn,
     ServiceStatusIn,
@@ -45,11 +46,12 @@ from aiskra.modules.incidents.application.commands.dds import (
     SetDdsTimerPaused,
     SetDdsTimerPausedHandler,
 )
+from aiskra.modules.incidents.application.commands.link_card import LinkCard, LinkCardHandler
 from aiskra.modules.incidents.application.commands.open_card import OpenCard, OpenCardHandler
 from aiskra.modules.incidents.application.commands.record_card_view import RecordCardView, RecordCardViewHandler
 from aiskra.modules.incidents.application.commands.save_card import SaveCard, SaveCardHandler
 from aiskra.modules.incidents.application.commands.set_card_flags import SetCardFlags, SetCardFlagsHandler
-from aiskra.modules.incidents.application.ports.cards import CardView
+from aiskra.modules.incidents.application.ports.cards import CardView, JournalRow
 from aiskra.modules.incidents.application.ports.dds import BrigadeOption
 from aiskra.modules.incidents.application.queries.dds import (
     DdsCardView,
@@ -62,6 +64,13 @@ from aiskra.modules.incidents.application.queries.dds import (
     SearchDdsJournalHandler,
 )
 from aiskra.modules.incidents.application.queries.get_card import GetCard, GetCardHandler
+from aiskra.modules.incidents.application.queries.links import (
+    FindMatches,
+    FindMatchesHandler,
+    GetLinks,
+    GetLinksHandler,
+    LinksView,
+)
 from aiskra.modules.incidents.application.queries.search_journal import JournalPage, SearchJournal, SearchJournalHandler
 from aiskra.modules.incidents.domain.incident import AddedBy, Appendix, CardService
 from aiskra.shared.security import Permission, Principal
@@ -141,6 +150,49 @@ async def get_card(
     handler: Annotated[GetCardHandler, Depends(deps.provide_get_card)],
 ) -> CardView:
     return await handler(GetCard(actor=actor, card_id=card_id))
+
+
+# ------------------------------------------------------------------ п. 1.6 (ТЗ 4.6): повторные обращения и связи
+
+
+@router.get(
+    "/matches",
+    response_model=list[JournalRow],
+    summary="Недавние карточки с тем же телефоном или адресом — «Есть карточка с заявителем по этому номеру»",
+)
+async def matches(
+    actor: CurrentPrincipal,
+    handler: Annotated[FindMatchesHandler, Depends(deps.provide_matches)],
+    phone: Annotated[list[str] | None, Query(description="АОН, предоставленный, телефон на место")] = None,
+    street: str = "",
+    house: str = "",
+    exclude: UUID | None = None,
+) -> list[JournalRow]:
+    return await handler(FindMatches(actor=actor, phones=phone or [], street=street, house=house, exclude=exclude))
+
+
+@router.get("/cards/{card_id}/links", response_model=LinksView, summary="Окно связей: главная и подчинённые")
+async def card_links(
+    card_id: UUID, actor: CurrentPrincipal, handler: Annotated[GetLinksHandler, Depends(deps.provide_links)]
+) -> LinksView:
+    return await handler(GetLinks(actor=actor, card_id=card_id))
+
+
+@router.post(
+    "/cards/{card_id}/link",
+    response_model=LinksView,
+    summary="«привязать» к главной карточке (main_id) или «отвязать» (main_id = null)",
+)
+async def link_card(
+    card_id: UUID,
+    body: LinkIn,
+    actor: CurrentPrincipal,
+    meta: Meta,
+    handler: Annotated[LinkCardHandler, Depends(deps.provide_link_card)],
+    links: Annotated[GetLinksHandler, Depends(deps.provide_links)],
+) -> LinksView:
+    await handler(LinkCard(actor=actor, card_id=card_id, main_id=body.main_id, meta=meta))
+    return await links(GetLinks(actor=actor, card_id=card_id))
 
 
 # ------------------------------------------------------------------ п. 1.3: журнал и работа с сохранённой карточкой

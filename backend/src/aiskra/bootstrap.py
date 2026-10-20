@@ -122,6 +122,7 @@ from aiskra.modules.incidents.application.commands.dds import (
     MarkServiceReceivedHandler,
     SetDdsTimerPausedHandler,
 )
+from aiskra.modules.incidents.application.commands.link_card import LinkCardHandler
 from aiskra.modules.incidents.application.commands.open_card import OpenCardHandler
 from aiskra.modules.incidents.application.commands.record_card_view import RecordCardViewHandler
 from aiskra.modules.incidents.application.commands.save_card import SaveCardHandler
@@ -132,8 +133,10 @@ from aiskra.modules.incidents.application.queries.dds import (
     SearchDdsJournalHandler,
 )
 from aiskra.modules.incidents.application.queries.get_card import GetCardHandler
+from aiskra.modules.incidents.application.queries.links import FindMatchesHandler, GetLinksHandler
 from aiskra.modules.incidents.application.queries.search_journal import SearchJournalHandler
 from aiskra.modules.incidents.infrastructure.dds import SqlDdsReader, SqlDdsRepository
+from aiskra.modules.incidents.infrastructure.links import SqlCardLinks
 from aiskra.modules.incidents.infrastructure.reader import SqlCardReader
 from aiskra.modules.incidents.infrastructure.repositories import SqlCardRepository
 from aiskra.modules.system.api import deps as system_deps
@@ -493,6 +496,17 @@ def _wire_incidents(app: FastAPI) -> None:
     def append(session: Session) -> AppendCardHandler:
         return AppendCardHandler(SqlCardRepository(session), SqlAuditRecorder(session), SqlAlchemyUnitOfWork(session))
 
+    def link_card(session: Session) -> LinkCardHandler:
+        return LinkCardHandler(
+            SqlCardRepository(session), SqlCardLinks(session), SqlAuditRecorder(session), SqlAlchemyUnitOfWork(session)
+        )
+
+    def find_matches(session: Session) -> FindMatchesHandler:
+        return FindMatchesHandler(SqlCardLinks(session))
+
+    def card_links(session: Session) -> GetLinksHandler:
+        return GetLinksHandler(SqlCardRepository(session), SqlCardLinks(session))
+
     def add_workout(session: Session) -> AddWorkoutHandler:
         return AddWorkoutHandler(
             SqlCardRepository(session), SqlAuditRecorder(session), SqlAlchemyUnitOfWork(session), clock
@@ -508,6 +522,9 @@ def _wire_incidents(app: FastAPI) -> None:
     ov[incidents_deps.provide_set_flags] = set_flags
     ov[incidents_deps.provide_card_timer] = card_timer
     ov[incidents_deps.provide_append] = append
+    ov[incidents_deps.provide_link_card] = link_card
+    ov[incidents_deps.provide_links] = card_links
+    ov[incidents_deps.provide_matches] = find_matches
     ov[incidents_deps.provide_add_workout] = add_workout
     ov[incidents_deps.provide_record_view] = record_view
 

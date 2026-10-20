@@ -69,6 +69,8 @@ class AuditEvent(StrEnum):
     CARD_RETURNED = "card.returned"
     CARD_FLAGS = "card.flags"
     CARD_APPENDED = "card.appended"
+    CARD_LINKED = "card.linked"
+    CARD_UNLINKED = "card.unlinked"
     CARD_TIMER_PAUSED = "card.timer_paused"
     WORKOUT_ADDED = "card.workout_added"
     FEEDBACK_SAVED = "assessment.feedback_saved"
@@ -127,6 +129,8 @@ AUDIT_EVENT_TITLES: Mapping[AuditEvent, str] = {
     AuditEvent.CARD_RETURNED: "Возврат на доработку",
     AuditEvent.CARD_FLAGS: "Изменение признаков ЧС / ЧП",
     AuditEvent.CARD_APPENDED: "Дополнение карточки",
+    AuditEvent.CARD_LINKED: "Привязка карточки к главной (повторное обращение)",
+    AuditEvent.CARD_UNLINKED: "Карточка отвязана от главной",
     AuditEvent.CARD_TIMER_PAUSED: "Пауза таймера карточки на обучение интерфейсу",
     AuditEvent.WORKOUT_ADDED: "Отработка",
     AuditEvent.FEEDBACK_SAVED: "Отзыв преподавателя по занятию",

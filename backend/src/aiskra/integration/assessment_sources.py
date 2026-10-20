@@ -209,7 +209,35 @@ class IncidentAttempts:
             caller=await self._caller(list(calls)) if calls else None,
             psy=psy,
             branch=await self._branch(card.id),
+            **await self._repeat(card.id),
         )
+
+    async def _repeat(self, card_id: UUID) -> dict[str, Any]:
+        """ТЗ 4.6: карточка по повторному звонку — исходная карточка, её главная и к чему привязана эта."""
+        repeat_of = (
+            await self._s.execute(
+                select(CallModel.repeat_of).where(CallModel.card_id == card_id, CallModel.repeat_of.is_not(None))
+            )
+        ).scalar()
+        main = (
+            await self._s.execute(select(IncidentCardModel.main_card_id).where(IncidentCardModel.id == card_id))
+        ).scalar_one_or_none()
+        if repeat_of is None:
+            return {"main_card_id": main}
+        orig = (
+            await self._s.execute(
+                select(IncidentCardModel.number, IncidentCardModel.main_card_id).where(
+                    IncidentCardModel.id == repeat_of
+                )
+            )
+        ).first()
+        targets = {repeat_of} | ({orig.main_card_id} if orig and orig.main_card_id else set())
+        return {
+            "repeat_of": repeat_of,
+            "repeat_targets": targets,
+            "repeat_number": orig.number if orig else None,
+            "main_card_id": main,
+        }
 
     async def dds(self, card_id: UUID, service_code: str) -> DdsAttempt | None:
         card = await SqlCardReader(self._s).get(card_id)

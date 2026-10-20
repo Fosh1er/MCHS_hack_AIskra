@@ -121,6 +121,7 @@ class SessionSettingsIn(_Strict):
     call_interval_s: float | None = Field(default=None, ge=5, le=3600)
     feed_interval_s: float | None = Field(default=None, ge=5, le=3600)
     max_waiting: int | None = Field(default=None, ge=1, le=10)
+    repeat_share: int | None = Field(default=None, ge=0, le=100, description="Повторные обращения, % вызовов (4.6)")
     psy: PsySettingsIn | None = None
     branch: BranchSettingsIn | None = None
 

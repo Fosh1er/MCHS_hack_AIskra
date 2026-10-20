@@ -143,6 +143,38 @@ class JournalRow:
     victims_count: int
     address_line: str | None
     description: str | None
+    linked: bool = False  # п. 1.6: у карточки есть связи (главная или подчинённая) — «Связи» в журнале
+    main_card_id: UUID | None = None  # подчинённая — к какой главной привязана
+    match: str | None = None  # совпадение при повторном обращении: phone | address
+
+
+@dataclass(frozen=True, kw_only=True)
+class MatchQuery:
+    """Поиск недавних карточек при повторном обращении (п. 1.6, `image61–62`): по любому из телефонов или по адресу."""
+
+    phones: list[str]
+    street: str = ""
+    house: str = ""
+    exclude: UUID | None = None
+    author_id: UUID | None = None  # None — все карточки (преподаватель)
+    hours: int = 24
+    limit: int = 10
+
+
+class CardLinks(Protocol):
+    """Связи карточек «главная / подчинённая» (п. 1.6, `image65–68`)."""
+
+    async def main_of(self, card_id: UUID) -> UUID | None: ...
+
+    async def set_main(self, card_id: UUID, main_id: UUID | None) -> None: ...
+
+    async def subordinates(self, main_id: UUID) -> list[UUID]: ...
+
+    async def matches(self, q: MatchQuery) -> list[JournalRow]: ...
+
+    async def rows(self, ids: list[UUID], author_id: UUID | None = None) -> list[JournalRow]:
+        """Строки журнала; `author_id` — только карточки этого автора (обучающийся не видит чужих)."""
+        ...
 
 
 class CardReader(Protocol):

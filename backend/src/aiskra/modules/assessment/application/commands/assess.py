@@ -24,6 +24,7 @@ from aiskra.modules.assessment.domain.scoring import (
     assess_card_112,
     assess_dds,
     finish,
+    repeat_link,
 )
 from aiskra.shared.application import Command, UnitOfWork
 from aiskra.shared.audit import AuditEntry, AuditEvent, AuditRecorder, RequestMeta
@@ -159,11 +160,12 @@ class AssessCardHandler:
                 raise NotFoundError("Карточка не найдена", code="card_not_found")
             if a.status == "draft":
                 raise DomainError("Карточка ещё не сохранена", code="card_not_saved")
+            repeat = a.repeat_of is not None  # ТЗ 4.6: по повторному звонку важна привязка, а не поля заново
             criteria = assess_card_112(
                 a.data,
                 a.services,
                 a.processing_s,
-                a.reference,
+                None if repeat else a.reference,
                 a.asked_topics,
                 norm_seconds=s.norm_seconds or CARD_NORM_SECONDS,
                 names=a.service_names,
@@ -171,14 +173,16 @@ class AssessCardHandler:
                 spoken=a.legend_text or None,
                 caller=a.caller,
             )
+            if repeat:
+                criteria.append(repeat_link(a.main_card_id, a.repeat_targets, a.repeat_number))
             judged = (
                 await self._judge.check(
                     legend=a.legend_text, description=str(a.data.get("description") or ""), comments=[]
                 )
-                if a.reference
+                if a.reference and not repeat
                 else None
             )
-            if a.reference:
+            if a.reference and not repeat:
                 criteria += _judge_criteria(
                     judged, ["description_meaning", "grammar"], [str(a.data.get("description") or "")]
                 )
