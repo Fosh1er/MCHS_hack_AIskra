@@ -20,7 +20,8 @@ export function DdsPhonebookPage() {
   const [saved, setSaved] = useState(false);
 
   useEffect(() => { if (!service && sorted.length) setService(sorted[0].code); }, [service, sorted]);
-  useEffect(() => { setRows(book.data?.entries ?? []); setSaved(false); }, [book.data]);
+  useEffect(() => { setRows(book.data?.entries ?? []); }, [book.data]);
+  useEffect(() => { setSaved(false); }, [service]);
 
   const roles = book.data?.roles ?? [];
   const edit = (i: number, patch: Partial<PhonebookEntry>) => { setSaved(false); setRows((r) => r.map((e, j) => (j === i ? { ...e, ...patch } : e))); };

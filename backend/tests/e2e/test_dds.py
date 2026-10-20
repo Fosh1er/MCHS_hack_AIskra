@@ -71,7 +71,7 @@ def _queue_statuses_brigade_call_recording(ui: Session, sid: str) -> None:
     # IP-телефон: у демо-служб задана телефонная книга (demo_seed) — набор номера не из книги не начинает звонок,
     # звонок начальнику аварийной бригады из книги — ИИ докладывает
     page.get_by_label("Номер абонента").fill("999-99")
-    page.get_by_role("button", name="вызов").click()
+    page.get_by_role("button", name="вызов", exact=True).click()
     expect(page.get_by_label("IP-телефон").get_by_role("alert")).to_have_text("Номер не обслуживается")
     page.get_by_role("button", name="Начальник аварийной бригады").first.click()
     box = page.get_by_placeholder(COMPOSER)
@@ -96,3 +96,24 @@ def _queue_statuses_brigade_call_recording(ui: Session, sid: str) -> None:
         rec.click()
     head = Path(dl.value.path()).read_bytes()[:12]
     assert head[:4] == b"RIFF" and head[8:12] == b"WAVE", head
+
+
+def test_teacher_dds_phonebook(ui: Session) -> None:
+    """Телефоны ДДС (п. 2.3): демо-книга службы видна преподавателю; новая книга сохраняется целиком."""
+    stand = ui.stand
+    page = ui.new_page("teacher")
+    page.goto(f"{stand.web}/teacher/dds-phonebook")
+    page.get_by_label("Служба", exact=True).select_option("S101")
+    expect(page.get_by_label("ФИО, строка 3")).to_have_value("Голубев Станислав Юрьевич")
+
+    page.get_by_label("Служба", exact=True).select_option("S104")
+    expect(page.get_by_text("Абонентов нет.")).to_be_visible()
+    page.get_by_role("button", name="добавить").click()
+    page.get_by_label("Должность, строка 1").select_option("head")
+    page.get_by_label("ФИО, строка 1").fill("Зайцев Павел Олегович")
+    page.get_by_label("Номер, строка 1").fill("104-10")
+    page.get_by_role("button", name="сохранить").click()
+    expect(page.get_by_role("status")).to_have_text("Сохранено")
+    book = stand.client("dds1").get("/training/dds-phonebook/S104").json()  # диспетчер читает книгу
+    assert [(e["role"], e["number"]) for e in book["entries"]] == [("head", "104-10")]
+    assert stand.client("teacher").put("/training/dds-phonebook/S104", json={"entries": []}).status_code == 200
