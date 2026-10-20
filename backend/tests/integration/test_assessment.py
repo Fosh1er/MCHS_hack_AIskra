@@ -74,6 +74,8 @@ def test_112_and_dds_assessment(app_client: Callable[[], TestClient]) -> None:
 
     insights = teacher.get("/api/v1/assessment/insights").json()
     assert insights["assessments"] >= 2 and insights["weakest"]
+    # ТЗ 3.13, 7.3: выводы по ошибкам группы; без модели — правилами
+    assert insights["summary"] and insights["actions"] and insights["source"] == "rules"
     assert student.get("/api/v1/assessment/insights").status_code == 403
 
 

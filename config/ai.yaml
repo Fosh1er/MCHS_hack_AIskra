@@ -16,7 +16,7 @@ ai:
     brigade_actor:       {provider: fake, temperature: 0.6, cache: task,  cache_ttl: 1d}
     service_actor:       {provider: fake, temperature: 0.6, cache: task,  cache_ttl: 1d}
     judge:               {provider: fake, temperature: 0,   cache: exact, cache_ttl: 7d}
-    insights:            {provider: fake, temperature: 0.3, cache: off}
+    insights:            {provider: fake, temperature: 0.3, cache: exact, cache_ttl: 1h}
     psy_acts:            {provider: fake, temperature: 0,   cache: exact, cache_ttl: 7d, max_tokens: 300}
     psy_judge:           {provider: fake, temperature: 0,   cache: exact, cache_ttl: 7d, max_tokens: 700}
     branch_texts:        {provider: fake, temperature: 0.7, cache: off}

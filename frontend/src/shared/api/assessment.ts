@@ -36,6 +36,8 @@ export interface Insights {
   assessments: number; average_score: number; passed_share: number;
   weakest: { key: string; title: string; average: number; checked: number }[];
   frequent_errors: { text: string; count: number }[];
+  /** ТЗ 3.13, 7.3: выводы по ошибкам группы — моделью (`ai`) или правилами без неё (`rules`). */
+  summary: string; insights: string[]; actions: string[]; source: 'ai' | 'rules'; model: string | null;
 }
 
 const A = '/api/v1/assessment';
@@ -72,7 +74,7 @@ export const usePsyBasis = (enabled = true) =>
     queryFn: () => http<{ criteria: PsyBasisRow[]; acts: PsyBasisRow[] }>(`${A}/psy/basis`),
   });
 export const useInsights = (enabled: boolean) =>
-  useQuery({ queryKey: ['assessment', 'insights'], queryFn: () => http<Insights>(`${A}/insights`), enabled, refetchInterval: 30_000 });
+  useQuery({ queryKey: ['assessment', 'insights'], queryFn: () => http<Insights>(`${A}/insights`), enabled, refetchInterval: 120_000 }); // выводы пишет модель — не чаще раза в 2 мин
 
 // ------------------------------------------------------------------ п. 4.3: отчёт по занятию
 export interface CardResult {

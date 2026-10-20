@@ -865,7 +865,7 @@ def _wire_assessment(app: FastAPI, services: Services) -> None:
         return GetAssessmentHandler(SqlAssessmentRepository(session))
 
     def insights(session: Session) -> GroupInsightsHandler:
-        return GroupInsightsHandler(SqlAssessmentRepository(session))
+        return GroupInsightsHandler(SqlAssessmentRepository(session), services.model_router)
 
     ov[assessment_deps.provide_assess] = assess
     ov[assessment_deps.provide_get] = get
