@@ -9,7 +9,9 @@ export type Status = 'ok' | 'warn' | 'serious' | 'critical' | 'info' | 'neutral'
 /** 75 → «1:15»; 5 → «0:05» */
 export function formatMmSs(totalSeconds: number): string {
   const s = Math.max(0, Math.floor(totalSeconds));
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  const ss = String(s % 60).padStart(2, '0');
+  if (s < 3600) return `${Math.floor(s / 60)}:${ss}`;
+  return `${Math.floor(s / 3600)}:${String(Math.floor(s / 60) % 60).padStart(2, '0')}:${ss}`; // «1:02:05», а не «62:05»
 }
 
 /** Таймер карточки 112: всегда две цифры минут — «02:38» */
