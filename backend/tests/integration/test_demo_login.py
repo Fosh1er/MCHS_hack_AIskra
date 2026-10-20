@@ -111,9 +111,19 @@ def test_bad_body_is_422(demo: TestClient) -> None:
     assert demo.post(DEMO_LOGIN, json={}).status_code == 422
 
 
+def test_prod_shows_demo_accounts_with_password(demo_settings: Settings) -> None:
+    """Рекомендации экспертов финала: временные учётки и пароль по ролям на главной панели — и в prod."""
+    with stand(demo_settings, app_env="prod", session_cookie_secure=True) as c:
+        body = c.get(ACCOUNTS).json()
+        assert body["password"] == DEMO_PASSWORD and [a["login"] for a in body["accounts"]] == ["teacher", "dds1"]
+        assert c.post(DEMO_LOGIN, json={"login": "dds1"}).status_code == 200
+
+
 @pytest.mark.parametrize("show", [False, True])
 def test_prod_has_no_demo_routes(demo_settings: Settings, show: bool) -> None:
-    with stand(demo_settings, app_env="prod", demo_show_password=show, session_cookie_secure=True) as c:
+    with stand(
+        demo_settings, app_env="prod", demo_show_password=show, demo_in_prod=False, session_cookie_secure=True
+    ) as c:
         assert c.get(ACCOUNTS).status_code == 404
         assert c.post(DEMO_LOGIN, json={"login": "op1"}).status_code == 404
         assert c.get("/api/v1/auth/me").status_code == 401

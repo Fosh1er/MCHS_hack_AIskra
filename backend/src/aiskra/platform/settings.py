@@ -58,6 +58,9 @@ class Settings(BaseSettings):
     # данные синтетические); выключить — AISKRA_DEMO_SHOW_PASSWORD=false. В prod пароля в API нет никогда.
     demo_password: SecretStr | None = None
     demo_show_password: bool = True
+    # рекомендации экспертов финала: временные учётки по ролям на главной панели и в prod, если задан пароль
+    # демо-учёток (стенд для экспертов); контур заказчика без демо-учёток — AISKRA_DEMO_IN_PROD=false
+    demo_in_prod: bool = True
 
     @field_validator("app_env", mode="before")
     @classmethod
@@ -66,8 +69,9 @@ class Settings(BaseSettings):
 
     @property
     def demo_enabled(self) -> bool:
-        """Демо-вход и демо-учётки на странице входа (F2): только в режимах demo и dev."""
-        return self.app_env in DEMO_ENVS
+        """Демо-вход и демо-учётки на странице входа (F2): режимы demo и dev, а в prod — если задан пароль
+        демо-учёток и не выключено `demo_in_prod` (рекомендации экспертов финала)."""
+        return self.app_env in DEMO_ENVS or (self.demo_in_prod and self.demo_password is not None)
 
     @property
     def docs_admin_only(self) -> bool:
