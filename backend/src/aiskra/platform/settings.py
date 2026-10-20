@@ -53,9 +53,11 @@ class Settings(BaseSettings):
     bootstrap_admin_password: SecretStr | None = None
     bootstrap_admin_name: str = "Администратор системы"
     # Демо-стенд (F2): пароль демо-учёток (тот же, что для `demo-seed`) и показ его на странице входа.
-    # Пароль уходит в API только при demo_show_password=true и только в режиме demo/dev.
+    # Пароль уходит в API только в режиме demo/dev и только при demo_show_password=true — по умолчанию да:
+    # рекомендации экспертов финала — временные логины и пароли по ролям на главной панели (пароль учебный,
+    # данные синтетические); выключить — AISKRA_DEMO_SHOW_PASSWORD=false. В prod пароля в API нет никогда.
     demo_password: SecretStr | None = None
-    demo_show_password: bool = False
+    demo_show_password: bool = True
 
     @field_validator("app_env", mode="before")
     @classmethod

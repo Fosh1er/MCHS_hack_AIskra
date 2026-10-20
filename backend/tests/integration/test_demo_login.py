@@ -77,8 +77,8 @@ def test_accounts_listed_without_passwords(demo: TestClient) -> None:
         "hint": list(next(u.hint for u in DEMO_USERS if u.login == "op1")),
         "arm_number": "101",
     }
-    assert body["password"] is None
-    assert DEMO_PASSWORD not in r.text and PASSWORD not in r.text and "admin" not in r.text
+    assert body["password"] == DEMO_PASSWORD  # рекомендации экспертов: пароль по ролям на главной панели
+    assert PASSWORD not in r.text and "admin" not in r.text  # пароли обычных учёток и админ — никогда
 
 
 def test_demo_login_opens_regular_session_and_is_audited(demo: TestClient, demo_settings: Settings) -> None:
