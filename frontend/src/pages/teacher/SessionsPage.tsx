@@ -10,6 +10,7 @@ import {
   type SessionSettings,
 } from '../../shared/api/training';
 import { useGroups } from '../../shared/api/admin';
+import { role112, useMe } from '../../shared/api/auth';
 import { fetchSuggestion, type AssignmentSuggestion } from '../../shared/api/assessment';
 import { TeacherShell } from '../../shared/ui/TeacherShell';
 import { PsyCounter } from '../../shared/ui/PsyCounter';
@@ -38,7 +39,8 @@ function CreateForm({ onCreated, assign }: { onCreated: (id: string) => void; as
   // экстренные службы — первыми: с ними чаще всего тренируют ДДС (п. 2.1)
   const dds = useMemo(() => [...(services.data ?? [])].sort((a, b) => Number(b.kind === 'emergency') - Number(a.kind === 'emergency')), [services.data]);
   const [title, setTitle] = useState('');
-  const [mode, setMode] = useState<SessionMode>('mixed');
+  const with112 = role112(useMe().data); // роль 112 скрыта администратором — занятия только для ДДС
+  const [mode, setMode] = useState<SessionMode>(with112 ? 'mixed' : 'dds_actions');
   const [source, setSource] = useState<CardSource>('generated');
   const [picked, setPicked] = useState<number[]>([]);
   const [roles, setRoles] = useState<Record<string, { role: Role; service: string }>>({});
@@ -78,7 +80,7 @@ function CreateForm({ onCreated, assign }: { onCreated: (id: string) => void; as
         setTitle((t) => (t.trim() && !applyRoles ? t : sg.title));
         if (applyRoles) {
           const known = Object.fromEntries(sg.participants.map((p) => [p.student_id, { role: p.role as Role, service: p.service_code ?? '' }]));
-          setRoles(Object.fromEntries(ids.map((id) => [id, known[id] ?? { role: '112' as Role, service: '' }])));
+          setRoles(Object.fromEntries(ids.map((id) => [id, known[id] ?? { role: (with112 ? '112' : 'dds') as Role, service: '' }])));
         }
       })
       .catch((e: Error) => setSuggestError(e.message))
@@ -104,7 +106,7 @@ function CreateForm({ onCreated, assign }: { onCreated: (id: string) => void; as
         <label>Название<input value={title} placeholder="Например: пожары в жилом секторе" onChange={(e) => setTitle(e.target.value)} /></label>
         <label>Тип занятия
           <select value={mode} onChange={(e) => setMode(e.target.value as SessionMode)}>
-            {(Object.keys(MODE_TITLE) as SessionMode[]).map((m) => <option key={m} value={m}>{MODE_TITLE[m]}</option>)}
+            {(Object.keys(MODE_TITLE) as SessionMode[]).filter((m) => with112 || m === 'dds_actions').map((m) => <option key={m} value={m}>{MODE_TITLE[m]}</option>)}
           </select>
         </label>
         <label>Карточки для ДДС
@@ -144,7 +146,7 @@ function CreateForm({ onCreated, assign }: { onCreated: (id: string) => void; as
                 <td className="c-slate">{s.login}</td>
                 <td>
                   <select className="cab-select" aria-label={`Роль: ${s.full_name}`} value={r.role} onChange={(e) => setRole(s.id, { role: e.target.value as Role })}>
-                    <option value="">не участвует</option><option value="112">оператор 112</option><option value="dds">диспетчер ДДС</option>
+                    <option value="">не участвует</option>{with112 && <option value="112">оператор 112</option>}<option value="dds">диспетчер ДДС</option>
                   </select>
                 </td>
                 <td>

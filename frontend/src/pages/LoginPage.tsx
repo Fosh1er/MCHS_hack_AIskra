@@ -74,10 +74,9 @@ function DemoPanel({ data, onEnter }: { data: DemoAccounts; onEnter: (user: Me) 
 
   return (
     <section className="arm-demo" aria-labelledby="arm-demo-title">
-      <h2 className="arm-demo__title" id="arm-demo-title">Демо-учётки</h2>
+      <h2 className="arm-demo__title" id="arm-demo-title">Временные учётки по ролям</h2>
       <p className="arm-demo__note">
-        Вход в роль одной кнопкой, без пароля.
-        {data.password && <> Для входа вручную пароль всех демо-учёток: <code>{data.password}</code></>}
+        Вход в роль — кнопкой «Войти» или вручную логином и паролем в форме слева. Номер АРМ — любой, например 123.
       </p>
       <ul className="arm-demo__list">
         {data.accounts.map((a) => (
@@ -85,7 +84,8 @@ function DemoPanel({ data, onEnter }: { data: DemoAccounts; onEnter: (user: Me) 
             <Icon name={iconFor(a)} size="lg" />
             <div>
               <div className="arm-demo__role">{a.title}</div>
-              <div className="arm-demo__name">{a.full_name} · {a.login}{a.arm_number ? ` · АРМ ${a.arm_number}` : ''}</div>
+              <div className="arm-demo__name">{a.full_name}{a.arm_number ? ` · АРМ ${a.arm_number}` : ''}</div>
+              <div className="arm-demo__name">логин: <code>{a.login}</code>{data.password && <> · пароль: <code>{data.password}</code></>}</div>
               {a.hint.length > 0 && (
                 <ul className="arm-demo__hint">{a.hint.map((h) => <li key={h}>{h}</li>)}</ul>
               )}

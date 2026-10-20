@@ -5,7 +5,7 @@ import { Icon, type IconName } from '@smena112/ui-kit';
 import { useLogout, type Me } from '../api/auth';
 import { useTourControls } from '../onboarding/OnboardingProvider';
 
-export interface MenuItem { to: string; label: string; icon: IconName; permission?: string }
+export interface MenuItem { to: string; label: string; icon: IconName; permission?: string; feature?: string }
 
 const WEEKDAYS = ['Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'];
 const MONTHS = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
@@ -31,7 +31,7 @@ export function ArmTopBar({ me, menu }: { me: Me; menu: MenuItem[] }) {
   const logout = useLogout();
   const tour = useTourControls();
   const navigate = useNavigate();
-  const items = menu.filter((m) => !m.permission || me.permissions.includes(m.permission));
+  const items = menu.filter((m) => (!m.permission || me.permissions.includes(m.permission)) && (!m.feature || me.features?.[m.feature] !== false));
   const onLogout = () => logout.mutate(undefined, { onSettled: () => navigate('/', { replace: true }) });
 
   return (

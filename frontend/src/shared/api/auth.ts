@@ -23,7 +23,11 @@ export interface Me {
   operator_number: string | null;
   arm_number: string | null;
   permissions: string[];
+  features?: Record<string, boolean>; // включённые возможности (настройки администратора): role_112
 }
+
+/** Роль оператора 112 включена администратором (по рекомендациям экспертов скрыта по умолчанию, приоритет — ДДС). */
+export const role112 = (me?: Me | null) => me?.features?.role_112 !== false;
 
 export interface LoginInput { login: string; password: string; arm_number?: string }
 
@@ -117,6 +121,6 @@ export function homeFor(me: Me): string {
   // обучающийся сразу попадает в «Список происшествий», как оператор в АРМ-112 (п. 1.3);
   // на телефоне эмулятор неудобен (6.3) — в кабинет
   const narrow = typeof window !== 'undefined' && window.innerWidth < 1000;
-  if (me.permissions.includes(PERMISSIONS.trainingParticipate)) return narrow ? '/student' : '/arm/112/journal';
+  if (me.permissions.includes(PERMISSIONS.trainingParticipate)) return narrow ? '/student' : role112(me) ? '/arm/112/journal' : '/arm/dds';
   return '/student';
 }

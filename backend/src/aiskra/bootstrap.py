@@ -391,8 +391,11 @@ def _wire_identity_and_audit(app: FastAPI, services: Services) -> None:
             demo,
         )
 
+    def features(session: Session) -> SystemServiceSwitches:
+        return SystemServiceSwitches(session)
+
     def demo_accounts(session: Session) -> ListDemoAccountsHandler:
-        return ListDemoAccountsHandler(SqlUserReader(session), demo)
+        return ListDemoAccountsHandler(SqlUserReader(session), demo, SystemServiceSwitches(session))
 
     def logout(session: Session) -> LogoutHandler:
         return LogoutHandler(
@@ -449,6 +452,7 @@ def _wire_identity_and_audit(app: FastAPI, services: Services) -> None:
     ov[identity_deps.provide_demo_limit] = lambda: demo_limit
     ov[identity_deps.provide_demo_login] = demo_login
     ov[identity_deps.provide_demo_accounts] = demo_accounts
+    ov[identity_deps.provide_features] = features
     ov[identity_deps.provide_logout] = logout
     ov[identity_deps.provide_create_user] = create_user
     ov[identity_deps.provide_update_user] = update_user

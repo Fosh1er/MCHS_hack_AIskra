@@ -57,6 +57,20 @@ def skip_tour(page: Page) -> None:
         time.sleep(0.5)
 
 
+def enable_role_112(request: Any, web: str, insecure: bool) -> None:
+    """Роль оператора 112 по умолчанию скрыта (рекомендации экспертов, `services.role_112`) — смоук проверяет и её,
+    поэтому включает от имени администратора, если его пароль задан (`AISKRA_BOOTSTRAP_ADMIN_PASSWORD`)."""
+    admin_pw = os.environ.get("AISKRA_BOOTSTRAP_ADMIN_PASSWORD")
+    if not admin_pw:
+        return
+    api = request.new_context(base_url=web, ignore_https_errors=insecure)
+    r = api.post("/api/v1/auth/login", data={"login": "admin", "password": admin_pw})
+    assert r.ok, f"вход администратора: {r.status} {r.text()[:200]}"
+    r = api.put("/api/v1/system/settings/services", data={"values": {"role_112": 1}})
+    assert r.ok, f"роль 112: {r.status} {r.text()[:200]}"
+    api.dispose()
+
+
 def start_dds_lesson(request: Any, web: str, password: str, insecure: bool) -> tuple[Any, str]:
     """Занятие «Действия ДДС» для dds1 («Служба 101») от имени преподавателя: смоук проверяет работу диспетчера на
     занятии (ТЗ 2.7, 2.8 — своя служба и карточки своего занятия), карточки системы поступают потоком занятия.
@@ -99,6 +113,7 @@ def main() -> None:
         engine = p.firefox if args.browser == "firefox" else p.chromium
         browser = engine.launch(channel="chrome") if args.browser == "chrome" else engine.launch()
         report["version"] = browser.version
+        enable_role_112(p.request, args.web, args.insecure)
         lesson, lesson_id = start_dds_lesson(p.request, args.web, password, args.insecure)
 
         def context(user: str) -> Page:

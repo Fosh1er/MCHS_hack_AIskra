@@ -47,6 +47,7 @@ class MeOut(BaseModel):
     operator_number: str | None
     arm_number: str | None
     permissions: list[str]
+    features: dict[str, bool] = Field(default_factory=dict, description="Включённые возможности: role_112")
 
     @classmethod
     def of(cls, p: Principal) -> MeOut:

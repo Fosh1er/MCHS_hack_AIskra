@@ -48,6 +48,7 @@ from aiskra.modules.identity.application.commands.set_user_blocked import SetUse
 from aiskra.modules.identity.application.commands.update_user import UpdateUser, UpdateUserHandler
 from aiskra.modules.identity.application.ports.auth import LoginThrottle
 from aiskra.modules.identity.application.ports.demo import RequestLimit
+from aiskra.modules.identity.application.ports.features import FeatureSwitches, features_of
 from aiskra.modules.identity.application.ports.groups import GroupMember, GroupView
 from aiskra.modules.identity.application.queries.demo_accounts import ListDemoAccounts, ListDemoAccountsHandler
 from aiskra.modules.identity.application.queries.list_users import ListUsers, ListUsersHandler
@@ -72,6 +73,7 @@ async def login(
     cookie: Cookie,
     handler: Annotated[LoginHandler, Depends(deps.provide_login)],
     throttle: Annotated[LoginThrottle, Depends(deps.provide_login_throttle)],
+    features: Annotated[FeatureSwitches, Depends(deps.provide_features)],
 ) -> LoginOut:
     key = meta.ip or "unknown"
     throttle.check(key)
@@ -82,7 +84,11 @@ async def login(
         raise
     throttle.succeeded(key)
     cookie.set(response, result.token, result.expires_at)
-    return LoginOut(**MeOut.of(result.principal).model_dump(), expires_at=result.expires_at)
+    return LoginOut(
+        **MeOut.of(result.principal).model_dump(exclude={"features"}),
+        features=await features_of(features),
+        expires_at=result.expires_at,
+    )
 
 
 @demo_router.get(
@@ -122,13 +128,18 @@ async def demo_login(
     cookie: Cookie,
     handler: Annotated[DemoLoginHandler, Depends(deps.provide_demo_login)],
     limit: Annotated[RequestLimit, Depends(deps.provide_demo_limit)],
+    features: Annotated[FeatureSwitches, Depends(deps.provide_features)],
 ) -> LoginOut:
     key = meta.ip or "unknown"
     limit.check(key)
     limit.hit(key)  # RF2-07: считается каждый запрос, а не только неудачный
     result = await handler(DemoLogin(login=body.login, meta=meta))
     cookie.set(response, result.token, result.expires_at)
-    return LoginOut(**MeOut.of(result.principal).model_dump(), expires_at=result.expires_at)
+    return LoginOut(
+        **MeOut.of(result.principal).model_dump(exclude={"features"}),
+        features=await features_of(features),
+        expires_at=result.expires_at,
+    )
 
 
 @auth_router.post("/logout", status_code=204, summary="Выход: отзыв текущей сессии")
@@ -144,8 +155,10 @@ async def logout(
 
 
 @auth_router.get("/me", response_model=MeOut, summary="Текущий пользователь, роль и права")
-async def me(principal: CurrentPrincipal) -> MeOut:
-    return MeOut.of(principal)
+async def me(
+    principal: CurrentPrincipal, features: Annotated[FeatureSwitches, Depends(deps.provide_features)]
+) -> MeOut:
+    return MeOut.of(principal).model_copy(update={"features": await features_of(features)})
 
 
 @auth_router.get("/onboarding", response_model=OnboardingOut, summary="Обучение интерфейсу: мой прогресс (п. 5.3)")

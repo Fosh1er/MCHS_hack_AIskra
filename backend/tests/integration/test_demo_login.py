@@ -49,7 +49,20 @@ def test_demo_users_have_no_admin_and_say_what_to_see() -> None:
     assert all(u.title and 1 <= len(u.hint) <= 2 and u.arm_number for u in DEMO_USERS)
 
 
+def test_role_112_hidden_until_admin_enables(demo: TestClient) -> None:
+    """Рекомендации экспертов: приоритет — ДДС, роль оператора 112 включает администратор (services.role_112)."""
+    assert [a["login"] for a in demo.get(ACCOUNTS).json()["accounts"]] == ["teacher", "dds1"]
+    login(demo, "admin")
+    assert demo.get("/api/v1/auth/me").json()["features"] == {"role_112": False}
+    assert demo.put("/api/v1/system/settings/services", json={"values": {"role_112": 1}}).status_code == 200
+    assert demo.get("/api/v1/auth/me").json()["features"] == {"role_112": True}
+    assert [a["login"] for a in demo.get(ACCOUNTS).json()["accounts"]] == ["teacher", "op1", "dds1"]
+
+
 def test_accounts_listed_without_passwords(demo: TestClient) -> None:
+    login(demo, "admin")
+    demo.put("/api/v1/system/settings/services", json={"values": {"role_112": 1}})  # роль 112 включена
+    demo.post("/api/v1/auth/logout")
     r = demo.get(ACCOUNTS)
     assert r.status_code == 200
     body = r.json()
