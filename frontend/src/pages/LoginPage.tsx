@@ -29,7 +29,7 @@ export function LoginPage() {
 
   return (
     <div className="arm-login">
-      <div />
+      <div className="arm-login__city" aria-hidden="true" />
       <div className="arm-login__side">
         {demo.data && <div className="arm-login__ribbon" role="note">Демонстрационный стенд · данные синтетические</div>}
         <form className="arm-login__form" onSubmit={onSubmit} noValidate>
@@ -51,6 +51,7 @@ export function LoginPage() {
           </button>
           {login.isError && <div className="arm-login__error" role="alert">{login.error.message}</div>}
           <p className="arm-login__hint">Учебный тренажёр. Учётную запись выдаёт администратор учебного центра.</p>
+          <p className="arm-login__support">Техподдержка<br />администратор учебного центра</p>
         </form>
         {demo.data && <DemoPanel data={demo.data} onEnter={enter} />}
       </div>
