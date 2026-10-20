@@ -12,6 +12,7 @@ uv run python -m aiskra.cli check-config             # проверка наст
                                                      # код выхода 1 и список проблем; запускается до миграций
 uv run python -m aiskra.cli create-schema            # создать таблицы без Alembic (только для SQLite-демо)
 uv run python -m aiskra.cli demo-seed [--materials DIR]  # стенд одной командой (M6); пароль — AISKRA_DEMO_PASSWORD
+uv run python -m aiskra.cli demo-seed --household      # только бытовые сценарии ДДС на работающем стенде
 uv run python -m aiskra.cli purge-audit [--dry-run]   # журнал аудита старше срока хранения (≥183 дн., п. 6.2); для cron
 uv run python -m aiskra.cli import-materials FILE... --kind instruction --as admin --prompts
                                                      # учебные материалы (п. 4.4) от имени пользователя
@@ -239,6 +240,11 @@ def main() -> None:
     demo.add_argument("--scenarios", type=int, default=30, help="сколько утверждённых сценариев должно быть в банке")
     demo.add_argument("--materials", help="каталог с учебными материалами (DOCX, PDF, XLSX, TXT)")
     demo.add_argument("--load-users", type=int, default=0, help="учётки load001…loadNNN для нагрузочного теста (6.1)")
+    demo.add_argument(
+        "--household",
+        action="store_true",
+        help="только бытовые сценарии ДДС (животные, ЖКХ, экология) на работающем стенде, без пароля и учёток",
+    )
     purge = sub.add_parser("purge-audit", help="удалить записи журнала аудита старше срока хранения (п. 6.2)")
     purge.add_argument("--dry-run", action="store_true", help="только посчитать")
     mat = sub.add_parser("import-materials", help="загрузить учебные материалы: PDF, DOCX, XLSX, TXT (п. 4.4)")
@@ -280,6 +286,10 @@ def main() -> None:
             print(f"Настройки режима {settings.app_env} проверены")
         elif args.cmd == "create-schema":
             asyncio.run(create_schema(settings))
+        elif args.cmd == "demo-seed" and args.household:
+            from aiskra.demo_seed import seed_household
+
+            asyncio.run(seed_household(settings))
         elif args.cmd == "demo-seed":
             from aiskra.demo_seed import seed
 

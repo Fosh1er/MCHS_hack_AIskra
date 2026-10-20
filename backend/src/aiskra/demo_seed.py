@@ -35,6 +35,7 @@ from aiskra.modules.training.domain.material import MaterialKind
 from aiskra.modules.training.infrastructure.branch_catalog import YamlBranchCatalog
 from aiskra.modules.training.infrastructure.models import ScenarioModel
 from aiskra.platform.db import SqlAlchemyUnitOfWork, create_engine, create_session_factory
+from aiskra.platform.services import Services
 from aiskra.platform.settings import Settings
 from aiskra.shared.errors import AppError
 from aiskra.shared.security import Principal, Role
@@ -113,7 +114,88 @@ DEMO_USERS = [
 ]
 GROUP = "Смена 1 (демо)"
 DEMO_PSY = ("panic", "crying", "hysteria", "aggression", "apathy", "stupor")  # п. 3.7, реакции на стресс (ЦЭПП МЧС)
+
+
+@dataclass(frozen=True)
+class HouseholdScenario:
+    """Бытовой сценарий для ДДС (рекомендация экспертов: не пожары и не ДТП). `service` — служба демо-диспетчера,
+    которая должна быть в эталоне; `flags` — признаки опросной карты (задают службы эталона по матрице)."""
+
+    code: str  # строка классификатора (dict_incident_types.code)
+    service: str
+    flags: tuple[str, ...] = ()
+
+
+# Группы классификатора: 8 «Экологические происшествия», 14 «Аварии и происшествия в городском хозяйстве»,
+# 21 «Происшествия с участием животных». Службы эталона — по матрице dict_routing (п. 1.5).
+HOUSEHOLD = (
+    HouseholdScenario("14100203", "S101"),  # 14 · Лифт — падение в шахту — животные: МОСЛИФТ, 101, ГорХоз
+    HouseholdScenario("14071000", "S101"),  # 14 · Колодец, люк — животное провалилось: 101 (главная), 104, ЖКХ
+    HouseholdScenario("21040100", "S101"),  # 21 · Угроза животному — придавило, зажало, застряло: 101, ДПиООС
+    HouseholdScenario("21030000", "S101"),  # 21 · Дикое животное в городе: 101, ГорХоз, ЦОДД, ДПиООС
+    HouseholdScenario("8040000", "S101"),  # 8 · Массовая гибель рыбы: 101 (главная), Канал им. Москвы, ДПиООС
+    HouseholdScenario("14100101", "S103"),  # 14 · Застревание в лифте, нужна медпомощь: МОСЛИФТ, 101, 103
+    HouseholdScenario("21010200", "S103", ("victims",)),  # 21 · Укус животного, пострадавший: 102, 103, ГорХоз
+    HouseholdScenario("14030201", "S103", ("victims",)),  # 14 · Нет света в подъезде, пострадавший: ОЭК, 103
+)
+OFFLINE_AI_CONFIG = "<offline: без файла конфига ИИ>"
 KIND_BY_EXT = {".docx": MaterialKind.INSTRUCTION, ".pdf": MaterialKind.REGULATION, ".xlsx": MaterialKind.CLASSIFIER}
+
+
+def _has_service(reference_card: dict[str, object], service: str) -> bool:
+    services = reference_card.get("services")
+    return isinstance(services, list) and any(isinstance(x, dict) and x.get("code") == service for x in services)
+
+
+async def seed_household(settings: Settings, services: Services | None = None) -> int:
+    """Бытовые сценарии для ДДС (`HOUSEHOLD`): генерация по строке классификатора, офлайн-легенда при `fake`,
+    сразу утверждены. Идемпотентно: строка с утверждённым сценарием, где в эталоне есть служба, пропускается.
+    Справочники должны быть загружены; без `services` — офлайн. Возвращает, сколько сценариев добавлено."""
+    own = services is None
+    # Отдельный запуск (`demo-seed --household`) — всегда офлайн: нет файла конфига → fake (`load_ai_config`),
+    # легенда по шаблону, внешняя модель на работающем стенде не вызывается.
+    svc = services or build_services(settings.model_copy(update={"ai_config_path": OFFLINE_AI_CONFIG}))
+    engine = create_engine(settings.database_url)
+    made = 0
+    try:
+        async with create_session_factory(engine)() as s:
+            if not (await s.execute(select(func.count()).select_from(IncidentTypeModel))).scalar_one():
+                print("Бытовые сценарии: пропущены — справочники не загружены (import-dictionaries)")
+                return 0
+            rows = (
+                await s.execute(
+                    select(ScenarioModel.incident_type_code, ScenarioModel.reference_card).where(
+                        ScenarioModel.status == "approved",
+                        ScenarioModel.incident_type_code.in_([h.code for h in HOUSEHOLD]),
+                    )
+                )
+            ).all()
+            done = {
+                (code, h.service)
+                for h in HOUSEHOLD
+                for code, ref in rows
+                if code == h.code and _has_service(ref, h.service)
+            }
+            todo = [h for h in HOUSEHOLD if (h.code, h.service) not in done]
+            for i, h in enumerate(todo):
+                await build_generate_handler(svc.model_router, s)(
+                    GenerateScenarios(
+                        actor=None,
+                        count=1,
+                        difficulty=2,
+                        approve=True,
+                        seed=int(h.code) + i,
+                        codes=[h.code],
+                        flags=list(h.flags),
+                    )
+                )
+                made += 1
+        print(f"Бытовые сценарии ДДС: добавлено и утверждено {made}, всего {len(HOUSEHOLD)}")
+    finally:
+        await engine.dispose()
+        if own:
+            await svc.aclose()
+    return made
 
 
 async def seed(
@@ -181,6 +263,8 @@ async def seed(
                 print(f"Ветвящиеся сценарии: добавлено и утверждено {made}")
             else:
                 print(f"Ветвящиеся сценарии: уже есть ({branched})")
+
+        await seed_household(settings, services)  # ДДС: бытовые сценарии с S101 / S103 в эталоне
 
         async with factory() as s:  # п. 3.7: сценарии с психологическим профилем заявителя для показа модификатора
             pinned = (
