@@ -149,6 +149,9 @@ export function CallPanel({ callId, title, subtitle, partyName, initial, onEnded
   const [now, setNow] = useState(() => Date.now());
   const [voice, setVoice] = useState(() => { try { return localStorage.getItem(VOICE_KEY) === '1'; } catch { return false; } });
   const [psy, setPsy] = useState(false); // п. 3.7: у заявителя психологический профиль — доступна «Пауза»
+  // панель плавает поверх карточки и на экранах до ~1600 px закрывает её правую часть — её можно свернуть в одну
+  // полосу; режим «без рук» при этом продолжает слушать, а напечатать реплику — развернуть
+  const [collapsed, setCollapsed] = useState(false);
   const [branching, setBranching] = useState(false); // F5: ветвящийся сценарий — ситуация меняется и без реплик
   const spoken = useRef(0);
   const audio = useRef<HTMLAudioElement | null>(null);
@@ -183,6 +186,12 @@ export function CallPanel({ callId, title, subtitle, partyName, initial, onEnded
     a.play().catch((e: DOMException) => { if (e.name !== 'AbortError') fallback(); });
   };
   useEffect(() => () => stopVoice(), []); // eslint-disable-line react-hooks/exhaustive-deps
+  // панель плавает над карточкой: пока она открыта, у прокрутки карточки снизу запас, чтобы последние строки
+  // (опросная карта) можно было поднять над панелью
+  useEffect(() => {
+    document.body.classList.add('has-call-panel');
+    return () => document.body.classList.remove('has-call-panel');
+  }, []);
 
   /** F1: озвучка по фразам, пока ответ ещё пишется. Только серверный голос — браузерный говорит реплику целиком. */
   const playPhrases = () => {
@@ -398,13 +407,20 @@ export function CallPanel({ callId, title, subtitle, partyName, initial, onEnded
   }
 
   return (
-    <aside className="call-panel arm-dock" aria-label={`Разговор: ${title}`}>
+    <aside className={`call-panel arm-dock${collapsed ? ' call-panel--collapsed' : ''}`} aria-label={`Разговор: ${title}`}>
       <div className="arm-dock__section">
         <div className="arm-dock__title">
           <span><Icon name="phone" size="sm" /> {title}</span>
-          <span className="call-panel__timer" aria-label="Длительность разговора">{ended ? 'завершён' : `${pad(Math.floor(secs / 60))}:${pad(secs % 60)}`}</span>
+          <span className="call-panel__head">
+            <span className="call-panel__timer" aria-label="Длительность разговора">{ended ? 'завершён' : `${pad(Math.floor(secs / 60))}:${pad(secs % 60)}`}</span>
+            <button type="button" className="call-panel__fold" aria-expanded={!collapsed}
+              title={collapsed ? 'Развернуть разговор' : 'Свернуть разговор в полосу — открыть карточку под ним'}
+              onClick={() => setCollapsed((c) => !c)}>{collapsed ? 'развернуть' : 'свернуть'}</button>
+          </span>
         </div>
-        {subtitle && <div className="call-panel__sub">{subtitle}</div>}
+        {collapsed
+          ? <div className="call-panel__sub call-panel__last">{live?.text || [...messages].reverse().find((m) => m.speaker === 'party')?.text || subtitle}</div>
+          : subtitle && <div className="call-panel__sub">{subtitle}</div>}
       </div>
       <div className="arm-dock__section arm-dock__section--grow">
         {psyLevel && <PsyMeter level={psyLevel.level} title={psyLevel.title} last={psyLevel.last} />}

@@ -824,6 +824,7 @@
 .arm112__body { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: minmax(0, 45fr) minmax(0, 55fr); grid-template-rows: auto minmax(0, 1fr); gap: var(--arm-gap); padding: var(--arm-gap); }
 .arm112__col { display: flex; flex-direction: column; gap: var(--arm-gap); min-height: 0; min-width: 0; }
 .arm112__scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: var(--arm-gap); }
+.has-call-panel .arm112__scroll { padding-bottom: 72px; } /* под плавающей панелью звонка ничего не прячется */
 .arm112__row2 { display: flex; gap: var(--arm-gap); min-width: 0; }
 
 /* Телефоны с вводом */
@@ -1134,6 +1135,13 @@ body:has(.dds-editor) .ipphone > .arm-dock__section:not(.ipphone__screen) { disp
   display: flex; flex-direction: column; box-shadow: var(--shadow-popover);
 }
 .call-panel__timer { font-variant-numeric: tabular-nums; color: var(--text-inverse-muted); }
+.call-panel__head { display: inline-flex; align-items: center; gap: 10px; }
+.call-panel__fold { border: 0; background: none; color: var(--text-inverse-muted); font-size: var(--fs-xs); text-decoration: underline; cursor: pointer; padding: 0; }
+.call-panel__fold:hover, .call-panel__fold:focus-visible { color: var(--text-inverse); }
+/* свёрнутая панель: одна полоса — таймер, последняя реплика, «развернуть»; режим «без рук» продолжает слушать */
+.call-panel--collapsed { height: auto; }
+.call-panel--collapsed .arm-dock__section--grow, .call-panel--collapsed .call-panel__actions { display: none; }
+.call-panel__last { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .call-panel__sub { font-size: var(--fs-xs); color: var(--text-inverse-muted); }
 .call-panel__err { color: #ffb4a0; font-size: var(--fs-xs); margin-top: 6px; }
 .call-panel__actions { display: flex; justify-content: space-between; align-items: center; color: var(--text-inverse); font-size: var(--fs-sm); }
