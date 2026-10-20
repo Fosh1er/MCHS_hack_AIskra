@@ -36,10 +36,12 @@ def test_seed_on_clean_db_creates_branching_scenarios(tmp_path: Path) -> None:
     asyncio.run(seed(settings, password="Seed-Pass-2026", scenarios=2, materials_dir=None))
     snapshots = asyncio.run(_branching(settings))
     assert sum(1 for b in snapshots if b) == templates
-    assert len(snapshots) == 2 + templates + len(HOUSEHOLD)
+    # случайный сценарий банка может попасть на строку `HOUSEHOLD` со службой в эталоне — тогда бытовой
+    # не дублируется (seed_household идемпотентен), поэтому бытовых — от len(HOUSEHOLD) − 2 до len(HOUSEHOLD)
+    assert 2 + templates + len(HOUSEHOLD) - 2 <= len(snapshots) <= 2 + templates + len(HOUSEHOLD)
 
     asyncio.run(seed(settings, password="Seed-Pass-2026", scenarios=2, materials_dir=None))  # повтор — без дублей
-    assert len(asyncio.run(_branching(settings))) == 2 + templates + len(HOUSEHOLD)
+    assert len(asyncio.run(_branching(settings))) == len(snapshots)
 
 
 async def _approved(settings: Settings) -> list[tuple[str | None, int | None, list[str]]]:
