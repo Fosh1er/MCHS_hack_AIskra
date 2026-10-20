@@ -24,7 +24,12 @@ from aiskra.ai.config import load_ai_config
 from aiskra.ai.router import ModelRouter
 from aiskra.integration.assessment_sources import IncidentAttempts
 from aiskra.integration.session_sources import IncidentSystemCards, SessionFactsReader, SessionProgress, SqlScenarioBank
-from aiskra.integration.system_sources import SystemRetentionPolicy, SystemServiceSwitches, SystemSessionDefaults
+from aiskra.integration.system_sources import (
+    SystemRetentionPolicy,
+    SystemServiceSwitches,
+    SystemSessionDefaults,
+    SystemTelephonySettings,
+)
 from aiskra.integration.training_sources import DictionaryScenarioFacts, IncidentCardContext
 from aiskra.integration.validation_sources import ScenarioBankCases
 from aiskra.modules.assessment.api import deps as assessment_deps
@@ -149,6 +154,7 @@ from aiskra.modules.training.application.branching import BranchDirector
 from aiskra.modules.training.application.commands.calls import (
     AnswerCallHandler,
     EndCallHandler,
+    HoldCallHandler,
     PauseCallHandler,
     SendReplicaHandler,
     StartDdsCallHandler,
@@ -621,6 +627,11 @@ def _wire_training(app: FastAPI, services: Services) -> None:
     def pause_call(session: Session) -> PauseCallHandler:
         return PauseCallHandler(*call_parts(session), audit=SqlAuditRecorder(session))
 
+    def hold_call(session: Session) -> HoldCallHandler:
+        return HoldCallHandler(
+            *call_parts(session), audit=SqlAuditRecorder(session), telephony=SystemTelephonySettings(session)
+        )
+
     def set_scenario_psy(session: Session) -> SetScenarioPsyHandler:
         return SetScenarioPsyHandler(
             SqlScenarioRepository(session), catalog, SqlAuditRecorder(session), SqlAlchemyUnitOfWork(session)
@@ -670,6 +681,7 @@ def _wire_training(app: FastAPI, services: Services) -> None:
     ov[training_deps.provide_speech_status] = lambda: SpeechStatus(stt=services.stt.enabled, tts=services.tts.enabled)
     ov[training_deps.provide_end_call] = end_call
     ov[training_deps.provide_pause_call] = pause_call
+    ov[training_deps.provide_hold_call] = hold_call
     ov[training_deps.provide_set_scenario_psy] = set_scenario_psy
     ov[training_deps.provide_psy_catalog] = lambda: catalog
     ov[training_deps.provide_psy_methodology] = lambda: PsyMethodologyHandler(catalog)  # F4

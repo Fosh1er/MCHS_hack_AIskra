@@ -192,6 +192,9 @@ class SqlCallRepository:
         row.psy = dict(call.psy) if call.psy is not None else None
         row.branch = dict(call.branch) if call.branch is not None else None
         row.ended_by = call.ended_by
+        row.held_at = call.held_at
+        row.held_ms = call.held_ms or None
+        row.repeat_of = call.repeat_of
         row.answered_at = call.answered_at
         row.ended_at = call.ended_at
 
@@ -219,6 +222,9 @@ class SqlCallRepository:
             psy=dict(row.psy) if row.psy else None,
             branch=dict(row.branch) if row.branch else None,
             ended_by=row.ended_by,
+            held_at=as_utc(row.held_at),
+            held_ms=row.held_ms or 0,
+            repeat_of=row.repeat_of,
         )
 
     async def get(self, call_id: UUID) -> Call | None:

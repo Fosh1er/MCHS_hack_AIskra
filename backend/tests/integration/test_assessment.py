@@ -52,7 +52,9 @@ def test_112_and_dds_assessment(app_client: Callable[[], TestClient]) -> None:
     a = res.json()
     keys = {c["key"]: c for c in a["details"]["criteria"]}
     assert keys["type"]["score"] == 1 and keys["services"]["score"] == 1 and keys["interview"]["score"] == 1
-    assert keys["grammar"]["score"] is None and "не проверено" in keys["grammar"]["note"]
+    # ТЗ 4.5: без модели грамотность проверяют правила; смысл описания — «не проверено»
+    assert keys["grammar"]["score"] is not None and "правилами" in keys["grammar"]["note"]
+    assert keys["description_meaning"]["score"] is None
     assert a["score"] >= 90 and a["passed"] and a["grader"] == "rules"
     assert student.get(f"/api/v1/assessment/cards/{card['id']}", params={"role": "112"}).json()["id"] == a["id"]
     other = as_user(app_client, "petrov")

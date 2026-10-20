@@ -143,3 +143,16 @@ def test_caller_care_is_informational() -> None:
     assert not with_care[-1].critical
     advice = recommend({"caller_care": 0.4, "type": 1.0})
     assert advice[0]["key"] == "caller_care" and "я вас слышу" in str(advice[0]["text"])
+
+
+def test_grammar_by_rules_without_model() -> None:
+    """ТЗ 4.5, 5.10: без ИИ-судьи грамотность описания и комментариев проверяют правила."""
+    from aiskra.modules.assessment.application.commands.assess import _judge_criteria
+
+    clean = _judge_criteria(None, ["regulation", "grammar"], ["Принята, бригада направлена"])
+    assert clean[0].score is None  # регламентность без модели — не проверено
+    assert clean[1].score == 1.0 and "правилами" in clean[1].note
+    bad = _judge_criteria(None, ["grammar"], ["Сообшение принято , бригада направленна"])[0]
+    assert bad.score is not None and bad.score < 0.5
+    assert any("сообщение" in e for e in bad.errors) and any("направлена" in e for e in bad.errors)
+    assert _judge_criteria(None, ["grammar"], [""])[0].score is None  # нечего проверять

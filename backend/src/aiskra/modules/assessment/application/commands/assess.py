@@ -27,6 +27,9 @@ from aiskra.shared.application import Command, UnitOfWork
 from aiskra.shared.audit import AuditEntry, AuditEvent, AuditRecorder, RequestMeta
 from aiskra.shared.errors import DomainError, NotFoundError
 from aiskra.shared.security import Permission, Principal
+from aiskra.shared.spelling import check_operator_text
+
+RULE_PENALTY = 0.2  # грамотность без модели: −0,2 за каждое замечание правил
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -48,15 +51,30 @@ class AssessCard(Command):
     meta: RequestMeta = field(default_factory=RequestMeta)
 
 
-def _judge_criteria(out: JudgeOut | None, keys: list[str]) -> list[Criterion]:
+def _judge_criteria(out: JudgeOut | None, keys: list[str], texts: list[str] | None = None) -> list[Criterion]:
+    """Критерии ИИ-судьи. Без модели смысл и регламентность — «не проверено», а грамотность проверяют правила
+    (ТЗ 4.5, 5.10): повторы, латиница в русском слове, пробелы, скобки, частые орфографические ошибки."""
     crit = []
     for key in keys:
         score = getattr(out, key if key != "description_meaning" else "meaning", None) if out else None
         c = Criterion(key, score, note="" if out else "не проверено: ИИ-судья не подключён")
         if out and key == "grammar":
             c.errors = [f"«{r.quote}» → {r.fix}" for r in out.errors]
+        elif key == "grammar" and texts is not None and any(t.strip() for t in texts):
+            c = rules_grammar(texts)
         crit.append(c)
     return crit
+
+
+def rules_grammar(texts: list[str]) -> Criterion:
+    remarks = [r for t in texts for r in check_operator_text("текст", t)]
+    c = Criterion(
+        "grammar",
+        round(max(0.0, 1 - RULE_PENALTY * len(remarks)), 3),
+        note="проверено правилами (ИИ-судья не подключён)",
+    )
+    c.errors = [f"«{r.quote.strip() or r.quote}» → {r.fix} ({r.rule})" for r in remarks[:6]]
+    return c
 
 
 def psy_details(result: Result, attempt: PsyAttempt) -> dict[str, object]:
@@ -151,7 +169,9 @@ class AssessCardHandler:
                 else None
             )
             if a.reference:
-                criteria += _judge_criteria(judged, ["description_meaning", "grammar"])
+                criteria += _judge_criteria(
+                    judged, ["description_meaning", "grammar"], [str(a.data.get("description") or "")]
+                )
             weights = {**WEIGHTS_112, **s.weights}
             stats = {"processing_s": a.processing_s, "norm_s": s.norm_seconds or CARD_NORM_SECONDS}
             result = finish("112", criteria, weights, a.reference is not None, s.threshold, stats)
@@ -169,7 +189,7 @@ class AssessCardHandler:
             )
             comments = [h.comment for h in d.history if h.comment]
             judged = await self._judge.check(legend="", description="", comments=comments) if comments else None
-            criteria += _judge_criteria(judged, ["regulation", "grammar"]) if comments else []
+            criteria += _judge_criteria(judged, ["regulation", "grammar"], comments) if comments else []
             weights = {**WEIGHTS_DDS, **s.weights}
             # оценка — обучающемуся-ДДС: он сам или тот, кто ставил статусы (если запускает преподаватель)
             actor = cmd.actor.user_id if cmd.actor.user_id in d.actor_ids else next(iter(d.actor_ids), None)

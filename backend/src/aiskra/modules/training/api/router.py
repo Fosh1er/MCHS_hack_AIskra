@@ -43,6 +43,8 @@ from aiskra.modules.training.application.commands.calls import (
     CallStarted,
     EndCall,
     EndCallHandler,
+    HoldCall,
+    HoldCallHandler,
     PauseCall,
     PauseCallHandler,
     Replica,
@@ -600,6 +602,28 @@ async def end_call(
     call_id: UUID, actor: Trainee, meta: Meta, handler: Annotated[EndCallHandler, Depends(deps.provide_end_call)]
 ) -> StatusOut:
     return StatusOut(status=await handler(EndCall(actor=actor, call_id=call_id, meta=meta)))
+
+
+class HoldOut(BaseModel):
+    status: str
+    held_s: int = 0
+    hung_up: bool = Field(default=False, description="Заявитель не дождался на удержании и положил трубку")
+
+
+@router.post("/calls/{call_id}/hold", response_model=HoldOut, summary="Поставить звонок на удержание (ТЗ 6.1)")
+async def hold_call(
+    call_id: UUID, actor: Trainee, meta: Meta, handler: Annotated[HoldCallHandler, Depends(deps.provide_hold_call)]
+) -> HoldOut:
+    r = await handler(HoldCall(actor=actor, call_id=call_id, hold=True, meta=meta))
+    return HoldOut(status=r.status, held_s=r.held_s, hung_up=r.hung_up)
+
+
+@router.post("/calls/{call_id}/resume", response_model=HoldOut, summary="Снять звонок с удержания (ТЗ 6.1)")
+async def resume_call(
+    call_id: UUID, actor: Trainee, meta: Meta, handler: Annotated[HoldCallHandler, Depends(deps.provide_hold_call)]
+) -> HoldOut:
+    r = await handler(HoldCall(actor=actor, call_id=call_id, hold=False, meta=meta))
+    return HoldOut(status=r.status, held_s=r.held_s, hung_up=r.hung_up)
 
 
 @router.post(

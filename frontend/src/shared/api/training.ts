@@ -75,6 +75,10 @@ export const sendReplica = (id: string, text: string, via: ReplicaVia = 'text', 
 /** «Пауза» (п. 3.7): остановить тяжёлый учебный звонок; блок «Работа с заявителем» не оценивается. */
 export const pauseCall = (id: string) => post<{ status: string }>(`/calls/${id}/pause`);
 export const endCall = (id: string) => post<{ status: string }>(`/calls/${id}/end`);
+/** ТЗ 6.1: удержание; `hung_up` — заявитель не дождался (настройка администратора «IP-телефония»). */
+export interface HoldResult { status: string; held_s: number; hung_up: boolean }
+export const holdCall = (id: string) => post<HoldResult>(`/calls/${id}/hold`);
+export const resumeCall = (id: string) => post<HoldResult>(`/calls/${id}/resume`);
 export const startDdsCall = (b: { card_id: string; service_code: string; party: CallView['party']; target_service?: string | null; incoming?: boolean }) =>
   post<CallStarted>('/calls/dds', b);
 export const getCall = (id: string) => http<CallView>(`${T}/calls/${id}`);

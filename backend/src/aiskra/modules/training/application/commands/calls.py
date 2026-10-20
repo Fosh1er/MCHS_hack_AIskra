@@ -30,7 +30,7 @@ from aiskra.modules.training.application.ports.scenarios import (
     DdsCallContext,
     ScenarioRepository,
 )
-from aiskra.modules.training.application.ports.sessions import ServiceSwitches, SessionRepository
+from aiskra.modules.training.application.ports.sessions import ServiceSwitches, SessionRepository, TelephonySettings
 from aiskra.modules.training.application.psy import PsyDirector, TurnSignals, start_psy
 from aiskra.modules.training.domain.actors import topic_of
 from aiskra.modules.training.domain.call import Call, CallMessage, CallParty, CallStatus, ReplicaVia, Speaker
@@ -562,6 +562,74 @@ class PauseCallHandler(_CallBase):
         )
         await self._commit()
         return call.status.value
+
+
+HOLD_MAX_S = 60  # без настроек администратора: столько заявитель ждёт на удержании
+
+
+@dataclass(frozen=True, kw_only=True)
+class HoldCall(Command):
+    """Удержание (софтфон, ТЗ 6.1): «поставить на удержание» и «снять с удержания». Заявитель, которого держали
+    дольше настройки «IP-телефония → удержание» (п. 2.2), не дожидается и кладёт трубку."""
+
+    actor: Principal
+    call_id: UUID
+    hold: bool  # True — поставить, False — снять
+    meta: RequestMeta = field(default_factory=RequestMeta)
+
+
+@dataclass(frozen=True)
+class HoldResult:
+    status: str
+    held_s: int = 0  # сколько длилось снятое удержание
+    hung_up: bool = False  # заявитель не дождался
+
+
+class HoldCallHandler(_CallBase):
+    def __init__(
+        self, *args: object, audit: AuditRecorder, telephony: TelephonySettings | None = None, **kwargs: object
+    ) -> None:
+        super().__init__(*args, **kwargs)  # type: ignore[arg-type]
+        self._audit = audit
+        self._telephony = telephony
+
+    async def __call__(self, cmd: HoldCall) -> HoldResult:
+        call = await self._own_call(cmd.call_id, cmd.actor)
+        now = self._clock.now()
+        if cmd.hold:
+            if not call.hold(now):
+                return HoldResult(status=call.status.value)
+            await self._say(call, Speaker.SYSTEM, "Звонок на удержании")
+            event, description, result = AuditEvent.CALL_HELD, "Звонок поставлен на удержание", None
+        else:
+            if call.status is not CallStatus.HELD:
+                call.resume(now)  # завершённый — понятная ошибка; уже снят — без изменений
+                return HoldResult(status=call.status.value)
+            secs = call.resume(now)
+            limit = await self._telephony.hold_max_s() if self._telephony else HOLD_MAX_S
+            hung_up = call.party is CallParty.APPLICANT and secs > limit
+            if hung_up:
+                await self._say(call, Speaker.SYSTEM, f"Заявитель не дождался на удержании ({secs} с) и положил трубку")
+                call.end(now, by="party")
+            else:
+                await self._say(call, Speaker.SYSTEM, f"Снят с удержания (ожидание {secs} с)")
+            event = AuditEvent.CALL_RESUMED
+            description = f"Звонок снят с удержания через {secs} с" + (" — заявитель положил трубку" if hung_up else "")
+            result = HoldResult(status=call.status.value, held_s=secs, hung_up=hung_up)
+        await self._calls.save(call)
+        await self._audit.record(
+            AuditEntry(
+                event=event,
+                actor=cmd.actor,
+                meta=cmd.meta,
+                description=description,
+                object_type="call",
+                object_id=str(call.id),
+                data={"card_id": str(call.card_id) if call.card_id else None, "party": call.party.value},
+            )
+        )
+        await self._commit()
+        return result or HoldResult(status=call.status.value)
 
 
 @dataclass(frozen=True, kw_only=True)

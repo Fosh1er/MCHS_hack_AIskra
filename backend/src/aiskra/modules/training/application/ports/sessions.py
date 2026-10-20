@@ -79,6 +79,14 @@ class ServiceSwitches(Protocol):
     async def enabled(self, name: str) -> bool: ...
 
 
+class TelephonySettings(Protocol):
+    """Настройки IP-телефонии тренажёра из панели администратора (п. 2.2, ТЗ 6.4)."""
+
+    async def hold_max_s(self) -> int:
+        """Сколько заявитель ждёт на удержании, прежде чем положить трубку (ТЗ 6.1)."""
+        ...
+
+
 class SessionDefaults(Protocol):
     """Тайминг и пороги занятия по умолчанию — из настроек администратора (п. 5.2)."""
 
