@@ -93,12 +93,18 @@ class LLMStreamPort(Protocol):
 class VoiceProfile:
     """Как озвучить реплику. `voice` — роль голоса («applicant_female», «brigade»…): имя голоса провайдера
     подставляет адаптер по конфигу. `style` — подача словами («panicked, very fast…») — адаптер передаёт её
-    параметром провайдера, а не текстом реплики (п. 3.6, ADR-0011)."""
+    параметром провайдера, а не текстом реплики (п. 3.6, ADR-0011).
+
+    F3: `sounds` — неречевые звуки реплики (sob, gasp, pant, sigh, cough…), `agitation` — насколько взволнованно
+    звучать, 0–3. Как их передать модели, решает адаптер: Gemini — теги в тексте, движку без стиля — пунктуация.
+    Текст реплики в звонке от этого не меняется."""
 
     voice: str = "default"
     speed: float = 1.0
     emotion: str | None = None
     style: str | None = None
+    sounds: tuple[str, ...] = ()
+    agitation: int = 0
 
 
 @dataclass(frozen=True)

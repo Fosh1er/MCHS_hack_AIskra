@@ -147,8 +147,9 @@ def test_speech_style_and_speed_follow_tone() -> None:
     """П. 3.6, V2: подача для серверного синтеза — словами (стиль) и темпом."""
     t = panic()
     style = speech_style(t.snapshot())
-    assert style.startswith("a panicking caller") and "very fast" in style and "gasping" in style
+    assert style.startswith("extremely panicked") and "very fast" in style and "gasping" in style
+    assert "caller" not in style  # F3: короткая строка подачи, без описания говорящего
     assert speech_speed(t.snapshot()) == 1.3
     whisper = tone_for_legend({"difficulty": 4, "facts": {"offense": "x"}}, "15010100").snapshot()
-    assert "whispering" in speech_style(whisper) and "a frightened caller" in speech_style(whisper)
+    assert "whispering" in speech_style(whisper) and "frightened" in speech_style(whisper)
     assert speech_speed(initial_tone(1, 1).snapshot()) == 0.9

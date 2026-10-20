@@ -136,6 +136,17 @@ def test_fragment_is_spoken_in_the_callers_state(app_client: Callable[[], TestCl
         assert r.status_code == 200 and r.content == b"RIFF-stub-audio"
         text, profile = stub.calls[-1]
         assert text == "Горит кухня!" and profile.emotion == "panic" and profile.speed == 1.3
-        assert profile.style and "panicking" in profile.style
+        assert profile.style and "panicked" in profile.style
+        assert profile.agitation == 0 and profile.sounds == ()  # без напряжения — без звуков и восклицаний
+        # F3: напряжение, уровень и ремарки из потока → волнение и звуки голоса
+        r = student.get(url, params={**params, "text": "Тут дым!", "tension": 9, "remarks": ["плачет"]})
+        assert r.status_code == 200
+        _, profile = stub.calls[-1]
+        assert profile.agitation == 3 and profile.sounds == ("sob", "cough")
+        assert profile.style.startswith("extremely panicked")
+        assert student.get(url, params={**params, "level": 1, "tension": 9}).status_code == 200
+        assert stub.calls[-1][1].agitation == 0  # уровень ECCS профиля важнее напряжения
+        bad = student.get(url, params={**params, "tension": 11})
+        assert bad.status_code == 422
     finally:
         services.tts = real

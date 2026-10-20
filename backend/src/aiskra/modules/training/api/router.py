@@ -478,10 +478,24 @@ async def speak_fragment(
     pace: Annotated[str, QueryParam(max_length=12)] = "normal",
     volume: Annotated[str, QueryParam(max_length=12)] = "normal",
     breathing: Annotated[str, QueryParam(max_length=12)] = "calm",
+    tension: Annotated[int | None, QueryParam(ge=0, le=10, description="F3: напряжение заявителя 0–10")] = None,
+    level: Annotated[int | None, QueryParam(ge=1, le=5, description="F3: уровень ECCS при профиле")] = None,
+    remarks: Annotated[
+        list[str] | None, QueryParam(max_length=4, description="F3: ремарки перед фразой: плачет, задыхается…")
+    ] = None,
 ) -> Response:
     audio = await handler(
         SpeakFragment(
-            actor=actor, call_id=call_id, text=text, emotion=emotion, pace=pace, volume=volume, breathing=breathing
+            actor=actor,
+            call_id=call_id,
+            text=text,
+            emotion=emotion,
+            pace=pace,
+            volume=volume,
+            breathing=breathing,
+            tension=tension,
+            level=level,
+            remarks=tuple(r[:40] for r in remarks or ()),
         )
     )
     return Response(content=audio.content, media_type=audio.mime, headers={"Cache-Control": "private, max-age=600"})

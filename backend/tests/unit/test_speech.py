@@ -175,3 +175,17 @@ def test_whisper_phantoms_dropped() -> None:
     assert drop_phantoms("Субтитры сделал DimaTorzok") == ""
     assert drop_phantoms("Где вы находитесь? Продолжение следует...") == "Где вы находитесь?"
     assert drop_phantoms("Назовите адрес, пожалуйста.") == "Назовите адрес, пожалуйста."
+
+
+async def test_tts_sounds_and_agitation_by_style() -> None:
+    """F3: Gemini получает звуки тегами в тексте, движок без стиля — волнение пунктуацией, openai — текст как есть."""
+    voice = VoiceProfile(voice="applicant_female", style="panicked", sounds=("sob",), agitation=3)
+    tts, seen = tts_capture(style="google")
+    await tts.synthesize("Помогите. Сын не дышит.", voice=voice)
+    assert seen["json"]["input"] == "<sob> ПОМОГИТЕ. Сын не дышит."  # type: ignore[index]
+    tts, seen = tts_capture(style="none")
+    await tts.synthesize("Помогите. Сын не дышит.", voice=voice)
+    assert seen["json"]["input"] == "Помогите! Помогите! Сын не дышит!"  # type: ignore[index]
+    tts, seen = tts_capture(style="openai")
+    await tts.synthesize("Помогите. Сын не дышит.", voice=voice)
+    assert seen["json"]["input"] == "Помогите. Сын не дышит."  # type: ignore[index]

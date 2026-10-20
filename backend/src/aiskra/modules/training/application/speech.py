@@ -12,12 +12,14 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass
+from typing import Any
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
 from aiskra.ai.ports import STTPort, TTSPort, VoiceProfile
 from aiskra.modules.training.application.ports.scenarios import CallRepository, ScenarioRepository
 from aiskra.modules.training.application.queries.calls import call_visible
+from aiskra.modules.training.domain import voice_cues
 from aiskra.modules.training.domain.audio import join_call_audio
 from aiskra.modules.training.domain.call import Call, CallMessage, CallParty, Speaker
 from aiskra.modules.training.domain.scenario import legend_voice
@@ -128,15 +130,32 @@ class _Voices:
         if msg.speaker is Speaker.OPERATOR:  # запись звонка (п. 8.7): оператор — ровным голосом роли «operator»
             return VoiceProfile(voice="operator", style=STAFF_STYLE)
         if msg.tone is not None:
+            meta = msg.meta or {}
+            voice = meta.get("voice") if isinstance(meta.get("voice"), dict) else None
+            level = voice.get("level") if voice else None
+            agit = voice_cues.agitation(
+                msg.tone.tension, level if isinstance(level, int) else None, _intensity(call, voice)
+            )
+            remarks = [str(r) for r in meta.get("remarks") or [] if isinstance(r, str)]
             return VoiceProfile(
                 voice=await self._voice(call.party, call.scenario_id),
                 speed=speech_speed(msg.tone),
                 emotion=msg.tone.emotion,
                 style=speech_style(msg.tone),
+                sounds=voice_cues.sounds(
+                    msg.text, agitation=agit, remarks=remarks, profile_voice=voice, breathing=msg.tone.breathing
+                ),
+                agitation=agit,
             )
         # старший группы и диспетчер службы — ровная деловая подача; реплика заявителя до п. 3.6 — без стиля
         staff = call.party is not CallParty.APPLICANT
         return VoiceProfile(voice=await self._voice(call.party, call.scenario_id), style=STAFF_STYLE if staff else None)
+
+
+def _intensity(call: Call, voice: dict[str, Any] | None = None) -> int:
+    """Интенсивность модификатора (п. 3.7): из голоса реплики или из снимка профиля звонка; без профиля — 2."""
+    raw = (voice or {}).get("intensity") or (call.psy or {}).get("intensity") or 2
+    return raw if isinstance(raw, int) else 2
 
 
 class ReplicaAudioHandler(_Voices):
@@ -175,6 +194,9 @@ class SpeakFragment(Query):
     pace: str = "normal"
     volume: str = "normal"
     breathing: str = "calm"
+    tension: int | None = None  # F3: напряжение 0–10 из события `state`
+    level: int | None = None  # F3: уровень ECCS 1–5, если у звонка профиль
+    remarks: tuple[str, ...] = ()  # F3: ремарки, пришедшие в потоке перед этой фразой
 
 
 class SpeakFragmentHandler(_Voices):
@@ -192,7 +214,7 @@ class SpeakFragmentHandler(_Voices):
             tone = ToneSnapshot(
                 emotion=q.emotion,
                 emotion_title="",
-                tension=0,
+                tension=q.tension or 0,
                 trust=0,
                 readiness=0,
                 band="",
@@ -200,7 +222,15 @@ class SpeakFragmentHandler(_Voices):
                 volume=q.volume,
                 breathing=q.breathing,
             )
-            profile = VoiceProfile(voice=voice, speed=speech_speed(tone), emotion=q.emotion, style=speech_style(tone))
+            agit = voice_cues.agitation(q.tension, q.level, _intensity(call))
+            profile = VoiceProfile(
+                voice=voice,
+                speed=speech_speed(tone),
+                emotion=q.emotion,
+                style=speech_style(tone),
+                sounds=voice_cues.sounds(text, agitation=agit, remarks=q.remarks, breathing=q.breathing),
+                agitation=agit,
+            )
         else:
             profile = VoiceProfile(voice=voice, style=STAFF_STYLE if call.party is not CallParty.APPLICANT else None)
         try:

@@ -207,7 +207,16 @@ class CachingTTS:
         self._bytes -= len(blob.content)
 
     async def synthesize(self, text: str, *, voice: VoiceProfile) -> AudioBlob:
-        key = make_key("tts", normalize_strict(text), voice.voice, voice.speed, voice.emotion, voice.style)
+        key = make_key(
+            "tts",
+            normalize_strict(text),
+            voice.voice,
+            voice.speed,
+            voice.emotion,
+            voice.style,
+            ",".join(voice.sounds),
+            voice.agitation,
+        )
         hit = self._items.get(key)
         if hit is not None:
             if hit[0] > self._clock():

@@ -150,10 +150,18 @@ export async function streamReplica(
   }
 }
 
+/** F3: что ещё нужно синтезу фразы — уровень ECCS при профиле и ремарки, пришедшие перед фразой. */
+export interface PhraseCue { level?: number; remarks?: string[] }
+
 /** Звук фразы ответа, который ещё генерируется (F1): голос роли звонка, подача — по состоянию заявителя. */
-export const speakUrl = (callId: string, text: string, tone?: Tone | null) => {
+export const speakUrl = (callId: string, text: string, tone?: Tone | null, cue?: PhraseCue) => {
   const q = new URLSearchParams({ text });
-  if (tone) { q.set('emotion', tone.emotion); q.set('pace', tone.pace); q.set('volume', tone.volume); q.set('breathing', tone.breathing); }
+  if (tone) {
+    q.set('emotion', tone.emotion); q.set('pace', tone.pace); q.set('volume', tone.volume); q.set('breathing', tone.breathing);
+    q.set('tension', String(tone.tension));
+  }
+  if (cue?.level) q.set('level', String(cue.level));
+  for (const r of cue?.remarks?.slice(0, 4) ?? []) q.append('remarks', r);
   return `${T}/calls/${callId}/speak?${q}`;
 };
 export async function transcribe(audio: Blob): Promise<string> {
