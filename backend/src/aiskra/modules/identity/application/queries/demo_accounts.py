@@ -8,7 +8,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from aiskra.modules.identity.application.ports.demo import DemoPolicy
+from aiskra.modules.identity.application.ports.demo import DEMO_ADMIN_LOGIN, DemoPolicy
+from aiskra.modules.identity.application.ports.features import FeatureSwitches
 from aiskra.modules.identity.application.ports.reader import UserReader
 from aiskra.modules.identity.domain.user import UserStatus
 from aiskra.shared.application import Query
@@ -34,13 +35,15 @@ class DemoAccountView:
 @dataclass(frozen=True, kw_only=True)
 class DemoAccounts:
     accounts: list[DemoAccountView]
-    password: str | None  # None — пароль не показывается (по умолчанию)
+    password: str | None  # None — пароль не показывается
+    admin_login: str | None = None  # учётка администратора для экспертов — строкой на входе, вход формой
 
 
 class ListDemoAccountsHandler:
-    def __init__(self, reader: UserReader, demo: DemoPolicy) -> None:
+    def __init__(self, reader: UserReader, demo: DemoPolicy, features: FeatureSwitches | None = None) -> None:
         self._reader = reader
         self._demo = demo
+        self._features = features
 
     async def __call__(self, query: ListDemoAccounts) -> DemoAccounts:
         if not self._demo.enabled:
@@ -50,6 +53,7 @@ class ListDemoAccountsHandler:
             for u in await self._reader.by_logins([a.login for a in self._demo.accounts])
             if u.status == UserStatus.ACTIVE.value and u.role != Role.ADMIN.value
         }
+        role_112 = await self._features.enabled("role_112") if self._features else True
         accounts = [
             DemoAccountView(
                 login=spec.login,
@@ -61,5 +65,13 @@ class ListDemoAccountsHandler:
             )
             for spec in self._demo.accounts
             if (user := found.get(spec.login)) is not None
+            and (role_112 or "112" not in (spec.title or ""))  # роль 112 скрыта — её демо-учёток нет на входе
         ]
-        return DemoAccounts(accounts=accounts, password=self._demo.password if accounts else None)
+        admin = next(iter(await self._reader.by_logins([DEMO_ADMIN_LOGIN])), None)
+        admin_login = (
+            admin.login
+            if admin is not None and admin.status == UserStatus.ACTIVE.value and admin.role == Role.ADMIN.value
+            else None
+        )
+        password = self._demo.password if accounts else None
+        return DemoAccounts(accounts=accounts, password=password, admin_login=admin_login if password else None)

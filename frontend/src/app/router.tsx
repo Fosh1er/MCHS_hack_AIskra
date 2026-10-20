@@ -65,8 +65,8 @@ export const router = createBrowserRouter([
   { path: '/student/sessions/:id', element: <RequireAuth permission={PERMISSIONS.trainingParticipate}><MySessionPage /></RequireAuth> },
   { path: '/student/reference', element: <RequireAuth><ReferencePage /></RequireAuth> },
   // журнал: свои карточки — обучающемуся, все — преподавателю (сервер, п. 1.3)
-  { path: '/arm/112/journal', element: <ArmScreenGuard><RequireAuth><JournalPage /></RequireAuth></ArmScreenGuard> },
-  { path: '/arm/112', element: <ArmScreenGuard><RequireAuth permission={PERMISSIONS.trainingParticipate}><Card112NewPage /></RequireAuth></ArmScreenGuard> },
+  { path: '/arm/112/journal', element: <ArmScreenGuard><RequireAuth feature="role_112"><JournalPage /></RequireAuth></ArmScreenGuard> },
+  { path: '/arm/112', element: <ArmScreenGuard><RequireAuth permission={PERMISSIONS.trainingParticipate} feature="role_112"><Card112NewPage /></RequireAuth></ArmScreenGuard> },
   // своя карточка — обучающемуся, любая — преподавателю: права проверяет сервер (GET /incidents/cards/{id})
   { path: '/arm/112/:id', element: <ArmScreenGuard><RequireAuth><Card112Page /></RequireAuth></ArmScreenGuard> },
   // АРМ ДДС (п. 2.1, 2.2): обучающийся работает за выбранную службу, преподаватель смотрит; права — на сервере

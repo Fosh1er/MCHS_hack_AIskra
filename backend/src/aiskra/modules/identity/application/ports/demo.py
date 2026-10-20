@@ -20,6 +20,11 @@ class DemoAccountSpec:
     arm_number: str | None = None
 
 
+# рекомендации экспертов финала: учётка администратора для проверки (п. 5 — включение роли 112) строкой на входе;
+# вход — формой по паролю демо-учёток, без входа одной кнопкой
+DEMO_ADMIN_LOGIN = "admin-demo"
+
+
 @dataclass(frozen=True, kw_only=True)
 class DemoPolicy:
     """`enabled` — режим demo или dev. `password` задаётся, только если показ пароля включён явно

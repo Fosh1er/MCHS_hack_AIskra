@@ -213,6 +213,9 @@ def stand(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Stand]:
     try:
         backend.start()
         frontend.start()
+        # роль оператора 112 по умолчанию скрыта (рекомендации экспертов) — набор проверяет обе роли, включаем её
+        r = s.client("admin").put("/system/settings/services", json={"values": {"role_112": 1}})
+        assert r.status_code == 200, r.text
         for login in ("teacher", "op1", "op2", "dds1", "dds2", "load001", "load002", "load003"):
             s.client(login)
         yield s

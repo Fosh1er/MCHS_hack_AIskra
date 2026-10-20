@@ -32,6 +32,7 @@ runs:
         AISKRA_VERSION=${GITHUB_SHA::7}
         EOF
         echo "AISKRA_DEMO_PASSWORD=$demo" >> "$GITHUB_ENV"
+        echo "AISKRA_BOOTSTRAP_ADMIN_PASSWORD=$admin" >> "$GITHUB_ENV"  # смоук включает роль 112
         echo "demo-password=$demo" >> "$GITHUB_OUTPUT"
 
     - name: docker compose build

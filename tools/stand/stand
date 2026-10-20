@@ -42,6 +42,8 @@ backend_env() {
   # переменные только для backend: база, режим, модели; прокси — только для запросов к ИИ (VPN без «всего трафика»)
   export AISKRA_DATABASE_URL="sqlite+aiosqlite:///$DATA/stand.db"
   export AISKRA_APP_ENV="${AISKRA_APP_ENV:-demo}"
+  # рекомендации экспертов: временные логины и пароли по ролям — на странице входа (пароль учебный, данные синтетические)
+  export AISKRA_DEMO_SHOW_PASSWORD="${AISKRA_DEMO_SHOW_PASSWORD:-true}"
   export AISKRA_SESSION_COOKIE_SECURE=true
   export AISKRA_AI_CONFIG_PATH="${AISKRA_AI_CONFIG_PATH:-$REPO/config/ai.openrouter.yaml}"
   local key
@@ -75,6 +77,7 @@ ACME_EMAIL=
 # Режим demo: вход в роли одной кнопкой на странице входа (жюри и гости). prod — только по паролям.
 AISKRA_APP_ENV=demo
 AISKRA_DEMO_PASSWORD=$pw
+AISKRA_DEMO_SHOW_PASSWORD=true
 AISKRA_BOOTSTRAP_ADMIN_PASSWORD=$admin
 
 # ИИ: модели OpenRouter (ключ — DEMO_LLM_API_KEY в .env репозитория), голос и распознавание через тот же ключ

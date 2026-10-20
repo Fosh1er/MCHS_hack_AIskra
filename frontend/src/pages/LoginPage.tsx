@@ -29,7 +29,7 @@ export function LoginPage() {
 
   return (
     <div className="arm-login">
-      <div />
+      <div className="arm-login__city" aria-hidden="true" />
       <div className="arm-login__side">
         {demo.data && <div className="arm-login__ribbon" role="note">Демонстрационный стенд · данные синтетические</div>}
         <form className="arm-login__form" onSubmit={onSubmit} noValidate>
@@ -51,6 +51,7 @@ export function LoginPage() {
           </button>
           {login.isError && <div className="arm-login__error" role="alert">{login.error.message}</div>}
           <p className="arm-login__hint">Учебный тренажёр. Учётную запись выдаёт администратор учебного центра.</p>
+          <p className="arm-login__support">Техподдержка<br />администратор учебного центра</p>
         </form>
         {demo.data && <DemoPanel data={demo.data} onEnter={enter} />}
       </div>
@@ -74,10 +75,9 @@ function DemoPanel({ data, onEnter }: { data: DemoAccounts; onEnter: (user: Me) 
 
   return (
     <section className="arm-demo" aria-labelledby="arm-demo-title">
-      <h2 className="arm-demo__title" id="arm-demo-title">Демо-учётки</h2>
+      <h2 className="arm-demo__title" id="arm-demo-title">Временные учётки по ролям</h2>
       <p className="arm-demo__note">
-        Вход в роль одной кнопкой, без пароля.
-        {data.password && <> Для входа вручную пароль всех демо-учёток: <code>{data.password}</code></>}
+        Вход в роль — кнопкой «Войти» или вручную логином и паролем в форме слева. Номер АРМ — любой, например 123.
       </p>
       <ul className="arm-demo__list">
         {data.accounts.map((a) => (
@@ -85,7 +85,8 @@ function DemoPanel({ data, onEnter }: { data: DemoAccounts; onEnter: (user: Me) 
             <Icon name={iconFor(a)} size="lg" />
             <div>
               <div className="arm-demo__role">{a.title}</div>
-              <div className="arm-demo__name">{a.full_name} · {a.login}{a.arm_number ? ` · АРМ ${a.arm_number}` : ''}</div>
+              <div className="arm-demo__name">{a.full_name}{a.arm_number ? ` · АРМ ${a.arm_number}` : ''}</div>
+              <div className="arm-demo__name">логин: <code>{a.login}</code>{data.password && <> · пароль: <code>{data.password}</code></>}</div>
               {a.hint.length > 0 && (
                 <ul className="arm-demo__hint">{a.hint.map((h) => <li key={h}>{h}</li>)}</ul>
               )}
@@ -102,6 +103,11 @@ function DemoPanel({ data, onEnter }: { data: DemoAccounts; onEnter: (user: Me) 
           </li>
         ))}
       </ul>
+      {data.admin_login && data.password && (
+        <p className="arm-demo__note">
+          Администратор (настройки, включение роли оператора 112): логин <code>{data.admin_login}</code> · пароль <code>{data.password}</code> — вход формой выше.
+        </p>
+      )}
       {demoLogin.isError && <div className="arm-login__error" role="alert">{demoLogin.error.message}</div>}
     </section>
   );

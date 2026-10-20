@@ -249,7 +249,7 @@ def test_scenario_edit_runs_grammar_check(app_client: Callable[[], TestClient], 
 def test_admin_stops_trainer_services(app_client: Callable[[], TestClient], lesson: dict[str, Any]) -> None:
     """П. 2.2: администратор останавливает и запускает поток вызовов 112 и выдачу карточек ДДС."""
     admin, student, petrov = (as_user(app_client, u) for u in ("admin", "student", "petrov"))
-    assert admin.get("/api/v1/system/settings").json()["services"] == {"call_stream": 1, "dds_feed": 1}
+    assert admin.get("/api/v1/system/settings").json()["services"] == {"call_stream": 1, "dds_feed": 1, "role_112": 0}
     r = admin.put("/api/v1/system/settings/services", json={"values": {"call_stream": 0, "dds_feed": 0}})
     assert r.status_code == 200, r.text
     try:

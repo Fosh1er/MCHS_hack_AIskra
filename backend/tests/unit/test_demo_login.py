@@ -151,9 +151,13 @@ def test_demo_policy_from_settings() -> None:
     on = build_demo_policy(Settings(app_env="demo", demo_password=secret, demo_show_password=True))
     assert on.enabled and on.password == "Demo-Stand-2026" and "Demo-Stand-2026" not in repr(on)
     assert [a.login for a in on.accounts] == ["teacher", "op1", "op2", "dds1", "dds2"]
-    assert build_demo_policy(Settings(app_env="demo", demo_password=secret)).password is None  # флаг выключен
-    prod = build_demo_policy(Settings(app_env="prod", demo_password=secret, demo_show_password=True))
-    assert not prod.enabled and prod.password is None and prod.find("op1") is None
+    off = Settings(app_env="demo", demo_password=secret, demo_show_password=False)
+    assert build_demo_policy(off).password is None  # показ выключен явно
+    prod = build_demo_policy(Settings(app_env="prod", demo_password=secret))  # рекомендации экспертов: и в prod
+    assert prod.enabled and prod.password == "Demo-Stand-2026"
+    closed = build_demo_policy(Settings(app_env="prod", demo_password=secret, demo_in_prod=False))
+    assert not closed.enabled and closed.password is None and closed.find("op1") is None
+    assert not build_demo_policy(Settings(app_env="prod")).enabled  # без пароля демо-учёток — нет
 
 
 def test_hit_counts_every_request() -> None:

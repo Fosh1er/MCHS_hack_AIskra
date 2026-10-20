@@ -33,6 +33,7 @@ class DemoAccountOut(BaseModel):
 
 class DemoAccountsOut(BaseModel):
     accounts: list[DemoAccountOut]
+    admin_login: str | None = Field(default=None, description="Учётка администратора для экспертов (вход формой)")
     password: str | None = Field(
         default=None, description="Пароль демо-учёток — только при AISKRA_DEMO_SHOW_PASSWORD=true"
     )
@@ -47,6 +48,7 @@ class MeOut(BaseModel):
     operator_number: str | None
     arm_number: str | None
     permissions: list[str]
+    features: dict[str, bool] = Field(default_factory=dict, description="Включённые возможности: role_112")
 
     @classmethod
     def of(cls, p: Principal) -> MeOut:

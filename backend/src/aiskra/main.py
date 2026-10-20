@@ -131,7 +131,7 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
     signed_in = [Depends(provide_principal)]
     app.include_router(health_router)
     app.include_router(auth_router, prefix=settings.api_prefix)
-    if settings.demo_enabled:  # F2: демо-вход без пароля — только demo и dev; в prod маршрутов нет (404)
+    if settings.demo_enabled:  # F2: demo и dev; в prod — только при пароле демо-учёток и demo_in_prod (иначе 404)
         app.include_router(demo_router, prefix=settings.api_prefix)
     app.include_router(users_router, prefix=settings.api_prefix, dependencies=signed_in)
     app.include_router(groups_router, prefix=settings.api_prefix, dependencies=signed_in)
