@@ -9,9 +9,17 @@
 ## 2. Выбор команды (19.10.2026)
 | Задача | Основная | Резерв |
 |---|---|---|
-| LLM (заявитель, судья, генерация) | `openai/gpt-4o` | Qwen flash — по переменной `DEMO_LLM_MODEL` / `DEMO_SMALL_MODEL` |
+| LLM — реплики собеседников, разметка реплик (`demo_small`) | `qwen/qwen3.8-flash` | переменная `DEMO_SMALL_MODEL` |
+| LLM — генерация сценариев, ИИ-судья, отзыв (`demo`) | `openai/gpt-4o` | переменная `DEMO_LLM_MODEL` |
 | TTS (голос собеседника) | `google/gemini-3.8-flash-tts`, голос Zephyr | `microsoft/mai-voice-2.1-flash`, голос `ru-RU-Masha:MAI-Voice-2.1-Flash` |
 | STT (речь оператора) | `qwen/qwen3-asr-0.6b` | `openai/whisper-large-v3-turbo` |
+
+Проверка по каталогу OpenRouter (`/api/v1/models`, 20.10.2026):
+- все пять моделей есть;
+- у Gemini TTS есть голоса Zephyr, Charon, Orus, Aoede;
+- у MAI Voice — `ru-RU-Masha` (ещё `ru-RU-Lev`, `ru-RU-Grant`, `ru-RU-Harper`);
+- `qwen/qwen3.8-flash` поддерживает `response_format`, `structured_outputs`, `reasoning`; цена 0,15 / 0,47 $ за 1 млн токенов против 2,5 / 10 $ у gpt-4o;
+- у Gemini TTS два поставщика (AI Studio и Vertex) — стиль голоса передаётся обоим.
 
 ## 3. Трассировка
 | ID | Реализация | Проверка | Статус | Примечание |
@@ -31,5 +39,4 @@
 - [ ] Замер первого токена и первой фразы на стенде (порог F3.2).
 
 ## 6. Открытые вопросы
-- Точный идентификатор Qwen flash на OpenRouter — уточнить у команды; пока по умолчанию `openai/gpt-4o`.
 - Формат ответа MAI Voice на OpenRouter предполагается `mp3` (`TTS_FALLBACK_FORMAT`) — проверить на стенде.

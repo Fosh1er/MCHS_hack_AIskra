@@ -110,7 +110,12 @@ async def test_tts_style_google_goes_to_provider_options() -> None:
         "response_format": "mp3",
         "speed": 1.3,
         "voice": "Kore",
-        "provider": {"options": {"google-ai-studio": {"speech_metadata": {"style": PANIC.style}}}},
+        "provider": {
+            "options": {
+                "google-ai-studio": {"speech_metadata": {"style": PANIC.style}},
+                "google-vertex": {"speech_metadata": {"style": PANIC.style}},
+            }
+        },
     }
 
 
