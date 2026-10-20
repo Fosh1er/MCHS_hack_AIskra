@@ -1168,7 +1168,27 @@ body:has(.dds-editor) .ipphone > .arm-dock__section:not(.ipphone__screen) { disp
 .arm-newcard:disabled { opacity: .6; cursor: default; }
 
 .ipphone { height: auto; max-height: min(520px, calc(100vh - 220px)); }
-.ipphone--collapsed { height: auto; }
+/* свёрнутый IP-телефон — зелёный кружок с трубкой над правым краем панели служб (рекомендация экспертов) */
+.ipphone-fab {
+  position: fixed; z-index: var(--z-popover); right: 16px; bottom: calc(var(--arm-svcbar-h, 80px) + 12px);
+  width: 60px; height: 60px; border: 0; border-radius: 50%; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--s-ok); color: var(--text-inverse); box-shadow: var(--shadow-popover); cursor: pointer;
+}
+.ipphone-fab:hover { filter: brightness(1.08); }
+.ipphone-fab:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+/* входящий доклад старшего группы: кружок пульсирует (волна того же зелёного) и трубка покачивается */
+.ipphone-fab--ring::before {
+  content: ""; position: absolute; inset: 0; z-index: -1; border-radius: 50%; background: var(--s-ok);
+  animation: ipphone-ring-wave 1.2s ease-out infinite;
+}
+.ipphone-fab--ring .i { animation: ipphone-ring-shake 1.2s ease-in-out infinite; }
+@keyframes ipphone-ring-wave { from { transform: scale(1); opacity: .6; } to { transform: scale(1.7); opacity: 0; } }
+@keyframes ipphone-ring-shake { 0%, 50%, 100% { transform: rotate(0); } 10%, 30% { transform: rotate(-14deg); } 20%, 40% { transform: rotate(14deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .ipphone-fab--ring::before, .ipphone-fab--ring .i { animation: none; }
+  .ipphone-fab--ring { outline: 3px solid var(--s-warn); outline-offset: 3px; }
+}
 .ipphone__screen { background: #1d2a33; }
 .ipphone__toggle { border: 0; background: none; color: inherit; display: flex; cursor: pointer; padding: 0; }
 .ipphone__keys { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; overflow-y: auto; }

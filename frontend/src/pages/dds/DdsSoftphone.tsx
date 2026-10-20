@@ -3,8 +3,10 @@
  *  смежные службы карточки (#701). Отвечают ИИ-собеседники (3.3). Старший группы сам звонит с докладом после
  *  смены статуса (#691). Реальный SIP — вне MVP (#576).
  *  Телефонная книга ДДС (рекомендация экспертов): если преподаватель задал абонентов службы — клавиши из книги и
- *  номеронабиратель; номер не из книги — «Номер не обслуживается», заявителю — только если он есть в книге. */
-import { useEffect, useRef, useState } from 'react';
+ *  номеронабиратель; номер не из книги — «Номер не обслуживается», заявителю — только если он есть в книге.
+ *  Свёрнутый телефон (рекомендация экспертов) — зелёный кружок с трубкой в правом нижнем углу над панелью служб;
+ *  при входящем докладе старшего группы кружок пульсирует. */
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { Icon, IncomingCall } from '@smena112/ui-kit';
 import { useServices } from '../../shared/api/dictionaries';
 import type { CardView } from '../../shared/api/incidents';
@@ -18,6 +20,20 @@ const hhmm = (iso: string) => new Date(iso).toLocaleTimeString('ru-RU', { hour: 
 
 interface Active { id: string; title: string; party: string }
 
+/** Высота нижней панели служб карточки: телефон висит над ней и не перекрывает. Токен `--arm-svcbar-h` карточка
+ *  переопределяет внутри `.arm112`, а телефон рендерится вне её; на узком экране панель переносится в несколько строк. */
+function useSvcbarOffset(): CSSProperties | undefined {
+  const [h, setH] = useState<number | null>(null);
+  useEffect(() => {
+    const bar = document.querySelector<HTMLElement>('.arm-svcbar');
+    if (!bar) return;
+    const ro = new ResizeObserver(() => setH(bar.offsetHeight));
+    ro.observe(bar);
+    return () => ro.disconnect();
+  }, []);
+  return h === null ? undefined : ({ '--arm-svcbar-h': `${h}px` } as CSSProperties);
+}
+
 export function DdsSoftphone({ card, service, status }: { card: CardView; service: string; status: string }) {
   const catalog = useServices();
   const calls = useCardCalls(card.id);
@@ -26,11 +42,12 @@ export function DdsSoftphone({ card, service, status }: { card: CardView; servic
   const contacts = book?.configured ? book.entries : null; // null — книги нет, телефон работает как раньше
   const [active, setActive] = useState<Active | null>(null);
   const [ring, setRing] = useState<string | null>(null); // статус, по которому звонит старший группы
-  // на планшете и небольшом ноутбуке (до 1280) панель закрыла бы карточку — по умолчанию свёрнута (6.3)
-  const [collapsed, setCollapsed] = useState(() => window.innerWidth < 1280);
+  // по умолчанию свёрнут в кружок на любой ширине: развёрнутая панель закрыла бы карточку (6.3, рекомендация экспертов)
+  const [collapsed, setCollapsed] = useState(true);
   const [error, setError] = useState('');
   const [dialed, setDialed] = useState('');
   const reported = useRef(new Set<string>());
+  const above = useSvcbarOffset();
 
   const own = card.services.find((s) => s.code === service);
   const orderNo = [...(own?.history ?? [])].reverse().find((h) => h.order_no)?.order_no;
@@ -78,18 +95,22 @@ export function DdsSoftphone({ card, service, status }: { card: CardView; servic
       )}
       {active ? (
         <CallPanel callId={active.id} title={active.title} partyName={active.party} onEnded={hangUp} onClose={() => setActive(null)} />
+      ) : collapsed ? (
+        <button type="button" className={`ipphone-fab${ring ? ' ipphone-fab--ring' : ''}`} style={above} aria-label="IP-телефон"
+          title="IP-телефон: набор номера и абоненты" onClick={() => setCollapsed(false)}>
+          <Icon name="phone" size="xl" />
+        </button>
       ) : (
-        <aside className={`call-panel arm-dock ipphone${collapsed ? ' ipphone--collapsed' : ''}`} aria-label="IP-телефон">
+        <aside className="call-panel arm-dock ipphone" style={above} aria-label="IP-телефон">
           <div className="arm-dock__section ipphone__screen">
             <div className="arm-dock__title">
               <span><Icon name="phone" size="sm" /> IP-телефон · линия свободна</span>
-              <button type="button" className="ipphone__toggle" aria-label={collapsed ? 'Развернуть телефон' : 'Свернуть телефон'} onClick={() => setCollapsed(!collapsed)}>
-                <Icon name={collapsed ? 'expand_less' : 'expand_more'} size="sm" />
+              <button type="button" className="ipphone__toggle" aria-label="Свернуть телефон" title="Свернуть телефон" onClick={() => setCollapsed(true)}>
+                <Icon name="expand_more" size="sm" />
               </button>
             </div>
           </div>
-          {!collapsed && (
-            <>
+          <>
               <div className="arm-dock__section ipphone__keys">
                 {contacts ? contacts.filter((e) => e.role !== 'applicant').map((e) => (
                   <button key={e.number} type="button" className="ipphone__key" onClick={() => { void dial('brigade', `${e.title} · ${e.number}`, undefined, false, e.number); }}>
@@ -131,8 +152,7 @@ export function DdsSoftphone({ card, service, status }: { card: CardView; servic
                   </div>
                 ))}
               </div>
-            </>
-          )}
+          </>
         </aside>
       )}
     </>

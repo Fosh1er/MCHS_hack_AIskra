@@ -69,7 +69,17 @@ def _queue_statuses_brigade_call_recording(ui: Session, sid: str) -> None:
     assert own.get("brigades"), own  # силы службы сохранены со статусом (п. 5.5)
 
     # IP-телефон: у демо-служб задана телефонная книга (demo_seed) — набор номера не из книги не начинает звонок,
-    # звонок начальнику аварийной бригады из книги — ИИ докладывает
+    # звонок начальнику аварийной бригады из книги — ИИ докладывает. Свёрнутый телефон — зелёный кружок с трубкой
+    # над панелью служб (рекомендация экспертов): по нажатию разворачивается, «Свернуть телефон» — обратно в кружок
+    fab = page.get_by_role("button", name="IP-телефон", exact=True)
+    expect(fab).to_have_attribute("title", "IP-телефон: набор номера и абоненты")
+    fab_box, bar_box = fab.bounding_box(), page.locator(".arm-svcbar").bounding_box()  # кружок — над панелью служб
+    assert fab_box and bar_box and fab_box["y"] + fab_box["height"] <= bar_box["y"], (fab_box, bar_box)
+    fab.click()
+    expect(page.get_by_label("Номер абонента")).to_be_visible()
+    page.get_by_role("button", name="Свернуть телефон").click()
+    expect(page.get_by_label("Номер абонента")).to_be_hidden()
+    fab.click()
     page.get_by_label("Номер абонента").fill("999-99")
     page.get_by_role("button", name="вызов", exact=True).click()
     expect(page.get_by_label("IP-телефон").get_by_role("alert")).to_have_text("Номер не обслуживается")
