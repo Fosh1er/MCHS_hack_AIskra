@@ -86,13 +86,22 @@ class SqlDdsRepository:
             )
         ).all()
         busy: dict[str, tuple[UUID, int | None]] = {}
-        working = await self._s.execute(
-            select(CS.card_id, CS.card_number, CS.brigades).where(
-                CS.service_code == service_code,
-                CS.current_status.not_in([s.value for s in FINAL]),
-                CS.brigades.is_not(None),
-            )
+        query = select(CS.card_id, CS.card_number, CS.brigades).where(
+            CS.service_code == service_code,
+            CS.current_status.not_in([s.value for s in FINAL]),
+            CS.brigades.is_not(None),
         )
+        if exclude_card is not None:  # силы у каждого занятия свои: карточки прошлых занятий бригаду не держат
+            scope = (await self._s.execute(select(C.session_id, C.author_id).where(C.id == exclude_card))).first()
+            if scope is not None:
+                session_id, author_id = scope
+                same = (
+                    C.session_id == session_id
+                    if session_id is not None
+                    else and_(C.session_id.is_(None), C.author_id == author_id)
+                )
+                query = query.join(C, C.id == CS.card_id).where(same)
+        working = await self._s.execute(query)
         for card_id, number, codes in working.all():
             if card_id != exclude_card:
                 busy.update({b: (card_id, number) for b in codes or []})
