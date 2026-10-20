@@ -83,6 +83,7 @@ class Call:
     held_at: datetime | None = None  # ТЗ 6.1: удержание идёт с этого момента
     held_ms: int = 0  # сколько всего звонок был на удержании (без текущего)
     repeat_of: UUID | None = None  # ТЗ 4.6: повторный звонок заявителя по этой (уже сохранённой) карточке
+    contact: dict[str, Any] | None = None  # абонент телефонной книги ДДС {role, name, number} (п. 2.3)
     id: UUID = field(default_factory=uuid4)
 
     def answer(self, now: datetime) -> None:

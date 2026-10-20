@@ -98,6 +98,7 @@ class CallModel(Base):
     held_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))  # ТЗ 6.1: удержание идёт сейчас
     held_ms: Mapped[int | None] = mapped_column(Integer)  # сколько всего длилось удержание
     repeat_of: Mapped[uuid.UUID | None] = mapped_column(Uuid)  # ТЗ 4.6: повторный звонок по этой карточке
+    contact: Mapped[dict[str, Any] | None] = mapped_column(JsonType)  # абонент книги ДДС {role, name, number}
     ended_by: Mapped[str | None] = mapped_column(String(16))  # operator | party
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     answered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -114,6 +115,18 @@ class CallMessageModel(Base):
     tone: Mapped[dict[str, Any] | None] = mapped_column(JsonType)  # снимок состояния у реплики собеседника (п. 3.6)
     via: Mapped[str | None] = mapped_column(String(12))  # у реплик оператора: text | voice | hands_free (п. 3.6)
     meta: Mapped[dict[str, Any] | None] = mapped_column(JsonType)  # п. 3.7: действия, состояние, ремарки, голос
+
+
+class DdsPhonebookModel(Base):
+    """Телефонная книга ДДС (п. 2.3, рекомендация экспертов): до 10 абонентов IP-телефона службы."""
+
+    __tablename__ = "dds_phonebooks"
+    service_code: Mapped[str] = mapped_column(String(64), primary_key=True)
+    entries: Mapped[list[dict[str, Any]]] = mapped_column(JsonType, default=list)  # [{role, name, number}]
+    updated_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
 
 
 class MaterialModel(Base):

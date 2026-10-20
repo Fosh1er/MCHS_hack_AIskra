@@ -1,12 +1,14 @@
 /** Симулятор IP-телефона ДДС (п. 2.3), по мотивам РТУ Т16Р (datasheet заказчика): экран линии, DSS-клавиши абонентов,
  *  журнал звонков по карточке. Абоненты — старший группы своей службы, заявитель (номер из карточки, #739),
  *  смежные службы карточки (#701). Отвечают ИИ-собеседники (3.3). Старший группы сам звонит с докладом после
- *  смены статуса (#691). Реальный SIP — вне MVP (#576). */
+ *  смены статуса (#691). Реальный SIP — вне MVP (#576).
+ *  Телефонная книга ДДС (рекомендация экспертов): если преподаватель задал абонентов службы — клавиши из книги и
+ *  номеронабиратель; номер не из книги — «Номер не обслуживается», заявителю — только если он есть в книге. */
 import { useEffect, useRef, useState } from 'react';
 import { Icon, IncomingCall } from '@smena112/ui-kit';
 import { useServices } from '../../shared/api/dictionaries';
 import type { CardView } from '../../shared/api/incidents';
-import { endCall, startDdsCall, useCardCalls, useSpeechStatus, type CallView } from '../../shared/api/training';
+import { endCall, getCall, startDdsCall, useCardCalls, usePhonebook, useSpeechStatus, type CallView } from '../../shared/api/training';
 import { CallPanel } from '../../shared/ui/CallPanel';
 
 const REPORT_AFTER_MS = 12_000; // через сколько старший группы перезванивает с докладом после смены статуса
@@ -20,11 +22,14 @@ export function DdsSoftphone({ card, service, status }: { card: CardView; servic
   const catalog = useServices();
   const calls = useCardCalls(card.id);
   const tts = useSpeechStatus().data?.tts ?? false; // запись звонка (п. 8.7) собирается серверным синтезом
+  const book = usePhonebook(service).data;
+  const contacts = book?.configured ? book.entries : null; // null — книги нет, телефон работает как раньше
   const [active, setActive] = useState<Active | null>(null);
   const [ring, setRing] = useState<string | null>(null); // статус, по которому звонит старший группы
   // на планшете и небольшом ноутбуке (до 1280) панель закрыла бы карточку — по умолчанию свёрнута (6.3)
   const [collapsed, setCollapsed] = useState(() => window.innerWidth < 1280);
   const [error, setError] = useState('');
+  const [dialed, setDialed] = useState('');
   const reported = useRef(new Set<string>());
 
   const own = card.services.find((s) => s.code === service);
@@ -32,6 +37,7 @@ export function DdsSoftphone({ card, service, status }: { card: CardView; servic
   const phone = card.data.phones?.provided || card.data.phones?.aon || '';
   const others = card.services.filter((s) => s.code !== service);
   const phoneOf = (code: string) => catalog.data?.find((s) => s.code === code)?.phone ?? '';
+  const hasApplicant = !contacts || contacts.some((e) => e.role === 'applicant');
 
   // доклад старшего группы: один раз на каждый статус, если линия свободна
   useEffect(() => {
@@ -43,12 +49,16 @@ export function DdsSoftphone({ card, service, status }: { card: CardView; servic
     return () => clearTimeout(t);
   }, [status]);
 
-  const dial = async (party: CallView['party'], title: string, target?: string, incoming = false) => {
+  const dial = async (party: CallView['party'], title: string, target?: string, incoming = false, number?: string) => {
     if (active) return;
     setError('');
     try {
-      const c = await startDdsCall({ card_id: card.id, service_code: service, party, target_service: target ?? null, incoming });
-      setActive({ id: c.call_id, title, party: party === 'service' ? title : PARTY_TITLE[party] });
+      const c = await startDdsCall({ card_id: card.id, service_code: service, party, target_service: target ?? null, incoming, number });
+      // набранный номер: кто ответил — абонент книги или заявитель из карточки — знает сервер
+      const who = number ? await getCall(c.call_id).catch(() => null) : null;
+      const name = who?.contact?.title ?? (who?.party === 'applicant' ? PARTY_TITLE.applicant : null);
+      setActive({ id: c.call_id, title: name ? `${name} · ${number}` : title, party: name ?? (party === 'service' ? title : PARTY_TITLE[party]) });
+      if (number) setDialed('');
       setCollapsed(false);
     } catch (e) {
       setError((e as Error).message);
@@ -57,6 +67,7 @@ export function DdsSoftphone({ card, service, status }: { card: CardView; servic
   const answerReport = () => { setRing(null); void dial('brigade', `Старший группы${orderNo ? ` · наряд ${orderNo}` : ''}`, undefined, true); };
   const rejectReport = () => setRing(null);
   const hangUp = () => { setActive(null); void calls.refetch(); };
+  const callNumber = () => { const n = dialed.trim(); if (n) void dial('brigade', n, undefined, false, n); };
 
   return (
     <>
@@ -80,18 +91,32 @@ export function DdsSoftphone({ card, service, status }: { card: CardView; servic
           {!collapsed && (
             <>
               <div className="arm-dock__section ipphone__keys">
-                <button type="button" className="ipphone__key" onClick={() => { void dial('brigade', `Старший группы${orderNo ? ` · наряд ${orderNo}` : ''}`); }}>
-                  <span className="ipphone__led ipphone__led--on" /><b>Старший группы</b><small>{orderNo ? `наряд ${orderNo}` : 'наряд не назначен'}</small>
-                </button>
-                <button type="button" className="ipphone__key" disabled={!phone} onClick={() => { void dial('applicant', `Заявитель · ${phone}`); }}>
-                  <span className="ipphone__led" /><b>Заявитель</b><small>{phone || 'номера нет'}</small>
-                </button>
+                {contacts ? contacts.filter((e) => e.role !== 'applicant').map((e) => (
+                  <button key={e.number} type="button" className="ipphone__key" onClick={() => { void dial('brigade', `${e.title} · ${e.number}`, undefined, false, e.number); }}>
+                    <span className="ipphone__led ipphone__led--on" /><b>{e.title}</b><small>{e.name} · {e.number}</small>
+                  </button>
+                )) : (
+                  <button type="button" className="ipphone__key" onClick={() => { void dial('brigade', `Старший группы${orderNo ? ` · наряд ${orderNo}` : ''}`); }}>
+                    <span className="ipphone__led ipphone__led--on" /><b>Старший группы</b><small>{orderNo ? `наряд ${orderNo}` : 'наряд не назначен'}</small>
+                  </button>
+                )}
+                {hasApplicant && (
+                  <button type="button" className="ipphone__key" disabled={!phone} onClick={() => { void dial('applicant', `Заявитель · ${phone}`); }}>
+                    <span className="ipphone__led" /><b>Заявитель</b><small>{phone || 'номера нет'}</small>
+                  </button>
+                )}
                 {others.map((s) => (
                   <button key={s.code} type="button" className="ipphone__key" onClick={() => { void dial('service', s.short, s.code); }}>
                     <span className="ipphone__led" /><b>{s.short}</b><small>{phoneOf(s.code)}</small>
                   </button>
                 ))}
               </div>
+              {contacts && (
+                <form className="arm-dock__section ipphone__dial" onSubmit={(ev) => { ev.preventDefault(); callNumber(); }}>
+                  <input aria-label="Номер абонента" placeholder="номер абонента" inputMode="tel" maxLength={24} value={dialed} onChange={(ev) => setDialed(ev.target.value)} />
+                  <button type="submit" disabled={!dialed.trim()}>вызов</button>
+                </form>
+              )}
               {error && <div className="arm-dock__section call-panel__err" role="alert">{error}</div>}
               <div className="arm-dock__section ipphone__log">
                 <div className="arm-dock__title"><span>Журнал звонков</span></div>
@@ -99,7 +124,7 @@ export function DdsSoftphone({ card, service, status }: { card: CardView; servic
                 {(calls.data ?? []).slice(-6).reverse().map((c) => (
                   <div key={c.id} className="ipphone__logrow">
                     <Icon name={c.direction === 'in' ? 'arrow_down' : 'arrow_up'} size="xs" />
-                    {hhmm(c.started_at)} · {c.party === 'service' ? (others.find((s) => s.code === c.target_service)?.short ?? 'служба') : PARTY_TITLE[c.party]}
+                    {hhmm(c.started_at)} · {c.party === 'service' ? (others.find((s) => s.code === c.target_service)?.short ?? 'служба') : (c.contact?.title ?? PARTY_TITLE[c.party])}
                     {c.ended_at && c.answered_at ? ` · ${Math.round((new Date(c.ended_at).getTime() - new Date(c.answered_at).getTime()) / 1000)} с` : ''}
                     {c.status !== 'ended' && <button type="button" className="ipphone__hang" onClick={() => { void endCall(c.id).then(() => calls.refetch()); }}>сбросить</button>}
                     {c.status === 'ended' && tts && <a className="ipphone__hang" href={`/api/v1/training/calls/${c.id}/recording`} download title="Запись звонка (WAV): реплики обеих сторон синтезом">запись</a>}

@@ -1201,6 +1201,10 @@ body:has(.dds-editor) .ipphone > .arm-dock__section:not(.ipphone__screen) { disp
 .ipphone__led--on { background: var(--s-ok); }
 .ipphone__log { font-size: var(--fs-xs); color: var(--text-inverse); }
 .ipphone__logrow { display: flex; gap: 6px; align-items: center; padding: 3px 0; }
+.ipphone__dial { display: flex; gap: 6px; }
+.ipphone__dial input { flex: 1; min-width: 0; padding: 4px 8px; border: 1px solid rgba(255, 255, 255, .12); background: var(--bg-dark-2); color: var(--text-inverse); font: inherit; letter-spacing: .04em; }
+.ipphone__dial button { padding: 4px 10px; border: 1px solid var(--s-ok); background: none; color: var(--text-inverse); cursor: pointer; }
+.ipphone__dial button:disabled { opacity: .5; cursor: default; }
 .ipphone__hang { margin-left: auto; border: 0; background: none; color: #ffb4a0; cursor: pointer; font-size: var(--fs-2xs); }
 
 /* ==========================================================================

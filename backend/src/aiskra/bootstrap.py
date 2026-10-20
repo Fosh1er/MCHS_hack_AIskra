@@ -176,6 +176,7 @@ from aiskra.modules.training.application.commands.materials import (
     UpdateMaterialHandler,
     UploadMaterialHandler,
 )
+from aiskra.modules.training.application.commands.phonebook import SavePhonebookHandler
 from aiskra.modules.training.application.commands.scenario_review import ReviewSectionsHandler
 from aiskra.modules.training.application.commands.scenarios import (
     EditAnswerHandler,
@@ -193,6 +194,7 @@ from aiskra.modules.training.application.commands.sessions import (
 from aiskra.modules.training.application.psy import PsyDirector
 from aiskra.modules.training.application.queries.calls import BranchViews, CardCallsHandler, GetCallHandler
 from aiskra.modules.training.application.queries.materials import GetMaterialHandler, ListMaterialsHandler
+from aiskra.modules.training.application.queries.phonebook import GetPhonebookHandler
 from aiskra.modules.training.application.queries.psy_methodology import PsyMethodologyHandler
 from aiskra.modules.training.application.queries.scenarios import (
     GetScenarioHandler,
@@ -223,6 +225,7 @@ from aiskra.modules.training.infrastructure.materials import (
     SqlMaterialContext,
     SqlMaterialRepository,
 )
+from aiskra.modules.training.infrastructure.phonebook import SqlPhonebookRepository
 from aiskra.modules.training.infrastructure.psy_catalog import YamlPsyCatalog
 from aiskra.modules.training.infrastructure.repositories import SqlCallRepository, SqlScenarioRepository
 from aiskra.modules.training.infrastructure.sessions import SqlSessionRepository as SqlTrainingSessionRepository
@@ -654,7 +657,20 @@ def _wire_training(app: FastAPI, services: Services) -> None:
         return AnswerCallHandler(*call_parts(session), **psy_parts(session))  # type: ignore[arg-type]
 
     def dds_call(session: Session) -> StartDdsCallHandler:
-        return StartDdsCallHandler(*call_parts(session), **psy_parts(session))  # type: ignore[arg-type]
+        return StartDdsCallHandler(
+            *call_parts(session), phonebook=SqlPhonebookRepository(session), **psy_parts(session)
+        )
+
+    def get_phonebook(session: Session) -> GetPhonebookHandler:
+        return GetPhonebookHandler(SqlPhonebookRepository(session))
+
+    def save_phonebook(session: Session) -> SavePhonebookHandler:
+        return SavePhonebookHandler(
+            SqlPhonebookRepository(session), SqlAuditRecorder(session), SqlAlchemyUnitOfWork(session), clock
+        )
+
+    ov[training_deps.provide_get_phonebook] = get_phonebook
+    ov[training_deps.provide_save_phonebook] = save_phonebook
 
     def replica(session: Session) -> SendReplicaHandler:
         return SendReplicaHandler(*call_parts(session), **psy_parts(session))  # type: ignore[arg-type]
