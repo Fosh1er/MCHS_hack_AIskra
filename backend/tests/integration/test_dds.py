@@ -212,3 +212,33 @@ def test_brigades_directory_and_choice(app_client: Callable[[], TestClient], les
     admin = as_user(app_client, "admin")
     events = admin.get("/api/v1/audit", params={"q": str(first["number"])}).json()["items"]
     assert any("силы:" in (e.get("description") or "") for e in events)
+
+
+def test_brigade_busy_only_within_its_lesson(app_client: Callable[[], TestClient], lesson: str) -> None:
+    """Силы у каждого занятия свои: карточка завершённого занятия, брошенная в «Принята», не держит бригаду на
+    следующем занятии (на прогоне: «один отправил наряд — у второго бригады заняты»). Последний тест модуля."""
+    operator, dds, teacher = (
+        as_user(app_client, "student"),
+        as_user(app_client, "petrov"),
+        as_user(app_client, "teacher"),
+    )
+    code = dds.get(f"/api/v1/incidents/dds/{DDS}/brigades").json()[-1]["code"]
+    old = new_card(operator, session_id=lesson)
+    r = dds.post(
+        f"/api/v1/incidents/dds/{DDS}/cards/{old['id']}/status",
+        json={"status": "accepted", "order_no": "7", "comment": "направлены силы", "brigades": [code]},
+    )
+    assert r.status_code == 200, r.text
+    assert teacher.post(f"/api/v1/training/sessions/{lesson}/finish").status_code == 200
+
+    lesson2 = start_lesson(app_client, dds={"petrov": DDS})
+    fresh = new_card(operator, session_id=lesson2)
+    options = {
+        o["code"]: o for o in dds.get(f"/api/v1/incidents/dds/{DDS}/brigades", params={"card_id": fresh["id"]}).json()
+    }
+    assert options[code]["busy_card_number"] is None
+    r = dds.post(
+        f"/api/v1/incidents/dds/{DDS}/cards/{fresh['id']}/status",
+        json={"status": "accepted", "order_no": "8", "comment": "направлены силы", "brigades": [code]},
+    )
+    assert r.status_code == 200, r.text
