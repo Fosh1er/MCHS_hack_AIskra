@@ -125,8 +125,8 @@ jobs:
             echo "$path → $code"
             [ "$code" = 401 ] || exit 1
           done
-          # в режиме demo демо-вход (F2) публичен
-          curl -fsS --insecure "$WEB/api/v1/auth/demo-accounts" | jq -e '(.accounts | length) == 5 and .password == null' > /dev/null
+          # в режиме demo демо-вход (F2) публичен; по рекомендациям экспертов пароль показан, роль 112 скрыта (3 учётки)
+          curl -fsS --insecure "$WEB/api/v1/auth/demo-accounts" | jq -e '(.accounts | length) == 3 and .password != null' > /dev/null
 
       - name: Голосовой полигон — /voice-lab/index.html
         run: |
