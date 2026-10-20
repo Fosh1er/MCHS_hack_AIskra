@@ -184,7 +184,8 @@ EOF
 }
 
 tuna_args() {  # $1 — domain | subdomain | random
-  TUNA_ARGS=(http https://localhost:443 --request-header host:localhost --inspect=false -l ru --no-colors)
+  # --https-redirect: http://домен → https:// (иначе по http сайт открывается без шифрования, вход тоже)
+  TUNA_ARGS=(http https://localhost:443 --request-header host:localhost --inspect=false --https-redirect -l ru --no-colors)
   case "$1" in
     domain) TUNA_ARGS+=(--domain="$TUNA_DOMAIN") ;;
     subdomain) [ -n "${TUNA_SUBDOMAIN:-}" ] && TUNA_ARGS+=(--subdomain="$TUNA_SUBDOMAIN") ;;
@@ -240,12 +241,32 @@ watch_domain() {
     if grep -q "Forwarding https://$TUNA_DOMAIN" "$probe"; then
       echo "$(date '+%F %T') домен $TUNA_DOMAIN подтверждён — переключаю туннель"
       sleep 2
-      run_tuna domain && echo "$(date '+%F %T') сайт: $(tuna_url)" && exit 0
+      if run_tuna domain; then
+        echo "$(date '+%F %T') сайт: $(tuna_url)"
+        rm -f "$RUN/tuna-watch.pid"
+        exit 0
+      fi
       echo "$(date '+%F %T') переключиться не вышло — остаюсь на временном адресе"; run_tuna subdomain || true
     else
       echo "$(date '+%F %T') домен ещё на проверке"
     fi
   done
+}
+
+outside_code() {
+  # код ответа сайта мимо VPN-клиента: он перехватывает соединения по имени и ведёт на адрес из своего кеша.
+  # Адрес — через DNS-over-HTTPS, запрос — через основной сетевой интерфейс
+  local url="$1" host ip dev
+  [ -n "$url" ] || { echo "—"; return; }
+  host="${url#https://}"; host="${host%%/*}"
+  dev="$(route -n get default -ifscope en0 >/dev/null 2>&1 && echo en0 || echo en1)"
+  ip="$(curl -s -m 8 --interface "$dev" "https://1.1.1.1/dns-query?name=$host&type=A" -H 'accept: application/dns-json' 2>/dev/null \
+    | grep -oE '"data":"[0-9.]+"' | head -1 | cut -d'"' -f4)"
+  if [ -n "$ip" ]; then
+    curl -s -o /dev/null -w '%{http_code}' -m 10 --interface "$dev" --resolve "$host:443:$ip" "$url/" 2>/dev/null || echo "нет ответа"
+  else
+    curl -s -o /dev/null -w '%{http_code}' -m 10 "$url/" 2>/dev/null || echo "нет ответа"
+  fi
 }
 
 tuna_url() { grep -oE 'Forwarding https://[^ ]+' "$LOGS/tuna.log" 2>/dev/null | tail -1 | cut -d' ' -f2; }
@@ -347,7 +368,7 @@ cmd_status() {
   pid_alive "$RUN/caddy.pid" && echo "caddy:   работает (pid $(cat "$RUN/caddy.pid"))" || echo "caddy:   остановлен"
   if pid_alive "$RUN/tuna.pid"; then
     local u; u="$(tuna_url)"
-    echo "tuna:    работает → ${u:-адрес ещё не получен} ($(curl -s -o /dev/null -w '%{http_code}' -m 10 "${u:-http://0}/" 2>/dev/null || true))"
+    echo "tuna:    работает → ${u:-адрес ещё не получен} (снаружи: $(outside_code "${u:-}"))"
   fi
   local h
   h="$(curl -s -m 3 "http://127.0.0.1:$API_PORT/health" 2>/dev/null || true)"
