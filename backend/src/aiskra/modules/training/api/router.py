@@ -26,6 +26,7 @@ from aiskra.modules.training.api.schemas import (
     CreatedOut,
     CreateSessionIn,
     DdsCallIn,
+    EditAnswerIn,
     EditScenarioIn,
     GeneratedOut,
     GenerateIn,
@@ -72,6 +73,8 @@ from aiskra.modules.training.application.commands.scenario_review import (
     SectionsReviewed,
 )
 from aiskra.modules.training.application.commands.scenarios import (
+    EditAnswer,
+    EditAnswerHandler,
     EditScenario,
     EditScenarioHandler,
     GenerateScenarios,
@@ -769,6 +772,29 @@ async def edit_scenario(
     handler: Annotated[EditScenarioHandler, Depends(deps.provide_edit_scenario)],
 ) -> EditScenarioOut:
     r = await handler(EditScenario(actor=actor, scenario_id=scenario_id, meta=meta, **body.model_dump()))
+    return EditScenarioOut(
+        status=r.status,
+        grammar=[GrammarRemark(field=g.field, quote=g.quote, fix=g.fix, rule=g.rule) for g in r.grammar],
+        checked_by=r.checked_by,
+    )
+
+
+@router.put(
+    "/scenarios/{scenario_id}/answers/{topic}",
+    response_model=EditScenarioOut,
+    summary="Один ответ заявителя из прогона: вручную или по комментарию моделью (ТЗ 3.4); сценарий — в черновики",
+)
+async def edit_answer(
+    scenario_id: UUID,
+    topic: str,
+    body: EditAnswerIn,
+    actor: Manager,
+    meta: Meta,
+    handler: Annotated[EditAnswerHandler, Depends(deps.provide_edit_answer)],
+) -> EditScenarioOut:
+    r = await handler(
+        EditAnswer(actor=actor, scenario_id=scenario_id, topic=topic, text=body.text, comment=body.comment, meta=meta)
+    )
     return EditScenarioOut(
         status=r.status,
         grammar=[GrammarRemark(field=g.field, quote=g.quote, fix=g.fix, rule=g.rule) for g in r.grammar],

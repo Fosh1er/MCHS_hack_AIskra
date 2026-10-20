@@ -200,7 +200,7 @@ export interface ScenarioView {
   review?: SectionReview[];
   branching?: BranchGraph | null; // F5: граф ситуации
 }
-export interface PreviewItem { question: string; answer: string; reference: string }
+export interface PreviewItem { question: string; answer: string; reference: string; topic: string | null; custom: boolean }
 export interface ScenarioFilter { status?: string; difficulty?: number; card_type?: string; source?: string; psy?: string; page: number; page_size: number }
 
 const qs = (o: Record<string, unknown>) =>
@@ -262,6 +262,12 @@ export interface EditScenarioResult { status: string; grammar: GrammarRemark[]; 
 export const useEditScenario = () =>
   useInvalidating(({ id, ...b }: ScenarioEdit & { id: string }) => http<EditScenarioResult>(`${T}/scenarios/${id}`, { method: 'PATCH', body: JSON.stringify(b) }),
     [['scenarios'], ['scenario'], ['scenario-preview']]);
+
+/** ТЗ 3.4: один ответ заявителя из прогона — вручную (`text`) или моделью по комментарию; пустое — по легенде. */
+export const useEditAnswer = () =>
+  useInvalidating(({ id, topic, ...b }: { id: string; topic: string; text?: string; comment?: string }) =>
+    http<EditScenarioResult>(`${T}/scenarios/${id}/answers/${topic}`, { method: 'PUT', body: JSON.stringify(b) }),
+  [['scenarios'], ['scenario'], ['scenario-preview']]);
 
 // ------------------------------------------------------------------ п. 4.2: занятия
 export type SessionMode = 'cards_112' | 'dds_actions' | 'mixed';

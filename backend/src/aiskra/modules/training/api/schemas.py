@@ -85,6 +85,15 @@ class ReviewSectionsIn(_Strict):
     )
 
 
+class EditAnswerIn(_Strict):
+    """ТЗ 3.4: один ответ заявителя из прогона — вписать вручную или переписать моделью по комментарию."""
+
+    text: str | None = Field(
+        default=None, max_length=400, description="Ответ вручную; пусто вместе с comment — по легенде"
+    )
+    comment: str | None = Field(default=None, min_length=3, max_length=1000, description="Переписать моделью")
+
+
 class EditScenarioIn(_Strict):
     title: str | None = Field(default=None, min_length=3, max_length=200)
     difficulty: int | None = Field(default=None, ge=1, le=5)

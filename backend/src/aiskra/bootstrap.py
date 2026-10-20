@@ -168,6 +168,7 @@ from aiskra.modules.training.application.commands.materials import (
 )
 from aiskra.modules.training.application.commands.scenario_review import ReviewSectionsHandler
 from aiskra.modules.training.application.commands.scenarios import (
+    EditAnswerHandler,
     EditScenarioHandler,
     GenerateScenariosHandler,
     ReviewScenarioHandler,
@@ -707,6 +708,14 @@ def _wire_sessions(app: FastAPI, services: Services) -> None:
             SqlAlchemyUnitOfWork(session),
         )
 
+    def edit_answer(session: Session) -> EditAnswerHandler:
+        return EditAnswerHandler(
+            SqlScenarioRepository(session),
+            services.model_router,
+            SqlAuditRecorder(session),
+            SqlAlchemyUnitOfWork(session),
+        )
+
     def preview(session: Session) -> PreviewScenarioHandler:
         return PreviewScenarioHandler(SqlScenarioRepository(session))
 
@@ -759,6 +768,7 @@ def _wire_sessions(app: FastAPI, services: Services) -> None:
         return ListStudentsHandler(SqlStudentDirectory(session))
 
     ov[training_deps.provide_edit_scenario] = edit
+    ov[training_deps.provide_edit_answer] = edit_answer
     ov[training_deps.provide_preview] = preview
     ov[training_deps.provide_create_session] = create
     ov[training_deps.provide_session_state] = state

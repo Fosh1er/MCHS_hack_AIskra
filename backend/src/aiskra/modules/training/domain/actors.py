@@ -18,11 +18,12 @@ TOPICS: list[tuple[str, tuple[str, ...]]] = [
     ("floor", ("этаж", "подъезд", "квартир", "код", "домофон")),
     ("name", ("зовут", "имя", "фамил", "фио", "представ", "кто вы", "как к вам")),
     ("phone", ("телефон", "номер", "перезвон", "связ")),
+    # до «пострадавших»: «Кем вы приходитесь пострадавшему?» — о статусе заявителя
+    ("status", ("кем приход", "приходитесь", "очевид", "родствен", "кто вам", "свидетел")),
     ("victims", ("пострада", "ранен", "жертв", "люди", "человек", "дети", "кто-то")),
     ("danger", ("угроз", "опасн", "распростран", "огонь", "пламя", "дым")),
     ("access", ("доступ", "дверь", "попасть", "откры", "закрыт")),
     ("gas", ("газ",)),
-    ("status", ("кем приход", "очевид", "родствен", "кто вам", "свидетел")),
     ("what", ("что случ", "что произош", "что у вас", "опишите", "расскаж", "подробн", "что вид", "что там")),
 ]
 STATUS_WORDS = {
@@ -58,6 +59,38 @@ class ApplicantReply:
     revealed: list[str] = field(default_factory=list)
 
 
+ANSWER_TOPICS = ("opening", *(t for t, _ in TOPICS))
+
+
+def answer_fact_errors(legend: dict[str, Any], topic: str, text: str) -> list[str]:
+    """Переписанный ответ заявителя не должен менять факты легенды (ТЗ 3.4): эталон карточки строится по ним."""
+    t = text.lower().replace("ё", "е")
+    a, app, victims = legend.get("address") or {}, legend.get("applicant") or {}, legend.get("victims") or {}
+    need: list[tuple[str, str]] = []
+    if topic == "address":
+        street = str(a.get("street") or "").lower().replace("ё", "е")
+        stem = max((w for w in re.split(r"[\s,.-]+", street) if len(w) > 3), key=len, default="")
+        need += [(stem[:6], "улицу"), (str(a.get("house") or "").lower(), "номер дома")]
+    elif topic == "floor" and a.get("floor"):
+        need += [(str(a.get("floor")), "этаж"), (str(a.get("flat") or ""), "квартиру")]
+    elif topic == "name":
+        need.append(((str(app.get("name") or "").split() or [""])[0].lower().replace("ё", "е")[:5], "имя заявителя"))
+    elif topic == "phone":
+        need.append((re.sub(r"\D", "", str(app.get("phone") or ""))[-4:], "номер телефона"))
+    errors = [
+        f"в ответе нет {what} из легенды"
+        for value, what in need
+        if value and value not in re.sub(r"[-\s]", "", t) and value not in t
+    ]
+    if topic == "victims":
+        has_no = bool(re.search(r"\bнет\b|никто|не пострада", t))
+        if victims.get("has") and has_no:
+            errors.append("по легенде пострадавшие есть, а в ответе — нет")
+        if not victims.get("has") and not has_no:
+            errors.append("по легенде пострадавших нет — ответ должен это сообщить")
+    return errors
+
+
 def applicant_reply(legend: dict[str, Any], question: str, revealed: list[str]) -> ApplicantReply:
     """Ответ заявителя по легенде. Неясный вопрос — заявитель переспрашивает или повторяет главное."""
     a = legend.get("address", {})
@@ -89,6 +122,9 @@ def applicant_reply(legend: dict[str, Any], question: str, revealed: list[str]) 
         "status": STATUS_WORDS.get(app.get("status", ""), "Я просто сообщаю."),
         "what": f"{legend.get('what', 'Происшествие')}." + (f" {legend['details']}" if legend.get("details") else ""),
     }.get(topic or "")
+    custom = (legend.get("answers") or {}).get(topic or "")
+    if custom:  # ТЗ 3.4: ответ, переписанный преподавателем (вручную или по комментарию моделью)
+        text = str(custom)
     if text is None:
         text = "Что? Повторите, пожалуйста… " + (
             legend.get("what", "") if "what" not in revealed else "Я же говорю, приезжайте скорее!"

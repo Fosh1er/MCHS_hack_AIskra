@@ -34,8 +34,31 @@ def test_scenario_bank_filters_edit_preview(app_client: Callable[[], TestClient]
 
     preview = teacher.get(f"/api/v1/training/scenarios/{ids[1]}/preview").json()
     assert len(preview) >= 4 and all(p["question"] and p["answer"] and p["reference"] for p in preview)
+    assert [p["topic"] for p in preview] == ["what", "address", "floor", "victims", "name", "status"]
+
+    # ТЗ 3.4: переписать один ответ из прогона — вручную; факты легенды менять нельзя; модель — только подключённая
+    teacher.post(f"/api/v1/training/scenarios/{ids[1]}/approve")
+    sc = teacher.get(f"/api/v1/training/scenarios/{ids[1]}").json()
+    name = sc["legend"]["applicant"]["name"]
+    url = f"/api/v1/training/scenarios/{ids[1]}/answers/name"
+    wrong = teacher.put(url, json={"text": "Меня зовут Иван Иванович Неизвестный."})
+    assert wrong.status_code == 422 and wrong.json()["error"] == "answer_changes_facts"
+    ok = teacher.put(url, json={"text": f"Ой… {name}, записывайте скорее!"})
+    assert ok.status_code == 200 and ok.json()["status"] == "draft"  # правка — снова на проверку
+    again = {p["topic"]: p for p in teacher.get(f"/api/v1/training/scenarios/{ids[1]}/preview").json()}
+    assert again["name"]["custom"] and again["name"]["answer"].startswith("Ой…") and not again["address"]["custom"]
+    offline = teacher.put(url, json={"comment": "Пусть заявитель путается в словах"})
+    assert offline.status_code == 422 and offline.json()["error"] == "ai_unavailable"
+    reset = teacher.put(url, json={})
+    assert reset.status_code == 200
+    assert not {p["topic"]: p for p in teacher.get(f"/api/v1/training/scenarios/{ids[1]}/preview").json()}["name"][
+        "custom"
+    ]
+    assert teacher.put(f"/api/v1/training/scenarios/{ids[1]}/answers/bogus", json={"text": "да"}).status_code == 422
+
     student = as_user(app_client, "student")
     assert student.patch(f"/api/v1/training/scenarios/{ids[0]}", json={"title": "xxx"}).status_code == 403
+    assert student.put(url, json={"text": "xxx"}).status_code == 403
 
 
 def test_session_lifecycle_monitor_report(app_client: Callable[[], TestClient]) -> None:
