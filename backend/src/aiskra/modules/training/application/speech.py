@@ -28,6 +28,7 @@ from aiskra.shared.security import Principal
 
 log = logging.getLogger(__name__)
 
+STT_UNAVAILABLE = "Распознавание речи сейчас недоступно — напечатайте реплику"
 MAX_AUDIO_BYTES = 3 * 1024 * 1024  # ≈ 1,5–3 мин речи в webm/opus — реплика в трубку заметно короче
 
 # Whisper на тишине и шуме «досочиняет» титры из видео, на которых учился: «Продолжение следует…», «Субтитры сделал
@@ -71,7 +72,10 @@ class TranscribeHandler:
             raise DomainError("Пустая запись", code="empty_audio")
         if len(cmd.audio) > MAX_AUDIO_BYTES:
             raise DomainError("Запись слишком длинная — реплика в трубку до минуты", code="audio_too_long")
-        t = await self._stt.transcribe(cmd.audio, mime=cmd.mime)
+        try:
+            t = await self._stt.transcribe(cmd.audio, mime=cmd.mime)
+        except ExternalServiceError as e:  # подробности — в журнал (main.py), обучающемуся — что делать дальше
+            raise ExternalServiceError(e.message, code="stt_unavailable", public=STT_UNAVAILABLE) from e
         return Transcribed(text=drop_phantoms(t.text))
 
 

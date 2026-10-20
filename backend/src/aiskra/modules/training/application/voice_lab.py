@@ -12,7 +12,8 @@ from dataclasses import dataclass
 from aiskra.ai.ports import AudioBlob, ChatMessage, STTPort, TTSPort, VoiceProfile
 from aiskra.ai.router import ModelRouter
 from aiskra.ai.tasks import AITask
-from aiskra.shared.errors import DomainError
+from aiskra.modules.training.application.speech import STT_UNAVAILABLE
+from aiskra.shared.errors import DomainError, ExternalServiceError
 
 MAX_TURNS = 10
 MAX_CHARS = 4000
@@ -38,7 +39,10 @@ class VoiceLab:
     async def transcribe(self, audio: bytes, *, mime: str) -> str:
         if not self._stt.enabled:
             raise DomainError("Распознавание речи не настроено", code="stt_disabled")
-        return (await self._stt.transcribe(audio, mime=mime)).text.strip()
+        try:
+            return (await self._stt.transcribe(audio, mime=mime)).text.strip()
+        except ExternalServiceError as e:
+            raise ExternalServiceError(e.message, code="stt_unavailable", public=STT_UNAVAILABLE) from e
 
     def _chat(self, messages: list[LabMessage]) -> list[ChatMessage]:
         chat = [

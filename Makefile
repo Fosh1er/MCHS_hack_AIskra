@@ -37,6 +37,7 @@ dev-tts:       ; cd backend && uv run --with sherpa-onnx --with numpy python too
 # то же на голосе macOS (say, Milena) — ничего не скачивает, один голос на все роли
 dev-tts-say:   ; cd backend && uv run python tools/dev_tts_say.py
 # распознавание речи на процессоре без Docker и ключей — faster-whisper (модель small скачается при первом запуске); сервер: STT_KIND=openai_compatible STT_URL=http://localhost:8200/v1
-dev-stt:       ; cd backend && uv run --with faster-whisper python tools/dev_stt_whisper.py
+# av<17: PyAV 17 убрал аргумент metadata_errors, faster-whisper его передаёт — распознавание падало с TypeError (20.10.2026)
+dev-stt:       ; cd backend && uv run --with faster-whisper --with 'av<17' python tools/dev_stt_whisper.py
 fe-build:      ; npm run typecheck && npm run build
 check: be-check fe-build
