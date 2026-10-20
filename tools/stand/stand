@@ -1,0 +1,376 @@
+#!/bin/bash
+# Стенд АИскры на своём компьютере под своим доменом (п. 7.4): backend + собранный фронтенд + Caddy с сертификатом
+# Let's Encrypt. Без Docker и без туннелей: домен смотрит на внешний IP, порты 80 и 443 проброшены на этот компьютер.
+#
+#   stand init            создать папку стенда (~/aiskra-stand): настройки, пароли, база с демо-данными
+#   stand up [--local]    собрать фронтенд, запустить backend и Caddy; --local — проверка на этом компьютере:
+#                         https://localhost с локальным сертификатом, домен и проброс портов не нужны
+#   stand down            остановить
+#   stand status          что запущено и отвечает ли сайт
+#   stand logs [backend|caddy]
+#
+# Без белого IP и проброса портов — туннель tuna.am (STAND_TUNNEL=tuna): сервер tuna в России принимает посетителей
+# и передаёт их на этот компьютер; сертификат выпускает tuna. Свой домен — тариф «Профи» (TUNA_DOMAIN).
+#
+# Настройки — $STAND_HOME/stand.env (по умолчанию ~/aiskra-stand), ключ модели — DEMO_LLM_API_KEY из .env репозитория
+# (в настройки стенда не копируется). Подробно — docs/demo/Стенд_на_своём_компьютере.md.
+set -euo pipefail
+
+REPO="$(cd "$(dirname "$0")/../.." && pwd)"
+HOME_DIR="${STAND_HOME:-$HOME/aiskra-stand}"
+ENV_FILE="$HOME_DIR/stand.env"
+DATA="$HOME_DIR/data"
+LOGS="$HOME_DIR/logs"
+RUN="$HOME_DIR/run"
+CADDYFILE="$HOME_DIR/Caddyfile"
+DIST="$REPO/frontend/dist"
+API_PORT="${STAND_API_PORT:-8000}"
+
+say() { printf '\033[1m%s\033[0m\n' "$*"; }
+die() { printf '\033[31m%s\033[0m\n' "$*" >&2; exit 1; }
+pid_alive() { [ -f "$1" ] && kill -0 "$(cat "$1")" 2>/dev/null; }
+
+need() { command -v "$1" >/dev/null || die "Не найдена программа «$1». $2"; }
+
+load_env() {
+  [ -f "$ENV_FILE" ] || die "Нет настроек стенда $ENV_FILE — сначала: stand init"
+  set -a; . "$ENV_FILE"; set +a
+  : "${STAND_DOMAIN:?в $ENV_FILE не задан STAND_DOMAIN}"
+}
+
+backend_env() {
+  # переменные только для backend: база, режим, модели; прокси — только для запросов к ИИ (VPN без «всего трафика»)
+  export AISKRA_DATABASE_URL="sqlite+aiosqlite:///$DATA/stand.db"
+  export AISKRA_APP_ENV="${AISKRA_APP_ENV:-demo}"
+  export AISKRA_SESSION_COOKIE_SECURE=true
+  export AISKRA_AI_CONFIG_PATH="${AISKRA_AI_CONFIG_PATH:-$REPO/config/ai.openrouter.yaml}"
+  local key
+  key="$(grep -E '^DEMO_LLM_API_KEY=' "$REPO/.env" 2>/dev/null | head -1 | cut -d= -f2- || true)"
+  if [ -n "$key" ]; then
+    export DEMO_LLM_API_KEY="$key"
+  else
+    echo "Внимание: в $REPO/.env нет DEMO_LLM_API_KEY — ИИ и голос отключены, заявитель отвечает по правилам"
+    export AISKRA_AI_ALLOW_EXTERNAL=false
+  fi
+  if [ -n "${AI_PROXY:-}" ]; then export HTTPS_PROXY="$AI_PROXY" HTTP_PROXY="$AI_PROXY" NO_PROXY="localhost,127.0.0.1"; fi
+}
+
+cmd_init() {
+  need uv "Установите: brew install uv"
+  need npm "Установите Node.js: brew install node"
+  mkdir -p "$DATA" "$LOGS" "$RUN"
+  if [ ! -f "$ENV_FILE" ]; then
+    local pw admin
+    # head читает ограниченный кусок: tr из бесконечного /dev/urandom под pipefail падает на SIGPIPE
+    pw="$(head -c 512 /dev/urandom | LC_ALL=C tr -dc 'A-Za-z0-9' | cut -c1-16)"
+    admin="Adm-$(head -c 512 /dev/urandom | LC_ALL=C tr -dc 'A-Za-z0-9' | cut -c1-14)9"
+    cat >"$ENV_FILE" <<EOF
+# Настройки стенда АИскры. Файл не в git: здесь пароли.
+# Основной адрес; остальные имена перенаправляются на него. У каждого имени в DNS — запись A на внешний IP.
+STAND_DOMAIN=mchs-training-mvp.ru
+STAND_ALIASES="www.mchs-training-mvp.ru mchs-training-mvp.online www.mchs-training-mvp.online"
+# Почта для уведомлений Let's Encrypt о сертификате (можно оставить пустой)
+ACME_EMAIL=
+
+# Режим demo: вход в роли одной кнопкой на странице входа (жюри и гости). prod — только по паролям.
+AISKRA_APP_ENV=demo
+AISKRA_DEMO_PASSWORD=$pw
+AISKRA_BOOTSTRAP_ADMIN_PASSWORD=$admin
+
+# ИИ: модели OpenRouter (ключ — DEMO_LLM_API_KEY в .env репозитория), голос и распознавание через тот же ключ
+AISKRA_AI_ALLOW_EXTERNAL=true
+TTS_KIND=openai_compatible
+STT_KIND=openai_compatible
+# Реплики собеседников: qwen/qwen3.8-flash на OpenRouter часто отвечает 429 — на стенде GPT-4o (замер 20.10.2026)
+DEMO_SMALL_MODEL=openai/gpt-4o
+# Туннель вместо белого IP: STAND_TUNNEL=tuna (нужен tuna-cli: brew install tuna и вход: tuna login).
+# TUNA_DOMAIN — свой домен (тариф «Профи», домен добавлен в my.tuna.am/domains); пусто — постоянный бесплатный
+# адрес TUNA_SUBDOMAIN (его показывает tuna при первом запуске: «Your permanent free domain: <имя>…»).
+STAND_TUNNEL=
+TUNA_DOMAIN=
+TUNA_SUBDOMAIN=
+# Если OpenRouter недоступен без VPN: адрес локального прокси VPN-клиента, через него пойдут только запросы к ИИ.
+# Например AI_PROXY=http://127.0.0.1:7890 (Clash, Hiddify), socks5://127.0.0.1:1080
+AI_PROXY=
+EOF
+    chmod 600 "$ENV_FILE"
+    say "Создан $ENV_FILE — проверьте домены в начале файла"
+  fi
+  load_env
+  if [ -f "$DATA/stand.db" ]; then
+    say "База уже есть: $DATA/stand.db — оставляю как есть"
+    return
+  fi
+  say "Создаю базу с демо-данными (ИИ не нужен, несколько минут)…"
+  (
+    cd "$REPO/backend"
+    export AISKRA_DATABASE_URL="sqlite+aiosqlite:///$DATA/stand.db" AISKRA_APP_ENV=demo
+    unset AISKRA_AI_CONFIG_PATH TTS_KIND STT_KIND  # наполнение — офлайн: быстро и бесплатно
+    uv run alembic upgrade head >"$LOGS/init.log" 2>&1
+    for c in import-dictionaries import-addresses ensure-admin demo-seed; do
+      uv run python -m aiskra.cli "$c" >>"$LOGS/init.log" 2>&1
+    done
+    uv run python tools/demo_history.py --lessons 6 >>"$LOGS/init.log" 2>&1
+  ) || die "Не удалось создать базу — подробности в $LOGS/init.log"
+  say "База готова. Дальше: stand up"
+}
+
+write_caddyfile() {
+  # $1 — основной адрес, $2 — имена с переадресацией, $3 — строка tls для основного, $4 — глобальные опции,
+  # $5 — адрес компьютера в домашней сети: на нём тот же сайт с локальным сертификатом (проверка дома без домена)
+  local site="$1" aliases="$2" tls_line="$3" global_extra="$4" lan="${5:-}"
+  cat >"$CADDYFILE" <<EOF
+{
+	admin localhost:2019
+	${global_extra}
+	${lan:+skip_install_trust}
+}
+
+(aiskra) {
+	encode gzip
+	request_body {
+		max_size 30MB
+	}
+	header -Server
+	header Strict-Transport-Security "max-age=31536000"
+
+	@api path /api/* /ws/* /health /docs /docs/* /openapi.json
+	handle @api {
+		reverse_proxy 127.0.0.1:${API_PORT} {
+			transport http {
+				read_timeout 180s
+			}
+		}
+	}
+
+	handle {
+		root * ${DIST}
+		header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self' data:; connect-src 'self'; frame-src 'self'; frame-ancestors 'self'; object-src 'none'; base-uri 'self'; form-action 'self'"
+		header X-Content-Type-Options nosniff
+		header X-Frame-Options SAMEORIGIN
+		header Referrer-Policy same-origin
+		header Permissions-Policy "camera=(), geolocation=(), microphone=(self)"
+		header Cross-Origin-Opener-Policy same-origin
+		@assets path /assets/*
+		header @assets Cache-Control "public, max-age=2592000, immutable"
+		try_files {path} /index.html
+		file_server
+	}
+}
+
+${site} {
+	${tls_line}
+	import aiskra
+}
+EOF
+  if [ -n "$lan" ]; then
+    cat >>"$CADDYFILE" <<EOF
+
+${lan} {
+	tls internal
+	import aiskra
+}
+EOF
+  fi
+  if [ -n "$aliases" ]; then
+    cat >>"$CADDYFILE" <<EOF
+
+$(echo "$aliases" | tr ' ' ',' | sed 's/,/, /g') {
+	${tls_line}
+	redir https://${site}{uri} permanent
+}
+EOF
+  fi
+}
+
+tuna_args() {  # $1 — domain | subdomain | random
+  TUNA_ARGS=(http https://localhost:443 --request-header host:localhost --inspect=false -l ru --no-colors)
+  case "$1" in
+    domain) TUNA_ARGS+=(--domain="$TUNA_DOMAIN") ;;
+    subdomain) [ -n "${TUNA_SUBDOMAIN:-}" ] && TUNA_ARGS+=(--subdomain="$TUNA_SUBDOMAIN") ;;
+  esac
+}
+
+run_tuna() {  # $1 — domain | subdomain; 0 — туннель поднялся
+  if pid_alive "$RUN/tuna.pid"; then kill "$(cat "$RUN/tuna.pid")" 2>/dev/null || true; sleep 1; fi
+  tuna_args "$1"
+  : >"$LOGS/tuna.log"
+  # --inspect=false: инспектор tuna задерживает потоковые ответы (SSE) — реплики модели шли бы рывками
+  # tuna сам читает TUNA_DOMAIN и TUNA_SUBDOMAIN из окружения — параметры передаём явно, переменные убираем
+  nohup env -u TUNA_DOMAIN -u TUNA_SUBDOMAIN tuna "${TUNA_ARGS[@]}" --log "$LOGS/tuna.log" --log-format text \
+    >/dev/null 2>&1 </dev/null &
+  echo $! >"$RUN/tuna.pid"
+  for _ in $(seq 1 30); do
+    [ -n "$(tuna_url)" ] && return 0
+    pid_alive "$RUN/tuna.pid" || return 1
+    sleep 1
+  done
+  return 1
+}
+
+start_tuna() {
+  say "   Туннель tuna…"
+  if pid_alive "$RUN/tuna-watch.pid"; then kill "$(cat "$RUN/tuna-watch.pid")" 2>/dev/null || true; fi
+  if [ -n "${TUNA_DOMAIN:-}" ]; then
+    run_tuna domain && return 0
+    if grep -q "Domain not verified" "$LOGS/tuna.log" 2>/dev/null; then
+      echo "   tuna ещё проверяет домен $TUNA_DOMAIN — пока сайт на временном адресе; переключится сам, когда tuna подтвердит домен"
+      run_tuna subdomain || die "Туннель tuna не поднялся — stand logs tuna"
+      nohup "$0" _watch-domain >>"$LOGS/tuna-watch.log" 2>&1 </dev/null &
+      echo $! >"$RUN/tuna-watch.pid"
+      return 0
+    fi
+    die "Туннель tuna на домене $TUNA_DOMAIN не поднялся — stand logs tuna"
+  fi
+  run_tuna subdomain || die "Туннель tuna не поднялся — stand logs tuna (вход: tuna login)"
+}
+
+watch_domain() {
+  # раз в 2 минуты: проверить, подтвердил ли tuna домен (пробный туннель на свободный порт), и переключиться
+  load_env
+  local probe="$LOGS/tuna-probe.log" pid
+  while sleep 120; do
+    tuna_args domain
+    TUNA_ARGS[1]="http://127.0.0.1:9"
+    : >"$probe"
+    env -u TUNA_DOMAIN -u TUNA_SUBDOMAIN tuna "${TUNA_ARGS[@]}" --log "$probe" --log-format text >/dev/null 2>&1 </dev/null &
+    pid=$!
+    sleep 10
+    kill "$pid" 2>/dev/null || true
+    if grep -q "Forwarding https://$TUNA_DOMAIN" "$probe"; then
+      echo "$(date '+%F %T') домен $TUNA_DOMAIN подтверждён — переключаю туннель"
+      sleep 2
+      run_tuna domain && echo "$(date '+%F %T') сайт: $(tuna_url)" && exit 0
+      echo "$(date '+%F %T') переключиться не вышло — остаюсь на временном адресе"; run_tuna subdomain || true
+    else
+      echo "$(date '+%F %T') домен ещё на проверке"
+    fi
+  done
+}
+
+tuna_url() { grep -oE 'Forwarding https://[^ ]+' "$LOGS/tuna.log" 2>/dev/null | tail -1 | cut -d' ' -f2; }
+
+cmd_up() {
+  local local_mode=0
+  [ "${1:-}" = "--local" ] && local_mode=1
+  need caddy "Установите: brew install caddy"
+  need uv "Установите: brew install uv"
+  need npm "Установите Node.js: brew install node"
+  [ -f "$DATA/stand.db" ] || cmd_init
+  load_env
+  mkdir -p "$LOGS" "$RUN"
+  local tunnel="${STAND_TUNNEL:-}"
+  [ "$local_mode" = 1 ] && tunnel=""
+  if [ "$tunnel" = "tuna" ]; then
+    need tuna "Установите: brew install tuna, затем войдите: tuna login"
+    local_mode=1  # сертификат для посетителей выпускает tuna, Caddy — только на этом компьютере
+  fi
+
+  say "1/4 Фронтенд: сборка…"
+  (cd "$REPO" && npm run build >"$LOGS/build.log" 2>&1) || die "Сборка фронтенда не удалась — $LOGS/build.log"
+
+  say "2/4 Backend: миграции и запуск…"
+  if pid_alive "$RUN/backend.pid"; then kill "$(cat "$RUN/backend.pid")"; sleep 1; fi
+  (
+    backend_env
+    cd "$REPO/backend"
+    [ -x .venv/bin/uvicorn ] || uv sync -q >>"$LOGS/backend.log" 2>&1
+    .venv/bin/alembic upgrade head >>"$LOGS/backend.log" 2>&1
+    # uvicorn напрямую из окружения проекта (не через uv run): pid — сам сервер, stand down останавливает именно его
+    nohup .venv/bin/uvicorn aiskra.main:app --host 127.0.0.1 --port "$API_PORT" \
+      --proxy-headers --forwarded-allow-ips 127.0.0.1 >>"$LOGS/backend.log" 2>&1 </dev/null &
+    echo $! >"$RUN/backend.pid"
+  )
+  for _ in $(seq 1 60); do curl -sf -m 2 "http://127.0.0.1:$API_PORT/health" >/dev/null && break; sleep 1; done
+  curl -sf -m 2 "http://127.0.0.1:$API_PORT/health" >/dev/null || die "Backend не ответил — stand logs backend"
+
+  say "3/4 Caddy: сайт и сертификат…"
+  local site aliases tls_line global_extra lan
+  # адрес компьютера в домашней сети: сайт открывается с телефона или ноутбука в той же Wi-Fi и без домена
+  lan="$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null || true)"
+  if [ "$local_mode" = 1 ]; then
+    site="localhost"; aliases=""; tls_line="tls internal"; global_extra=""
+  else
+    site="$STAND_DOMAIN"; aliases="${STAND_ALIASES:-}"; tls_line=""
+    global_extra="${ACME_EMAIL:+email $ACME_EMAIL}"
+  fi
+  write_caddyfile "$site" "$aliases" "$tls_line" "$global_extra" "$lan"
+  caddy validate --config "$CADDYFILE" --adapter caddyfile >"$LOGS/caddy-validate.log" 2>&1 \
+    || die "Ошибка в настройках Caddy — $LOGS/caddy-validate.log"
+  caddy stop >/dev/null 2>&1 || true
+  (
+    cd "$HOME_DIR"
+    nohup caddy run --config "$CADDYFILE" --adapter caddyfile >>"$LOGS/caddy.log" 2>&1 </dev/null &
+    echo $! >"$RUN/caddy.pid"
+  )
+
+  if [ "$tunnel" = "tuna" ]; then start_tuna; fi
+
+  say "4/4 Не засыпать, пока стенд работает…"
+  if pid_alive "$RUN/caffeinate.pid"; then kill "$(cat "$RUN/caffeinate.pid")" 2>/dev/null || true; fi
+  nohup caffeinate -dimsu -w "$(cat "$RUN/backend.pid")" >/dev/null 2>&1 </dev/null &
+  echo $! >"$RUN/caffeinate.pid"
+
+  sleep 3
+  cmd_status "$site"
+  echo
+  if [ "$tunnel" = "tuna" ]; then
+    say "Сайт: $(tuna_url)"
+    echo "Туннель tuna — журнал: stand logs tuna"
+  elif [ "$local_mode" = 1 ]; then
+    say "Проверка: https://localhost${lan:+ и в домашней сети https://$lan} (браузер предупредит о локальном сертификате — это нормально)"
+  else
+    say "Сайт: https://$STAND_DOMAIN${lan:+ (в домашней сети, пока домен не готов: https://$lan)}"
+    echo "Первый запуск: Caddy получает сертификат Let's Encrypt — до минуты. Не выходит — stand logs caddy"
+    echo "(нужны: запись A домена на внешний IP и проброс портов 80 и 443 на этот компьютер)."
+  fi
+}
+
+cmd_down() {
+  caddy stop >/dev/null 2>&1 || true
+  local p pid
+  for p in tuna-watch tuna caddy backend caffeinate; do
+    if pid_alive "$RUN/$p.pid"; then
+      pid="$(cat "$RUN/$p.pid")"
+      kill "$pid" 2>/dev/null || true
+      for _ in $(seq 1 20); do kill -0 "$pid" 2>/dev/null || break; sleep 0.5; done  # дождаться остановки
+    fi
+    rm -f "$RUN/$p.pid"
+  done
+  say "Стенд остановлен"
+}
+
+cmd_status() {
+  local site="${1:-}"
+  [ -n "$site" ] || { load_env; site="$STAND_DOMAIN"; [ "${STAND_TUNNEL:-}" = "tuna" ] && site="localhost"; }
+  pid_alive "$RUN/backend.pid" && echo "backend: работает (pid $(cat "$RUN/backend.pid"))" || echo "backend: остановлен"
+  pid_alive "$RUN/caddy.pid" && echo "caddy:   работает (pid $(cat "$RUN/caddy.pid"))" || echo "caddy:   остановлен"
+  if pid_alive "$RUN/tuna.pid"; then
+    local u; u="$(tuna_url)"
+    echo "tuna:    работает → ${u:-адрес ещё не получен} ($(curl -s -o /dev/null -w '%{http_code}' -m 10 "${u:-http://0}/" 2>/dev/null || true))"
+  fi
+  local h
+  h="$(curl -s -m 3 "http://127.0.0.1:$API_PORT/health" 2>/dev/null || true)"
+  [ -n "$h" ] && echo "api:     $(echo "$h" | grep -o '"env":"[a-z]*"') $(echo "$h" | grep -o '"db":"[a-z]*"')" || echo "api:     не отвечает"
+  local code
+  code="$(curl -sk -o /dev/null -w '%{http_code}' -m 5 --resolve "$site:443:127.0.0.1" "https://$site/" 2>/dev/null || true)"
+  echo "сайт:    https://$site → ${code:-нет ответа} (проверка изнутри компьютера)"
+}
+
+cmd_logs() {
+  local what="${1:-backend}"
+  tail -n 80 -f "$LOGS/$what.log"
+}
+
+# при подключении через source (проверка конфига) — только функции, без запуска команды
+[ "${BASH_SOURCE[0]}" = "$0" ] || return 0
+
+case "${1:-}" in
+  init) cmd_init ;;
+  up) shift; cmd_up "$@" ;;
+  down) cmd_down ;;
+  status) cmd_status ;;
+  logs) shift; cmd_logs "$@" ;;
+  _watch-domain) watch_domain ;;
+  *) sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
+esac
