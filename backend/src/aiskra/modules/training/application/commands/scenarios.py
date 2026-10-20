@@ -100,6 +100,8 @@ class GenerateScenarios(Command):
     approve: bool = False  # сразу в банк (CLI-заготовка демо); по умолчанию — на проверку преподавателю
     seed: int | None = None
     branching: str | None = None  # F5: шаблон ветвления; None — сценарий без ветвления
+    codes: list[str] = field(default_factory=list)  # строки классификатора; пусто — любые строки групп
+    flags: list[str] | None = None  # признаки опросной карты; None — случайно из признаков строки
     meta: RequestMeta = field(default_factory=RequestMeta)
 
 
@@ -190,13 +192,19 @@ class ScenarioGenerator:
         difficulty: int,
         author: UUID | None,
         branching: str | None = None,
+        codes: list[str] | None = None,
+        forced_flags: list[str] | None = None,
     ) -> Scenario:
         tpl = self._branches.get(branching) if branching and self._branches else None
         if branching and tpl is None:
             raise DomainError("Нет такого шаблона ветвления", code="bad_branching")
-        incident = await self._facts.pick_incident(rng, groups or None, list(tpl.incident_codes) if tpl else None)
+        incident = await self._facts.pick_incident(
+            rng, groups or None, list(tpl.incident_codes) if tpl else (codes or None)
+        )
         address = await self._facts.pick_address(rng)
         flags = [f for f in incident.flags if f in FLAG_FACTS and rng.random() < 0.5]
+        if forced_flags is not None:  # засев стенда: признаки заданы — эталон служб предсказуем (нужная ДДС в нём)
+            flags = [f for f in incident.flags if f in FLAG_FACTS and f in forced_flags]
         if tpl is not None:  # F5: признаки — по легенде шаблона, а не случайно (иначе эталон разойдётся с ситуацией)
             victims = bool((tpl.legend.get("victims") or {}).get("has"))
             flags = [f for f in incident.flags if f == "victims" and victims]
@@ -248,7 +256,9 @@ class GenerateScenariosHandler:
         ids: list[UUID] = []
         try:
             for _ in range(cmd.count):
-                scenario = await self._gen.generate(rng, cmd.groups, cmd.difficulty, author, cmd.branching)
+                scenario = await self._gen.generate(
+                    rng, cmd.groups, cmd.difficulty, author, cmd.branching, cmd.codes, cmd.flags
+                )
                 if cmd.approve:  # из CLI — от имени системы
                     scenario.status = ScenarioStatus.APPROVED
                     scenario.approved_by = author

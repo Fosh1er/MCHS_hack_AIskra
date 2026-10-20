@@ -31,7 +31,10 @@ pytestmark = pytest.mark.e2e
 def test_operator_call_stream_card_assessment(ui: Session) -> None:
     stand = ui.stand
     # занятие с психологическим профилем у op1 — иначе модификатор (п. 3.7) не включается
-    start_session(stand, [("op1", "112", None)], psy=PSY_ALWAYS)
+    # бытовые сценарии ДДС (группы 8, 14, 21 — demo-seed) тут ни при чём: у их типов другие опросные карты
+    start_session(
+        stand, [("op1", "112", None)], psy=PSY_ALWAYS, groups=[g for g in range(1, 25) if g not in (8, 14, 21)]
+    )
     try:
         page = ui.new_page()
         page.goto(stand.web + "/")
