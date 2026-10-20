@@ -179,3 +179,35 @@ def test_session_lifecycle_monitor_report(app_client: Callable[[], TestClient]) 
     admin = as_user(app_client, "admin")
     events = {e["event"] for e in admin.get("/api/v1/audit", params={"page_size": 100}).json()["items"]}
     assert {"sessions.created", "sessions.started", "sessions.finished", "assessment.overridden"} <= events
+
+
+def test_dds_feed_prefers_scenarios_of_dispatcher_service(app_client: Callable[[], TestClient]) -> None:
+    """Карточку ДДС получает служба, которой она положена по эталону: диспетчеру 103 — сценарии со скорой в эталоне,
+    а не пожар, к которому служба дописана сбоку («кошку не везут в скорую»). Нет таких — как раньше, любой."""
+    teacher, petrov = as_user(app_client, "teacher"), as_user(app_client, "petrov")
+    ids = teacher.post("/api/v1/training/scenarios/generate", json={"count": 6, "groups": [1, 22]}).json()["ids"]
+    refs = {}
+    for sid in ids:
+        teacher.post(f"/api/v1/training/scenarios/{sid}/approve")
+        refs[sid] = {
+            s["code"] for s in teacher.get(f"/api/v1/training/scenarios/{sid}").json()["reference_card"]["services"]
+        }
+    own = {sid for sid, codes in refs.items() if "S103" in codes}
+    assert own and own != set(refs), refs  # иначе проверять нечего: в пуле есть и свои, и чужие сценарии
+    people = {s["login"]: s["id"] for s in teacher.get("/api/v1/training/students").json()}
+    for i in range(6):
+        body = {
+            "title": f"ДДС 103, прогон {i}",
+            "mode": "dds_actions",
+            "card_source": "generated",
+            "groups": [1, 22],
+            "participants": [{"student_id": people["petrov"], "role": "dds", "dds_service_code": "S103"}],
+        }
+        sid = teacher.post("/api/v1/training/sessions", json=body).json()["id"]
+        teacher.post(f"/api/v1/training/sessions/{sid}/start")
+        fed = petrov.post("/api/v1/training/sessions/feed").json()
+        assert fed["card_id"], fed
+        card = petrov.get(f"/api/v1/incidents/dds/S103/cards/{fed['card_id']}").json()
+        mine = next(s for s in card["card"]["services"] if s["code"] == "S103")
+        assert mine["added_by"] != "manual", card["card"]["services"]  # служба — из эталона, а не дописана сбоку
+        teacher.post(f"/api/v1/training/sessions/{sid}/finish")

@@ -198,6 +198,7 @@ class FeedDdsCardHandler:
             random.Random(cmd.seed),
             s.groups or None,
             int(s.settings["difficulty"]) if "difficulty" in s.settings else None,
+            service=p.dds_service_code,
         )
         if scenario is None:
             return FeedResult(
