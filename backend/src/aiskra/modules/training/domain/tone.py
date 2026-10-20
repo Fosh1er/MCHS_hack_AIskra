@@ -349,26 +349,39 @@ def color_reply(text: str, tone: CallerTone, n: int) -> str:
 
 # Подача для серверного синтеза (п. 3.6, V2; спецификация — таблицы 7.3 и 7.4). Стиль — по-английски: так его
 # понимают модели с инструкциями (Gemini, OpenAI TTS); модели без инструкций (Piper) получают только темп.
+# F3: стиль — короткая строка подачи, как советует документация Gemini TTS («whispered urgently»): эмоция с силой,
+# темп, громкость, дыхание. Кто говорит и в какой ситуации — не в стиле: длинные описания уводят голос.
 SPEED = {"slow": 0.9, "normal": 1.0, "fast": 1.15, "very_fast": 1.3}
 _STYLE_EMOTION = {
-    "calm": "a calm",
-    "relief": "a relieved, grateful",
-    "fear": "a frightened",
-    "panic": "a panicking",
-    "shock": "a shocked, stunned",
-    "irritation": "an irritated",
+    "calm": "calm",
+    "relief": "relieved, grateful",
+    "fear": "frightened",
+    "panic": "panicked",
+    "shock": "shocked, stunned",
+    "irritation": "irritated",
 }
-_STYLE_PACE = {"slow": "slow", "normal": "steady", "fast": "fast", "very_fast": "very fast, rushed"}
+_STEADY = frozenset({"calm", "relief"})  # у спокойных состояний силы нет: «extremely calm» звучит неестественно
+_STYLE_PACE = {
+    "slow": "speaking slowly",
+    "normal": "",
+    "fast": "speaking fast",
+    "very_fast": "speaking very fast, rushed",
+}
 _STYLE_VOLUME = {"whisper": "whispering", "low": "quiet", "normal": "", "loud": "loud"}
 _STYLE_BREATH = {"calm": "", "tense": "tense", "rapid": "breathless", "irregular": "gasping, voice breaking"}
-STAFF_STYLE = "a calm, professional emergency service officer, steady and clear"  # старший группы, служба
+STAFF_STYLE = "calm and professional, steady and clear"  # старший группы, служба, оператор в записи звонка
+
+
+def _degree(tension: int) -> str:
+    return "extremely " if tension >= 8 else "very " if tension >= 6 else ""
 
 
 def speech_style(tone: ToneSnapshot) -> str:
-    """«a panicking caller to the 112 emergency line: very fast, rushed, loud, gasping, voice breaking»."""
+    """«extremely panicked, speaking very fast, rushed, loud, gasping, voice breaking»."""
+    emotion = _STYLE_EMOTION.get(tone.emotion, "worried")
+    degree = "" if tone.emotion in _STEADY else _degree(tone.tension)
     parts = [_STYLE_PACE.get(tone.pace, ""), _STYLE_VOLUME.get(tone.volume, ""), _STYLE_BREATH.get(tone.breathing, "")]
-    who = _STYLE_EMOTION.get(tone.emotion, "a worried")
-    return f"{who} caller to the 112 emergency line: " + ", ".join(p for p in parts if p)
+    return ", ".join([degree + emotion, *(p for p in parts if p)])
 
 
 def speech_speed(tone: ToneSnapshot) -> float:

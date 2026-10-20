@@ -11,7 +11,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Composer, Icon, Transcript, type TranscriptMessage } from '@smena112/ui-kit';
 import { ApiError } from '../api/http';
-import { endCall, getCall, pauseCall, replicaAudioUrl, sendReplica, speakUrl, streamReplica, tickCall, transcribe, useSpeechStatus, type CallMessage, type PsyLive, type Replica, type ReplicaVia, type StreamMetrics, type Tone } from '../api/training';
+import { endCall, getCall, pauseCall, replicaAudioUrl, sendReplica, speakUrl, streamReplica, type PhraseCue, tickCall, transcribe, useSpeechStatus, type CallMessage, type PsyLive, type Replica, type ReplicaVia, type StreamMetrics, type Tone } from '../api/training';
 import { useActiveTour } from '../onboarding/OnboardingProvider';
 import { useHandsFree, type HandsFreeState } from '../voice/useHandsFree';
 import { VAD_PROFILES, isLikelyEcho, type VadProfileName } from '../voice/vad';
@@ -22,7 +22,7 @@ const note = (m: CallMessage) => (m.remarks && m.remarks.length ? `(${m.remarks.
 /** Реплика в панели: `aiLine` — кто и как быстро написал ответ (F1), `voiced` — уже озвучена по фразам во время потока. */
 type Msg = CallMessage & { aiLine?: string; voiced?: boolean };
 /** Ответ, который ещё генерируется (F1). */
-interface Live { text: string; fresh: string; tone?: Tone | null; model?: string; remarks: string[]; replaced: boolean }
+interface Live { text: string; fresh: string; tone?: Tone | null; model?: string; remarks: string[]; replaced: boolean; level?: number; voicedRemarks?: number }
 
 const sec = (ms: number) => `${(ms / 1000).toFixed(1).replace('.', ',')} с`;
 /** «ИИ · demo-m · первое слово 0,4 с · ответ 2,1 с» или «ответ по правилам» — честно, без имитации модели. */
@@ -203,18 +203,18 @@ export function CallPanel({ callId, title, subtitle, partyName, initial, onEnded
     a.onerror = next;
     a.play().catch(next);
   };
-  const sayPhrase = (text: string, tone?: Tone | null) => {
+  const sayPhrase = (text: string, tone?: Tone | null, cue?: PhraseCue) => {
     const t = text.trim();
     if (t.length < 2) return;
     lastParty.current = { text: (lastParty.current?.text ?? '') + ' ' + t, at: Date.now() };
-    const a = new Audio(speakUrl(callId, t, tone)); // синтез начинается сразу, пока звучит предыдущая фраза
+    const a = new Audio(speakUrl(callId, t, tone, cue)); // синтез начинается сразу, пока звучит предыдущая фраза
     a.preload = 'auto';
     phrases.current.push(a);
     playPhrases();
   };
-  const feedPhrases = (text: string, tone?: Tone | null) => {
+  const feedPhrases = (text: string, tone?: Tone | null, cue?: () => PhraseCue) => {
     for (let rest = text.slice(spokenUpTo.current), m = SENTENCE.exec(rest); m; m = SENTENCE.exec(rest)) {
-      sayPhrase(m[0], tone);
+      sayPhrase(m[0], tone, cue?.());
       spokenUpTo.current += m[0].length;
       rest = text.slice(spokenUpTo.current);
     }
@@ -263,6 +263,12 @@ export function CallPanel({ callId, title, subtitle, partyName, initial, onEnded
     setMessages((m) => [...m, { speaker: 'operator', text: t, at: new Date().toISOString() }]);
     const phrased = voice && serverVoice; // озвучка по фразам — пока ответ пишется
     const cur: Live = { text: '', fresh: '', remarks: [], replaced: false };
+    // F3: ремарки звучат с ближайшей фразой — каждая один раз
+    const cue = (): PhraseCue => {
+      const remarks = cur.remarks.slice(cur.voicedRemarks ?? 0);
+      cur.voicedRemarks = cur.remarks.length;
+      return { level: cur.level, remarks };
+    };
     spokenUpTo.current = 0;
     if (phrased) stopVoice();
     try {
@@ -271,13 +277,13 @@ export function CallPanel({ callId, title, subtitle, partyName, initial, onEnded
         r = await streamReplica(callId, t, via, {}, (e) => {
           if (e.type === 'state') {
             cur.tone = e.tone ?? cur.tone;
-            if (e.psy) { const p = e.psy; setPsy(true); setPsyLevel({ level: p.level_after, title: p.level_title, last: p }); }
+            if (e.psy) { const p = e.psy; cur.level = p.level_after; setPsy(true); setPsyLevel({ level: p.level_after, title: p.level_title, last: p }); }
           } else if (e.type === 'model') cur.model = e.model;
           else if (e.type === 'offline') cur.model = undefined; // модель не ответила — без подписи «ИИ думает»
           else if (e.type === 'token') {
             cur.text += e.text;
             cur.fresh = e.text;
-            if (phrased && !cur.replaced) feedPhrases(cur.text, cur.tone);
+            if (phrased && !cur.replaced) feedPhrases(cur.text, cur.tone, cue);
           } else if (e.type === 'remark') cur.remarks.push(e.text);
           else if (e.type === 'replace') { cur.replaced = true; if (phrased) stopVoice(); }
           setLive({ ...cur });
@@ -287,7 +293,7 @@ export function CallPanel({ callId, title, subtitle, partyName, initial, onEnded
         r = await sendReplica(callId, t, via); // сервер без потока — ответ целиком
       }
       const voiced = phrased && spokenUpTo.current > 0 && !cur.replaced;
-      if (voiced) sayPhrase(r.text.slice(spokenUpTo.current), r.tone ?? cur.tone); // хвост после последней фразы
+      if (voiced) sayPhrase(r.text.slice(spokenUpTo.current), r.tone ?? cur.tone, cue()); // хвост после последней фразы
       if (r.voice) setPsy(true);
       setMessages((m) => [...m, {
         speaker: r.speaker, text: r.text, at: new Date().toISOString(), id: r.message_id, tone: r.tone, remarks: r.remarks,

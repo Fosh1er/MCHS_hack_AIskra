@@ -13,6 +13,7 @@ from typing import Any, Literal
 
 import httpx
 
+from aiskra.ai.adapters.speech_markup import agitate, gemini_markup
 from aiskra.ai.ports import AudioBlob, STTPort, Transcript, TTSPort, VoiceProfile
 from aiskra.shared.errors import ExternalServiceError
 
@@ -154,10 +155,18 @@ class OpenAICompatibleTTS:
             return {"google-ai-studio": meta, "google-vertex": meta}
         return {"openai": {"instructions": profile.style}}
 
+    def _markup(self, text: str, profile: VoiceProfile) -> str:
+        """F3: звуки и волнение — в текст так, как понимает модель: Gemini — теги, движок без стиля — пунктуация."""
+        if self._style == "google":
+            return gemini_markup(text, profile.sounds, profile.agitation)
+        if self._style == "none":
+            return agitate(text, profile.agitation)
+        return text  # openai: подача целиком в `instructions`
+
     async def synthesize(self, text: str, *, voice: VoiceProfile) -> AudioBlob:
         body: dict[str, Any] = {
             "model": self._model,
-            "input": text,
+            "input": self._markup(text, voice),
             "response_format": self._format,
             "speed": round(voice.speed, 2),
         }

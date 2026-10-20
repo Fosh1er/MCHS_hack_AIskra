@@ -7,6 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from aiskra.ai.ports import AudioBlob, VoiceProfile
+from aiskra.modules.training.domain.voice_cues import agitation
 from tests.integration.test_journal import app_client as journal_app_client  # noqa: F401
 from tests.integration.test_journal import as_user
 
@@ -50,7 +51,9 @@ def test_replica_audio(app_client: Callable[[], TestClient]) -> None:
         text, profile = stub.calls[-1]
         assert text == rude["text"]  # в синтез уходит только текст реплики
         assert profile.voice in {"applicant_female", "applicant_male", "applicant"}
-        assert profile.emotion == rude["tone"]["emotion"] and profile.style and "caller" in profile.style
+        assert profile.emotion == rude["tone"]["emotion"] and profile.style and "caller" not in profile.style
+        # F3: волнение голоса — по напряжению у этой реплики (звонок без профиля), звуки разметит адаптер
+        assert profile.agitation == agitation(rude["tone"]["tension"])
         assert profile.speed == {"slow": 0.9, "normal": 1.0, "fast": 1.15, "very_fast": 1.3}[rude["tone"]["pace"]]
 
         view = student.get(f"/api/v1/training/calls/{cid}").json()
