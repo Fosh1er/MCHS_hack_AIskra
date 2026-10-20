@@ -16,7 +16,7 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from aiskra.ai.config import load_ai_config
-from aiskra.bootstrap import build_services, daily_backup_loop, wire
+from aiskra.bootstrap import apply_runtime_settings, build_services, daily_backup_loop, wire
 from aiskra.modules.assessment.api.router import router as assessment_router
 from aiskra.modules.audit.api.router import router as audit_router
 from aiskra.modules.dictionaries.api.router import router as dictionaries_router
@@ -68,6 +68,7 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
         app.state.services = svc
         app.state.started_at = datetime.now(UTC)  # время старта — в /health
         wire(app, svc)
+        await apply_runtime_settings(svc)  # п. 2.2: уровень журнала из настроек администратора
         backup_job = asyncio.create_task(daily_backup_loop(svc)) if settings.scheduler_enabled else None
         yield
         if backup_job:

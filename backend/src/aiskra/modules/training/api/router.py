@@ -26,6 +26,7 @@ from aiskra.modules.training.api.schemas import (
     CreatedOut,
     CreateSessionIn,
     DdsCallIn,
+    EditAnswerIn,
     EditScenarioIn,
     GeneratedOut,
     GenerateIn,
@@ -43,6 +44,8 @@ from aiskra.modules.training.application.commands.calls import (
     CallStarted,
     EndCall,
     EndCallHandler,
+    HoldCall,
+    HoldCallHandler,
     PauseCall,
     PauseCallHandler,
     Replica,
@@ -70,6 +73,8 @@ from aiskra.modules.training.application.commands.scenario_review import (
     SectionsReviewed,
 )
 from aiskra.modules.training.application.commands.scenarios import (
+    EditAnswer,
+    EditAnswerHandler,
     EditScenario,
     EditScenarioHandler,
     GenerateScenarios,
@@ -602,6 +607,28 @@ async def end_call(
     return StatusOut(status=await handler(EndCall(actor=actor, call_id=call_id, meta=meta)))
 
 
+class HoldOut(BaseModel):
+    status: str
+    held_s: int = 0
+    hung_up: bool = Field(default=False, description="Заявитель не дождался на удержании и положил трубку")
+
+
+@router.post("/calls/{call_id}/hold", response_model=HoldOut, summary="Поставить звонок на удержание (ТЗ 6.1)")
+async def hold_call(
+    call_id: UUID, actor: Trainee, meta: Meta, handler: Annotated[HoldCallHandler, Depends(deps.provide_hold_call)]
+) -> HoldOut:
+    r = await handler(HoldCall(actor=actor, call_id=call_id, hold=True, meta=meta))
+    return HoldOut(status=r.status, held_s=r.held_s, hung_up=r.hung_up)
+
+
+@router.post("/calls/{call_id}/resume", response_model=HoldOut, summary="Снять звонок с удержания (ТЗ 6.1)")
+async def resume_call(
+    call_id: UUID, actor: Trainee, meta: Meta, handler: Annotated[HoldCallHandler, Depends(deps.provide_hold_call)]
+) -> HoldOut:
+    r = await handler(HoldCall(actor=actor, call_id=call_id, hold=False, meta=meta))
+    return HoldOut(status=r.status, held_s=r.held_s, hung_up=r.hung_up)
+
+
 @router.post(
     "/calls/{call_id}/pause",
     response_model=StatusOut,
@@ -745,6 +772,29 @@ async def edit_scenario(
     handler: Annotated[EditScenarioHandler, Depends(deps.provide_edit_scenario)],
 ) -> EditScenarioOut:
     r = await handler(EditScenario(actor=actor, scenario_id=scenario_id, meta=meta, **body.model_dump()))
+    return EditScenarioOut(
+        status=r.status,
+        grammar=[GrammarRemark(field=g.field, quote=g.quote, fix=g.fix, rule=g.rule) for g in r.grammar],
+        checked_by=r.checked_by,
+    )
+
+
+@router.put(
+    "/scenarios/{scenario_id}/answers/{topic}",
+    response_model=EditScenarioOut,
+    summary="Один ответ заявителя из прогона: вручную или по комментарию моделью (ТЗ 3.4); сценарий — в черновики",
+)
+async def edit_answer(
+    scenario_id: UUID,
+    topic: str,
+    body: EditAnswerIn,
+    actor: Manager,
+    meta: Meta,
+    handler: Annotated[EditAnswerHandler, Depends(deps.provide_edit_answer)],
+) -> EditScenarioOut:
+    r = await handler(
+        EditAnswer(actor=actor, scenario_id=scenario_id, topic=topic, text=body.text, comment=body.comment, meta=meta)
+    )
     return EditScenarioOut(
         status=r.status,
         grammar=[GrammarRemark(field=g.field, quote=g.quote, fix=g.fix, rule=g.rule) for g in r.grammar],

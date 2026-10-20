@@ -2,7 +2,7 @@
  "openapi": "3.1.0",
  "info": {
   "title": "АИскра — тренажёр оператора 112 / ДДС",
-  "version": "0.1.0"
+  "version": "unknown"
  },
  "paths": {
   "/health": {
@@ -2339,6 +2339,197 @@
     }
    }
   },
+  "/api/v1/incidents/matches": {
+   "get": {
+    "tags": [
+     "incidents"
+    ],
+    "summary": "Недавние карточки с тем же телефоном или адресом — «Есть карточка с заявителем по этому номеру»",
+    "operationId": "matches_api_v1_incidents_matches_get",
+    "parameters": [
+     {
+      "name": "phone",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "array",
+         "items": {
+          "type": "string"
+         }
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "АОН, предоставленный, телефон на место",
+       "title": "Phone"
+      },
+      "description": "АОН, предоставленный, телефон на место"
+     },
+     {
+      "name": "street",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "default": "",
+       "title": "Street"
+      }
+     },
+     {
+      "name": "house",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "default": "",
+       "title": "House"
+      }
+     },
+     {
+      "name": "exclude",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "format": "uuid"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Exclude"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "$ref": "#/components/schemas/JournalRow"
+         },
+         "title": "Response Matches Api V1 Incidents Matches Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/incidents/cards/{card_id}/links": {
+   "get": {
+    "tags": [
+     "incidents"
+    ],
+    "summary": "Окно связей: главная и подчинённые",
+    "operationId": "card_links_api_v1_incidents_cards__card_id__links_get",
+    "parameters": [
+     {
+      "name": "card_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Card Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/LinksView"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/incidents/cards/{card_id}/link": {
+   "post": {
+    "tags": [
+     "incidents"
+    ],
+    "summary": "«привязать» к главной карточке (main_id) или «отвязать» (main_id = null)",
+    "operationId": "link_card_api_v1_incidents_cards__card_id__link_post",
+    "parameters": [
+     {
+      "name": "card_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Card Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/LinkIn"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/LinksView"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/incidents/journal": {
    "get": {
     "tags": [
@@ -3868,7 +4059,7 @@
      "training"
     ],
     "summary": "Реплика оператора → ответ ИИ-собеседника потоком SSE (F1)",
-    "description": "События: `accepted` → `state` (состояние заявителя до ответа) → `model` (ответ пишет модель; нет события — ответ по правилам) → `token`* / `remark`* → `replace`? (ответ модели отклонён проверкой, итоговый текст — в `final`) → `final` (как ответ `POST /replicas` + `metrics`) или `error`. Сохранение — после ответа целиком; обрыв соединения генерацию не отменяет, чтобы реплика не потерялась.",
+    "description": "События: `accepted` → `state` (состояние заявителя до ответа) → `model` (ответ пишет модель; нет события — ответ по правилам) → `offline`? (модель недоступна, ответ по правилам) → `token`* / `remark`* → `replace`? (ответ модели отклонён проверкой, итоговый текст — в `final`) → `final` (как ответ `POST /replicas` + `metrics`) или `error`. Сохранение — после ответа целиком; обрыв соединения генерацию не отменяет, чтобы реплика не потерялась.",
     "operationId": "replica_stream_api_v1_training_calls__call_id__replicas_stream_post",
     "parameters": [
      {
@@ -3992,6 +4183,68 @@
        "default": "calm",
        "title": "Breathing"
       }
+     },
+     {
+      "name": "tension",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "integer",
+         "maximum": 10,
+         "minimum": 0
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "F3: напряжение заявителя 0–10",
+       "title": "Tension"
+      },
+      "description": "F3: напряжение заявителя 0–10"
+     },
+     {
+      "name": "level",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "integer",
+         "maximum": 5,
+         "minimum": 1
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "F3: уровень ECCS при профиле",
+       "title": "Level"
+      },
+      "description": "F3: уровень ECCS при профиле"
+     },
+     {
+      "name": "remarks",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "array",
+         "items": {
+          "type": "string"
+         },
+         "maxItems": 4
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "F3: ремарки перед фразой: плачет, задыхается…",
+       "title": "Remarks"
+      },
+      "description": "F3: ремарки перед фразой: плачет, задыхается…"
      }
     ],
     "responses": {
@@ -4227,6 +4480,92 @@
        "application/json": {
         "schema": {
          "$ref": "#/components/schemas/StatusOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/training/calls/{call_id}/hold": {
+   "post": {
+    "tags": [
+     "training"
+    ],
+    "summary": "Поставить звонок на удержание (ТЗ 6.1)",
+    "operationId": "hold_call_api_v1_training_calls__call_id__hold_post",
+    "parameters": [
+     {
+      "name": "call_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Call Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HoldOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/training/calls/{call_id}/resume": {
+   "post": {
+    "tags": [
+     "training"
+    ],
+    "summary": "Снять звонок с удержания (ТЗ 6.1)",
+    "operationId": "resume_call_api_v1_training_calls__call_id__resume_post",
+    "parameters": [
+     {
+      "name": "call_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Call Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HoldOut"
         }
        }
       }
@@ -4549,6 +4888,68 @@
           "$ref": "#/components/schemas/CallView"
          },
          "title": "Response Card Calls Api V1 Training Cards  Card Id  Calls Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/training/scenarios/{scenario_id}/answers/{topic}": {
+   "put": {
+    "tags": [
+     "training"
+    ],
+    "summary": "Один ответ заявителя из прогона: вручную или по комментарию моделью (ТЗ 3.4); сценарий — в черновики",
+    "operationId": "edit_answer_api_v1_training_scenarios__scenario_id__answers__topic__put",
+    "parameters": [
+     {
+      "name": "scenario_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Scenario Id"
+      }
+     },
+     {
+      "name": "topic",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Topic"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/EditAnswerIn"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/EditScenarioOut"
         }
        }
       }
@@ -7538,6 +7939,18 @@
        }
       ],
       "title": "Branch"
+     },
+     "repeat_of": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Repeat Of"
      }
     },
     "type": "object",
@@ -9076,6 +9489,41 @@
     ],
     "title": "DistrictRow"
    },
+   "EditAnswerIn": {
+    "properties": {
+     "text": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 400
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Text",
+      "description": "Ответ вручную; пусто вместе с comment — по легенде"
+     },
+     "comment": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 1000,
+        "minLength": 3
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Comment",
+      "description": "Переписать моделью"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "title": "EditAnswerIn",
+    "description": "ТЗ 3.4: один ответ заявителя из прогона — вписать вручную или переписать моделью по комментарию."
+   },
    "EditScenarioIn": {
     "properties": {
      "title": {
@@ -10065,6 +10513,30 @@
     ],
     "title": "Heatmap"
    },
+   "HoldOut": {
+    "properties": {
+     "status": {
+      "type": "string",
+      "title": "Status"
+     },
+     "held_s": {
+      "type": "integer",
+      "title": "Held S",
+      "default": 0
+     },
+     "hung_up": {
+      "type": "boolean",
+      "title": "Hung Up",
+      "description": "Заявитель не дождался на удержании и положил трубку",
+      "default": false
+     }
+    },
+    "type": "object",
+    "required": [
+     "status"
+    ],
+    "title": "HoldOut"
+   },
    "HousePoint": {
     "properties": {
      "label": {
@@ -10381,6 +10853,41 @@
       },
       "type": "array",
       "title": "Frequent Errors"
+     },
+     "summary": {
+      "type": "string",
+      "title": "Summary",
+      "default": ""
+     },
+     "insights": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Insights"
+     },
+     "actions": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Actions"
+     },
+     "source": {
+      "type": "string",
+      "title": "Source",
+      "default": "rules"
+     },
+     "model": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Model"
      }
     },
     "type": "object",
@@ -10554,6 +11061,34 @@
        }
       ],
       "title": "Description"
+     },
+     "linked": {
+      "type": "boolean",
+      "title": "Linked",
+      "default": false
+     },
+     "main_card_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Main Card Id"
+     },
+     "match": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Match"
      }
     },
     "type": "object",
@@ -10601,6 +11136,54 @@
      "text"
     ],
     "title": "LevelSign"
+   },
+   "LinkIn": {
+    "properties": {
+     "main_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Main Id"
+     }
+    },
+    "type": "object",
+    "title": "LinkIn",
+    "description": "п. 1.6: главная карточка для привязки; null — отвязать."
+   },
+   "LinksView": {
+    "properties": {
+     "main_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Main Id"
+     },
+     "rows": {
+      "items": {
+       "$ref": "#/components/schemas/JournalRow"
+      },
+      "type": "array",
+      "title": "Rows"
+     }
+    },
+    "type": "object",
+    "required": [
+     "main_id",
+     "rows"
+    ],
+    "title": "LinksView"
    },
    "LogRecord": {
     "properties": {
@@ -11905,6 +12488,22 @@
      "reference": {
       "type": "string",
       "title": "Reference"
+     },
+     "topic": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Topic"
+     },
+     "custom": {
+      "type": "boolean",
+      "title": "Custom",
+      "default": false
      }
     },
     "type": "object",
@@ -13751,6 +14350,20 @@
       ],
       "title": "Max Waiting"
      },
+     "repeat_share": {
+      "anyOf": [
+       {
+        "type": "integer",
+        "maximum": 100.0,
+        "minimum": 0.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Repeat Share",
+      "description": "Повторные обращения, % вызовов (4.6)"
+     },
      "psy": {
       "anyOf": [
        {
@@ -14342,6 +14955,22 @@
         "type": "null"
        }
       ]
+     },
+     "max_time_s": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Max Time S"
+     },
+     "over_norm": {
+      "type": "integer",
+      "title": "Over Norm",
+      "default": 0
      }
     },
     "type": "object",

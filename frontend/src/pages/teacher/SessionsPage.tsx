@@ -16,7 +16,7 @@ import { PsyCounter } from '../../shared/ui/PsyCounter';
 import { useScreenTour } from '../../shared/onboarding/OnboardingProvider';
 import { GroupPicker } from './ScenariosPage';
 
-const DEFAULTS: SessionSettings = { norm_112: 75, norm_dds: 30, threshold: 70, difficulty: 2, call_interval_s: 40, feed_interval_s: 45, max_waiting: 3 };
+const DEFAULTS: SessionSettings = { norm_112: 75, norm_dds: 30, threshold: 70, difficulty: 2, call_interval_s: 40, feed_interval_s: 45, max_waiting: 3, repeat_share: 0 };
 const SETTING_LABELS: [Exclude<keyof SessionSettings, 'psy' | 'branch'>, string, number, number][] = [
   ['norm_112', 'Норматив карточки 112, с', 5, 3600],
   ['norm_dds', 'Норматив решения ДДС, с', 5, 3600],
@@ -25,6 +25,7 @@ const SETTING_LABELS: [Exclude<keyof SessionSettings, 'psy' | 'branch'>, string,
   ['call_interval_s', 'Темп вызовов 112, с', 5, 3600],
   ['feed_interval_s', 'Темп карточек ДДС, с', 5, 3600],
   ['max_waiting', 'Очередь ДДС, не больше', 1, 10],
+  ['repeat_share', 'Повторные обращения, % вызовов', 0, 100],
 ];
 type Role = '' | '112' | 'dds';
 
@@ -46,7 +47,7 @@ function CreateForm({ onCreated, assign }: { onCreated: (id: string) => void; as
   const [psy, setPsy] = useState<PsySettings>(PSY_DEFAULTS); // п. 3.7: психологический модификатор
   // значения по умолчанию — из настроек администратора (п. 5.2)
   const defaults = useSessionDefaults().data;
-  useEffect(() => { if (defaults) setSettings(defaults); }, [defaults]);
+  useEffect(() => { if (defaults) setSettings({ ...DEFAULTS, ...defaults }); }, [defaults]);
   // группа (п. 5.2): роли и службы участников подставляются из состава группы
   const groupList = useGroups().data ?? [];
   const applyGroup = (id: string) => {

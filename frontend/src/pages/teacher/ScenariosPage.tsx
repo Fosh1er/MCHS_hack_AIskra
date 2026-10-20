@@ -4,8 +4,8 @@ import { useEffect, useState } from 'react';
 import { Banner, Button, Card, Segmented, StatusPill, Tag } from '@smena112/ui-kit';
 import { useCardTypes, useEnum, useIncidentGroups, useServices } from '../../shared/api/dictionaries';
 import {
-  useBranchTemplates, useEditScenario, useGenerateScenarios, usePsyProfiles, useReviewScenario, useScenario, useScenarioPreview, useScenarios, useSetScenarioPsy,
-  type EditScenarioResult, type ScenarioFilter, type ScenarioRow, type ScenarioView,
+  useBranchTemplates, useEditAnswer, useEditScenario, useGenerateScenarios, usePsyProfiles, useReviewScenario, useScenario, useScenarioPreview, useScenarios, useSetScenarioPsy,
+  type EditScenarioResult, type PreviewItem, type ScenarioFilter, type ScenarioRow, type ScenarioView,
 } from '../../shared/api/training';
 import { TeacherShell } from '../../shared/ui/TeacherShell';
 import { useScreenTour } from '../../shared/onboarding/OnboardingProvider';
@@ -167,6 +167,42 @@ function PsyPick({ s }: { s: ScenarioView }) {
   );
 }
 
+/** ТЗ 3.4: переписать один ответ заявителя — по комментарию (модель) или вручную; факты легенды не меняются. */
+function AnswerEdit({ id, item }: { id: string; item: PreviewItem }) {
+  const edit = useEditAnswer();
+  const [open, setOpen] = useState(false);
+  const [comment, setComment] = useState('');
+  const [text, setText] = useState(item.answer);
+  useEffect(() => setText(item.answer), [item.answer]);
+  const run = (b: { text?: string; comment?: string }) =>
+    edit.mutate({ id, topic: item.topic!, ...b }, { onSuccess: () => { setOpen(false); setComment(''); } });
+  if (!open) {
+    return (
+      <div className="cab-filters">
+        <Button size="sm" variant="ghost" icon="edit" onClick={() => setOpen(true)}>переписать ответ</Button>
+        {item.custom && <Button size="sm" variant="ghost" disabled={edit.isPending} onClick={() => run({})}>вернуть по легенде</Button>}
+      </div>
+    );
+  }
+  return (
+    <div className="tch-form">
+      <label>Комментарий для модели (что изменить в ответе)
+        <input value={comment} placeholder="например: заявитель путается и переспрашивает" onChange={(e) => setComment(e.target.value)} />
+      </label>
+      <label>Или ответ вручную
+        <textarea rows={2} maxLength={400} value={text} onChange={(e) => setText(e.target.value)} />
+      </label>
+      <div className="cab-filters">
+        <Button size="sm" variant="primary" disabled={edit.isPending || comment.trim().length < 3} onClick={() => run({ comment: comment.trim() })}>переписать моделью</Button>
+        <Button size="sm" disabled={edit.isPending || !text.trim() || text === item.answer} onClick={() => run({ text: text.trim() })}>сохранить вручную</Button>
+        <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>отменить</Button>
+      </div>
+      <small className="c-slate">Адрес, имя, число пострадавших должны остаться как в легенде. После правки сценарий снова на проверке.</small>
+      {edit.isError && <Banner status="critical">{edit.error.message}</Banner>}
+    </div>
+  );
+}
+
 function Detail({ id }: { id: string }) {
   const q = useScenario(id);
   const review = useReviewScenario();
@@ -193,8 +229,9 @@ function Detail({ id }: { id: string }) {
           {preview.data?.map((p) => (
             <li key={p.question}>
               <div className="tch-preview__op">Оператор: {p.question}</div>
-              <div className="tch-preview__party">Заявитель: {p.answer}</div>
+              <div className="tch-preview__party">Заявитель: {p.answer}{p.custom && <small className="c-slate"> · переписан преподавателем</small>}</div>
               <div className="tch-preview__ref">В карточку: {p.reference}</div>
+              {p.topic && <AnswerEdit id={id} item={p} />}
             </li>
           ))}
           {preview.isFetching && <li>прогон…</li>}

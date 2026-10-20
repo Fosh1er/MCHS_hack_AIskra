@@ -13,6 +13,7 @@ import re
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
+from uuid import UUID
 
 CARD_NORM_SECONDS = 75  # опрос до карточки, доступной ДДС, в среднем 75 с — ПП РФ № 1931, п. 9 «р» (docs/research)
 DDS_NORM_SECONDS = 30  # норматив решения ДДС «Принята / Не принята» (#709, ТЗ)
@@ -32,6 +33,7 @@ WEIGHTS_112: dict[str, float] = {
     "grammar": 0.5,
     # п. 3.6: информативно, пока показатель не сверят эксперты (3.5); вес можно задать в настройках занятия
     "caller_care": 0,
+    "repeat_link": 3,  # ТЗ 4.6: повторное обращение привязано к карточке
 }
 WEIGHTS_DDS: dict[str, float] = {
     "decision": 3,
@@ -54,8 +56,9 @@ TITLES: dict[str, str] = {
     "interview": "Полнота опроса заявителя",
     "timing": "Время заполнения",
     "description_meaning": "Описание: смысл (ИИ)",
-    "grammar": "Грамотность (ИИ)",
+    "grammar": "Грамотность",
     "caller_care": "Работа с заявителем (информативно)",
+    "repeat_link": "Повторное обращение: привязка к карточке",
     "decision": "Решение «Принята / Не принята»",
     "reaction": "Время реакции",
     "chain": "Порядок и полнота статусов",
@@ -108,6 +111,19 @@ def caller_care(f: CallerFacts) -> Criterion:
         c.errors.append(f"заявитель стал напряжённее: {f.start} → {f.end} из 10")
     if f.invalidating:
         c.errors.append("обесценивающие фразы: " + ", ".join(f"«{p}»" for p in dict.fromkeys(f.invalidating)))
+    return c
+
+
+def repeat_link(linked_to: UUID | None, targets: set[UUID], number: int | None) -> Criterion:
+    """ТЗ 4.6, Памятка АРМ-112: повторный звонок по той же беде — найти карточку по номеру и привязать новую к ней.
+    Не привязал — критическая ошибка: службы получат вторую карточку и могут выехать дважды."""
+    if linked_to is not None and linked_to in targets:
+        return Criterion("repeat_link", 1.0, note=f"привязана к карточке {number}" if number else "")
+    c = Criterion("repeat_link", 0.0, critical=True)
+    c.errors.append(
+        f"повторное обращение не привязано к карточке {number or ''}".rstrip()
+        + " — заявитель уже звонил, проверьте «Есть карточка с заявителем по этому номеру»"
+    )
     return c
 
 
@@ -345,8 +361,10 @@ def assess_dds(
     calls: list[str],
     *,
     norm_seconds: float = DDS_NORM_SECONDS,
+    call_log: list[tuple[str, datetime]] | None = None,
 ) -> list[Criterion]:
-    """Критерии работы диспетчера ДДС по своей службе: история статусов и звонки."""
+    """Критерии работы диспетчера ДДС по своей службе: история статусов и звонки. `call_log` — стороны звонков
+    со временем начала: по нему проверяется порядок звонков относительно статусов (ТЗ 5.10)."""
     ref = reference or {}
     steps = [h for h in history if h.status not in ("added", "received")]
     out: list[Criterion] = []
@@ -368,9 +386,15 @@ def assess_dds(
 
     if first is not None and first.at and added_at:
         secs = max(0.0, (first.at - added_at).total_seconds())
+        received = next((h.at for h in history if h.status == "received" and h.at), None)
         c = Criterion("reaction", timing_score(secs, norm_seconds), critical=secs > 3 * norm_seconds)
         if secs > norm_seconds:
             c.errors.append(f"решение принято через {int(secs)} с при нормативе {int(norm_seconds)} с")
+        if received is not None and added_at <= received <= first.at:  # ТЗ #709: ожидание в очереди и разбор
+            wait = int((received - added_at).total_seconds())
+            c.note = f"в очереди {wait} с, после открытия {int((first.at - received).total_seconds())} с"
+            if wait > norm_seconds:
+                c.errors.append(f"карточка ждала в очереди {wait} с, прежде чем её открыли")
         out.append(c)
 
     if first is not None and first.status == "accepted":
@@ -407,8 +431,29 @@ def assess_dds(
         c = Criterion("calls", len(made & set(expected_calls)) / len(expected_calls))
         if "brigade" in expected_calls and "brigade" not in made:
             c.errors.append("не было связи со старшим группы — ход работ не подтверждён")
+        if call_log is not None and first is not None:
+            late = call_order_errors(steps, call_log)
+            if late and c.score:
+                c.score = round(c.score * 0.7, 3)  # как у статусов: нарушен порядок — 0,7 от доли
+            c.errors += late
         out.append(c)
     return out
+
+
+def call_order_errors(steps: list[StatusStep], call_log: list[tuple[str, datetime]]) -> list[str]:
+    """Порядок звонков ДДС (ТЗ 5.10, #684/#691): задание старшему группы — после решения «Принята», связь с ним —
+    до «Работы завершены» (иначе ход работ не подтверждён вовремя)."""
+    accepted = next((s.at for s in steps if s.status == "accepted" and s.at), None)
+    done = next((s.at for s in steps if s.status == "works_completed" and s.at), None)
+    brigade = [at for party, at in call_log if party == "brigade"]
+    if not brigade or accepted is None:
+        return []
+    errors = []
+    if all(at < accepted for at in brigade):
+        errors.append("старшему группы звонили только до «Принята» — задание бригаде дают после решения")
+    if done is not None and all(at > done for at in brigade):
+        errors.append("связь со старшим группы — только после «Работы завершены»: ход работ не подтверждён вовремя")
+    return errors
 
 
 def finish(

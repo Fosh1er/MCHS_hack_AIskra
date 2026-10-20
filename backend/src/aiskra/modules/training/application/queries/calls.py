@@ -48,6 +48,7 @@ class CallView:
     psy: dict[str, Any] | None = None  # п. 3.7: профиль заявителя, старт, пик и текущий уровень
     branching: bool = False  # F5: у звонка ветвящийся сценарий — интерфейс раз в 5 с вызывает /tick
     branch: dict[str, Any] | None = None  # F5: «Итог ситуации» — итог, путь, развилки (окончательный при final)
+    repeat_of: UUID | None = None  # ТЗ 4.6: повторный звонок заявителя по этой карточке
 
 
 def call_visible(call: Call | None, actor: Principal) -> bool:
@@ -106,6 +107,7 @@ async def _view(
         ended_by=call.ended_by,
         psy=_psy_summary(call.psy),
         branching=call.branch is not None,
+        repeat_of=call.repeat_of,
         branch=await branches.of(call) if branches else None,
     )
 
