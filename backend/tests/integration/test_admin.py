@@ -109,3 +109,25 @@ def test_status_logs_backup_restore(app_client: Callable[[], TestClient], admin:
     assert "tmpuser" not in logins and {"admin", "teacher", "student"} <= logins
     events = {e["event"] for e in again.get("/api/v1/audit", params={"page_size": 100}).json()["items"]}
     assert "system.backup_restored" in events
+
+
+def test_telephony_logging_and_db_settings(app_client: Callable[[], TestClient], admin: TestClient) -> None:
+    """П. 2.2: IP-телефония и журнал — в настройках администратора; уровень журнала применяется сразу; БД — в
+    состоянии сервисов (адрес и пароль — в окружении)."""
+    import logging
+
+    s = admin.get("/api/v1/system/settings").json()
+    assert s["telephony"]["hold_max_s"] == 60 and s["logging"]["level"] == 20
+    assert admin.put("/api/v1/system/settings/telephony", json={"values": {"hold_max_s": 5}}).status_code == 422
+    assert admin.put("/api/v1/system/settings/telephony", json={"values": {"hold_max_s": 120}}).status_code == 200
+    before = logging.getLogger().level
+    try:
+        assert admin.put("/api/v1/system/settings/logging", json={"values": {"level": 30}}).status_code == 200
+        assert logging.getLogger().level == logging.WARNING
+    finally:
+        admin.put("/api/v1/system/settings/logging", json={"values": {"level": 20}})
+        logging.getLogger().setLevel(before)
+    db = next(x for x in admin.get("/api/v1/system/status").json() if x["name"] == "База данных")
+    assert {"версия", "пул соединений"} <= {m[0] for m in db["metrics"]} and "AISKRA_DATABASE_URL" in db["note"]
+    teacher = as_(app_client, "teacher")
+    assert teacher.put("/api/v1/system/settings/logging", json={"values": {"level": 10}}).status_code == 403

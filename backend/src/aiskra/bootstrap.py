@@ -144,7 +144,7 @@ from aiskra.modules.system.application.commands.backups import (
     RestoreBackupHandler,
 )
 from aiskra.modules.system.application.commands.probe_model import ProbeModelHandler
-from aiskra.modules.system.application.commands.settings import GetSettingsHandler, UpdateSettingsHandler
+from aiskra.modules.system.application.commands.settings import GetSettingsHandler, UpdateSettingsHandler, merged
 from aiskra.modules.system.application.queries.admin import GetAlertsHandler, GetStatusHandler, RecentLogsHandler
 from aiskra.modules.system.application.queries.get_ai_config import GetAIConfigHandler
 from aiskra.modules.system.infrastructure.settings import SqlSettingsStore
@@ -221,6 +221,7 @@ from aiskra.platform import logbuffer
 from aiskra.platform.backup import FileBackupStore
 from aiskra.platform.db import SqlAlchemyUnitOfWork, create_engine, create_session_factory
 from aiskra.platform.deps import get_session
+from aiskra.platform.logbuffer import ProcessRuntime
 from aiskra.platform.models_registry import metadata as _all_models  # noqa: F401 — все ORM-модели в одном реестре
 from aiskra.platform.ratelimit import SlidingWindowThrottle
 from aiskra.platform.services import Services
@@ -958,7 +959,7 @@ def _wire_admin(app: FastAPI, services: Services) -> None:
 
     def update_settings(session: Session) -> UpdateSettingsHandler:
         return UpdateSettingsHandler(
-            SqlSettingsStore(session), SqlAuditRecorder(session), SqlAlchemyUnitOfWork(session)
+            SqlSettingsStore(session), SqlAuditRecorder(session), SqlAlchemyUnitOfWork(session), ProcessRuntime()
         )
 
     def create_backup(session: Session) -> CreateBackupHandler:
@@ -979,6 +980,18 @@ def _wire_admin(app: FastAPI, services: Services) -> None:
     ov[system_deps.provide_status] = lambda: GetStatusHandler(status)
     ov[system_deps.provide_logs] = lambda: RecentLogsHandler(logs)
     ov[system_deps.provide_alerts] = lambda: GetAlertsHandler(status, logs)  # п. 10.6
+
+
+async def apply_runtime_settings(services: Services) -> None:
+    """При старте — сохранённые администратором настройки процесса (п. 2.2: уровень журнала)."""
+    try:
+        async with services.session_factory() as session:
+            stored = await SqlSettingsStore(session).get("logging")
+    except Exception:  # схема ещё не создана (первый запуск) — остаётся уровень из переменных окружения
+        logging.getLogger(__name__).warning("настройки журнала не прочитаны — уровень из окружения", exc_info=True)
+        return
+    if stored:
+        ProcessRuntime().apply("logging", merged("logging", stored))
 
 
 async def daily_backup_loop(services: Services, period_s: float = 60.0) -> None:
