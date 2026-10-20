@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import ColumnElement, column, false, func, or_, select, table, true, tuple_, update
+from sqlalchemy import ColumnElement, and_, column, false, func, or_, select, table, true, tuple_, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from aiskra.modules.incidents.application.ports.dds import BrigadeOption, DdsFilter, DdsJournalRow, DdsServiceState
@@ -50,6 +50,8 @@ class SqlDdsRepository:
                     CS.pause_started_at,
                     CS.brigades,
                     C.session_id,
+                    C.origin,
+                    C.author_id,
                 )
                 .select_from(CS)
                 .join(C, C.id == CS.card_id)
@@ -59,7 +61,7 @@ class SqlDdsRepository:
         ).first()
         if found is None:
             return None
-        number, card_status, current, short, paused_ms, pause_started_at, brigades, session_id = found
+        number, card_status, current, short, paused_ms, pause_started_at, brigades, session_id, origin, author = found
         return DdsServiceState(
             card_id=card_id,
             card_number=number,
@@ -71,6 +73,8 @@ class SqlDdsRepository:
             pause_started_at=as_utc(pause_started_at),
             brigades=list(brigades or []),
             session_id=session_id,
+            origin=origin or "student",
+            author_id=author,
         )
 
     async def brigades(self, service_code: str, *, exclude_card: UUID | None = None) -> list[BrigadeOption]:
@@ -106,10 +110,15 @@ class SqlDdsRepository:
         ]
 
     async def timer_states(
-        self, service_code: str, *, paused: bool, session_ids: list[UUID | None] | None = None
+        self,
+        service_code: str,
+        *,
+        paused: bool,
+        session_ids: list[UUID | None] | None = None,
+        viewer_id: UUID | None = None,
     ) -> list[DdsServiceState]:
         cond = CS.pause_started_at.is_not(None) if paused else CS.current_status.in_(WAITING)
-        scope = in_sessions(session_ids) if session_ids is not None else true()
+        scope = in_sessions(session_ids, viewer_id) if session_ids is not None else true()
         rows = await self._s.execute(
             select(
                 CS.card_id,
@@ -181,12 +190,14 @@ class SqlDdsRepository:
         await self._s.flush()
 
 
-def in_sessions(ids: list[UUID | None]) -> ColumnElement[bool]:
-    """Карточки этих занятий; None в списке — и карточки вне занятий (свободная практика ДДС)."""
+def in_sessions(ids: list[UUID | None], viewer_id: UUID | None = None) -> ColumnElement[bool]:
+    """Карточки этих занятий; None в списке — и карточки вне занятий (свободная практика ДДС). Системная карточка
+    вне занятия — учебная карточка самостоятельной тренировки: видна только её обучающемуся (автору `viewer_id`)."""
     known = [i for i in ids if i is not None]
-    parts = [C.session_id.in_(known)] if known else []
+    parts: list[ColumnElement[bool]] = [C.session_id.in_(known)] if known else []
     if None in ids:
-        parts.append(C.session_id.is_(None))
+        own = or_(C.origin != "system", C.author_id == viewer_id) if viewer_id is not None else C.origin != "system"
+        parts.append(and_(C.session_id.is_(None), own))
     return or_(*parts) if parts else false()
 
 
@@ -207,7 +218,7 @@ class SqlDdsReader:
         if flt.q:
             scope = scope.where(C.search_key.like(f"%{search_key(flt.q)}%"))
         if flt.session_ids is not None:  # обучающийся — только карточки своих занятий (ТЗ 2.7, 2.8)
-            scope = scope.where(in_sessions(flt.session_ids))
+            scope = scope.where(in_sessions(flt.session_ids, flt.viewer_id))
         total = int((await self._s.execute(select(func.count()).select_from(scope.subquery()))).scalar_one())
         page_ids = (
             (

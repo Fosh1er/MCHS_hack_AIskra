@@ -911,6 +911,14 @@
 .arm112--alt .arm112-hint { display: inline-block; }
 .arm112-rel { position: relative; }
 
+/* iPad горизонтально (1101–1279 px): три телефона в одну строку не помещаются — шапка карточки в две строки,
+   как на узких экранах; остальная карточка не меняется */
+@media (max-width: 1279px) {
+  .arm112 { height: auto; min-height: 100vh; overflow: visible; }
+  .arm112__top { height: auto; flex-wrap: wrap; }
+  .arm112__top > * { min-width: 240px; }
+}
+
 @media (max-width: 1100px) {
   .arm112 { height: auto; min-height: 100vh; overflow: visible; }
   .arm112__top { height: auto; flex-wrap: wrap; }
@@ -932,10 +940,23 @@
 .arm112 .arm-phone__icons .i { width: 24px; height: 24px; }
 .arm112 .arm-phone__field { padding: 8px 12px; }
 .arm112 .arm-phone__label { font-size: 13.5px; }
-.arm112 .arm-phone__input { font-size: 23px; }
+/* Номер телефона — целиком в ячейке на любом экране от 1000 px (MacBook, iPad): шрифт по ширине ячейки, не крупнее
+   23 px стенда. «+7 (954) 684-38-81» занимает ≈ 8,9 кегля — отсюда делитель 9,2 (с запасом); у полей с кнопкой «АОН»
+   из ширины вычитается место под кнопку. Номер не переносится на вторую строку. */
+.arm112 .arm-phone__field { container-type: inline-size; }
+.arm112 .arm-phone__input { --phone-extra: 0px; font-size: clamp(9.5px, calc((100cqi - var(--phone-extra)) / 9.2), 23px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.arm112 .arm-phone__row:has(.arm-aonbtn) .arm-phone__input { --phone-extra: 54px; }
 .arm112 .arm-phone__tools .i { width: 16px; height: 16px; }
 .arm112 .arm-aonbtn { height: 23px; font-size: 12px; }
 .arm112 .arm-idbox { width: 260px !important; padding: 10px 12px; }
+/* MacBook и iPad (уже 1600 px): блок вызова и колонки иконок у́же — ширина достаётся трём телефонам.
+   Блок номера карточки не трогаем: при меньшей ширине номер переносится и строка «Опер.» обрезается. */
+@media (max-width: 1600px) {
+  .arm112 .arm-callctl { width: 270px; }
+  .arm112 .arm-callctl__hang { width: 58px; }
+  .arm112 .arm-phone__icons { width: 32px; }
+  .arm112 .arm-phone__icons .i { width: 20px; height: 20px; }
+}
 .arm112 .arm-idbox__title { font-size: 19px; }
 .arm112 .arm-idbox__meta { font-size: 13.5px; }
 .arm112 .arm-timer { width: 119px; }
@@ -1281,6 +1302,10 @@ body:has(.dds-editor) .ipphone > .arm-dock__section:not(.ipphone__screen) { disp
 .psy-act { font-size: var(--fs-2xs); padding: 0 6px; background: var(--c-blue-100); color: var(--text-strong); }
 .psy-act--bad { background: #fbe3dc; color: #8a3a1c; }
 .psy-warning { padding: 10px 12px; background: #fff4e0; border-left: 4px solid var(--s-warn); color: var(--text-strong); font-size: var(--fs-sm); }
+.assess__recs { margin: 0; padding: 6px 10px 6px 28px; font-size: var(--fs-xs); background: var(--c-blue-100); border-left: 3px solid var(--accent); }
+.assess__recs-title { margin: 0; font-size: var(--fs-xs); font-weight: var(--fw-bold); color: var(--text-strong); }
+.arm-list__tools .arm-minibtn { height: 23px; padding: 0 14px; font-size: 12px; cursor: pointer; }
+.dds-selfnote { margin-left: 10px; font-size: var(--fs-sm); color: var(--text-inverse-muted); }
 .assess__expert { margin: 6px 0; padding: 6px 10px; font-size: 13px; background: var(--c-blue-100); border-left: 3px solid var(--accent); }
 .progress-page .cab-card, .progress-page .cab-stat { color: var(--text); }
 .session-banner__clock { font-variant-numeric: tabular-nums; font-weight: 500; }

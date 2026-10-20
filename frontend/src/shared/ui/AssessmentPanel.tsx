@@ -6,16 +6,18 @@ import { num } from '../format';
 import { PsyBlockView } from './PsyBlock';
 import { BranchOutcome } from './BranchOutcome';
 
-export function AssessmentPanel({ cardId, role, service, auto }: { cardId: string; role: '112' | 'dds'; service?: string | null; auto: boolean }) {
+/** `auto` — проверить сразу, если оценки ещё нет; `fresh` — проверить заново и при уже готовой оценке (самостоятельная
+ *  тренировка ДДС: решение только что принято — оценка сразу, без преподавателя). */
+export function AssessmentPanel({ cardId, role, service, auto, fresh = false }: { cardId: string; role: '112' | 'dds'; service?: string | null; auto: boolean; fresh?: boolean }) {
   const a = useAssessment(cardId, role, service);
   const evaluate = useEvaluate(cardId, role, service);
   const [open, setOpen] = useState(true);
   const started = useRef(false);
   useEffect(() => {
-    if (!auto || started.current || a.isPending || a.data) return;
+    if (!auto || started.current || a.isPending || (a.data && !fresh)) return;
     started.current = true;
     evaluate.mutate();
-  }, [auto, a.isPending, a.data, evaluate]);
+  }, [auto, fresh, a.isPending, a.data, evaluate]);
 
   const data = a.data;
   return (
@@ -53,6 +55,12 @@ export function AssessmentPanel({ cardId, role, service, auto }: { cardId: strin
               </li>
             ))}
           </ul>
+          {(data.details.recommendations?.length ?? 0) > 0 && (
+            <div aria-label="Рекомендации">
+              <p className="assess__recs-title">Рекомендации</p>
+              <ul className="assess__recs">{data.details.recommendations!.map((r) => <li key={r.key}>{r.text}</li>)}</ul>
+            </div>
+          )}
           {data.details.psy && <PsyBlockView block={data.details.psy} />}
           {data.details.branch && <BranchOutcome branch={data.details.branch} />}
           {(data.details.psy?.weight || data.details.branch?.weight) && data.details.role_score != null

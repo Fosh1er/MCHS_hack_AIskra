@@ -18,6 +18,7 @@ export interface Assessment {
     role_score?: number;
     psy?: PsyBlock;
     branch?: BranchDebrief; // F5: «Развитие ситуации» — итог ветвящегося сценария
+    recommendations?: Recommendation[]; // советы по слабым критериям этой работы (п. 5.1)
   };
 }
 /** Блок «Работа с заявителем» (п. 3.7): отдельный от балла роли, с лентой разбора. */

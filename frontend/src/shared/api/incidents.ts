@@ -161,7 +161,10 @@ export interface DdsJournalRow {
   paused_ms: number; pause_started_at: string | null; // п. 5.3: пауза таймера ожидания на подсказки
 }
 export interface DdsJournalPage { items: DdsJournalRow[]; total: number; page: number; page_size: number }
-export interface DdsCardView { card: CardView; service_code: string; service_status: string; next_statuses: string[] }
+export interface DdsCardView {
+  card: CardView; service_code: string; service_status: string; next_statuses: string[];
+  self_training: boolean; // учебная карточка самостоятельной тренировки: оценка — сразу после окончательного статуса
+}
 export interface ServiceStatusBody { status: string; order_no: string; comment: string; brigades?: string[] }
 /** Бригада справочника своей службы (п. 5.5); `busy_card_number` — занята на другой незакрытой карточке. */
 export interface BrigadeOption { code: string; call_sign: string; name: string; kind: string; crew: number; busy_card_id: string | null; busy_card_number: number | null }
