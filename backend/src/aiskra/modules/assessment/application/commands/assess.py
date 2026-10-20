@@ -12,6 +12,7 @@ from aiskra.modules.assessment.application.ports.attempts import AssessmentRecor
 from aiskra.modules.assessment.application.psy_judge import PsyJudge
 from aiskra.modules.assessment.domain.branch_scoring import BranchAttempt, branch_details
 from aiskra.modules.assessment.domain.psy_scoring import PsyAttempt, assess_psy, basis_of, timeline
+from aiskra.modules.assessment.domain.recommendations import recommend
 from aiskra.modules.assessment.domain.scoring import (
     CARD_NORM_SECONDS,
     DDS_NORM_SECONDS,
@@ -227,6 +228,8 @@ class AssessCardHandler:
             raise DomainError("Роль — 112 или dds", code="bad_role")
 
         details = to_details(result, service, number)
+        # п. 5.1, рекомендация экспертов п. 10: советы по слабым критериям этой работы — сразу в панели оценки
+        details["recommendations"] = recommend({c.key: c.score for c in result.criteria if c.score is not None})
         score, passed = result.score, result.passed
         block = await self._psy_block(psy_attempt, s.threshold)
         if block is not None:

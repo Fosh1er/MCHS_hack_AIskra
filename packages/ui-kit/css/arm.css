@@ -1278,6 +1278,10 @@ body:has(.dds-editor) .ipphone > .arm-dock__section:not(.ipphone__screen) { disp
 .psy-act { font-size: var(--fs-2xs); padding: 0 6px; background: var(--c-blue-100); color: var(--text-strong); }
 .psy-act--bad { background: #fbe3dc; color: #8a3a1c; }
 .psy-warning { padding: 10px 12px; background: #fff4e0; border-left: 4px solid var(--s-warn); color: var(--text-strong); font-size: var(--fs-sm); }
+.assess__recs { margin: 0; padding: 6px 10px 6px 28px; font-size: var(--fs-xs); background: var(--c-blue-100); border-left: 3px solid var(--accent); }
+.assess__recs-title { margin: 0; font-size: var(--fs-xs); font-weight: var(--fw-bold); color: var(--text-strong); }
+.arm-list__tools .arm-minibtn { height: 23px; padding: 0 14px; font-size: 12px; cursor: pointer; }
+.dds-selfnote { margin-left: 10px; font-size: var(--fs-sm); color: var(--text-inverse-muted); }
 .assess__expert { margin: 6px 0; padding: 6px 10px; font-size: 13px; background: var(--c-blue-100); border-left: 3px solid var(--accent); }
 .progress-page .cab-card, .progress-page .cab-stat { color: var(--text); }
 .session-banner__clock { font-variant-numeric: tabular-nums; font-weight: 500; }

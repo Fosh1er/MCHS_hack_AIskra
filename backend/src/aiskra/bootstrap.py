@@ -25,6 +25,7 @@ from aiskra.ai.router import ModelRouter
 from aiskra.integration.assessment_sources import IncidentAttempts
 from aiskra.integration.session_sources import (
     CardLessonsReader,
+    IncidentSelfTrainingCards,
     IncidentSystemCards,
     SessionFactsReader,
     SessionProgress,
@@ -185,6 +186,7 @@ from aiskra.modules.training.application.commands.scenarios import (
     ScenarioGenerator,
     SetScenarioPsyHandler,
 )
+from aiskra.modules.training.application.commands.self_training import RequestDdsSelfCardHandler
 from aiskra.modules.training.application.commands.sessions import (
     ChangeSessionStateHandler,
     CreateSessionHandler,
@@ -787,6 +789,18 @@ def _wire_sessions(app: FastAPI, services: Services) -> None:
             switches=SystemServiceSwitches(session),
         )
 
+    def self_card(session: Session) -> RequestDdsSelfCardHandler:
+        return RequestDdsSelfCardHandler(
+            SqlTrainingSessionRepository(session),
+            SqlScenarioRepository(session),
+            IncidentSelfTrainingCards(session),
+            ScenarioGenerator(DictionaryScenarioFacts(session), services.model_router, SqlMaterialContext(session)),
+            SqlAuditRecorder(session),
+            SqlAlchemyUnitOfWork(session),
+            clock,
+            switches=SystemServiceSwitches(session),
+        )
+
     def list_sessions(session: Session) -> ListSessionsHandler:
         return ListSessionsHandler(SqlTrainingSessionRepository(session), SqlStudentDirectory(session))
 
@@ -810,6 +824,7 @@ def _wire_sessions(app: FastAPI, services: Services) -> None:
     ov[training_deps.provide_create_session] = create
     ov[training_deps.provide_session_state] = state
     ov[training_deps.provide_feed] = feed
+    ov[training_deps.provide_self_card] = self_card
     ov[training_deps.provide_list_sessions] = list_sessions
     ov[training_deps.provide_get_session] = get_session_
     ov[training_deps.provide_my_session] = my_session

@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from aiskra.modules.assessment.application.ports.reports import CardLesson, ReportCard, ReportParticipant, SessionFacts
 from aiskra.modules.assessment.infrastructure.models import AssessmentModel
-from aiskra.modules.dictionaries.infrastructure.models import IncidentGroupModel, IncidentTypeModel
+from aiskra.modules.dictionaries.infrastructure.models import IncidentGroupModel, IncidentTypeModel, ServiceModel
 from aiskra.modules.incidents.application.ports.dds import DdsPost
 from aiskra.modules.incidents.domain.card import IncidentCardData
 from aiskra.modules.incidents.domain.incident import AddedBy, CardService, IncidentCard
@@ -71,8 +71,15 @@ class IncidentSystemCards:
         self._s = session
 
     async def create_from_scenario(
-        self, scenario: Scenario, *, extra_service: str | None, session_id: UUID, author_id: UUID
+        self, scenario: Scenario, *, extra_service: str | None, session_id: UUID | None, author_id: UUID
     ) -> UUID:
+        return (
+            await self._create(scenario, extra_service=extra_service, session_id=session_id, author_id=author_id)
+        ).id
+
+    async def _create(
+        self, scenario: Scenario, *, extra_service: str | None, session_id: UUID | None, author_id: UUID
+    ) -> IncidentCard:
         repo = SqlCardRepository(self._s)
         now = datetime.now(UTC)
         card = IncidentCard(
@@ -93,7 +100,7 @@ class IncidentSystemCards:
             services.append(CardService(code=extra_service, is_main=False, added_by=AddedBy.MANUAL))
         card.save(IncidentCardData.from_dict(card_data_from_scenario(scenario)), services, now)
         await repo.register(card)
-        return card.id
+        return card
 
     async def waiting(self, service_code: str, session_id: UUID) -> tuple[int, datetime | None]:
         base = (
@@ -107,6 +114,48 @@ class IncidentSystemCards:
         if last is not None and last.tzinfo is None:
             last = last.replace(tzinfo=UTC)
         return waiting, last
+
+
+class IncidentSelfTrainingCards(IncidentSystemCards):
+    """`SelfTrainingCards` (п. 2.1): учебная карточка самостоятельной тренировки ДДС — системная, вне занятия,
+    автор — сам обучающийся (так её видит только он: `incidents/infrastructure/dds.py:in_sessions`)."""
+
+    async def service_exists(self, service_code: str) -> bool:
+        found = await self._s.execute(select(ServiceModel.code).where(ServiceModel.code == service_code))
+        return found.scalar_one_or_none() is not None
+
+    async def approved_references(self) -> list[tuple[UUID, dict[str, Any]]]:
+        rows = await self._s.execute(
+            select(ScenarioModel.id, ScenarioModel.reference_card).where(ScenarioModel.status == "approved")
+        )
+        return [(sid, dict(ref or {})) for sid, ref in rows.all()]
+
+    async def pending(self, student_id: UUID) -> tuple[int, list[UUID]]:
+        own = (
+            await self._s.execute(
+                select(IncidentCardModel.id, IncidentCardModel.scenario_id)
+                .where(
+                    IncidentCardModel.author_id == student_id,
+                    IncidentCardModel.origin == "system",
+                    IncidentCardModel.session_id.is_(None),
+                )
+                .order_by(IncidentCardModel.opened_at.desc())
+            )
+        ).all()
+        if not own:
+            return 0, []
+        rows = await self._s.execute(
+            select(CardServiceModel.card_id, CardServiceModel.current_status).where(
+                CardServiceModel.card_id.in_([cid for cid, _ in own])
+            )
+        )
+        decided = {cid for cid, st in rows.all() if st not in WAITING}  # решение принято хотя бы по одной службе
+        waiting = sum(1 for cid, _ in own if cid not in decided)
+        return waiting, [sid for _, sid in own[:5] if sid is not None]
+
+    async def create(self, scenario: Scenario, *, service_code: str, student_id: UUID) -> tuple[UUID, int]:
+        card = await self._create(scenario, extra_service=service_code, session_id=None, author_id=student_id)
+        return card.id, card.number
 
 
 class SessionProgress:

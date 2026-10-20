@@ -52,6 +52,24 @@ class SystemCards(Protocol):
         ...
 
 
+class SelfTrainingCards(Protocol):
+    """Самостоятельная тренировка ДДС (п. 2.1): учебная карточка вне занятия, видна только своему обучающемуся."""
+
+    async def service_exists(self, service_code: str) -> bool: ...
+
+    async def approved_references(self) -> list[tuple[UUID, dict[str, Any]]]:
+        """Утверждённые сценарии банка с эталоном карточки 112 (в нём — службы)."""
+        ...
+
+    async def pending(self, student_id: UUID) -> tuple[int, list[UUID]]:
+        """Сколько учебных карточек обучающегося ждут решения и сценарии последних выданных (от новых)."""
+        ...
+
+    async def create(self, scenario: Scenario, *, service_code: str, student_id: UUID) -> tuple[UUID, int]:
+        """Системная карточка вне занятия, автор — обучающийся; возвращает id и номер."""
+        ...
+
+
 @dataclass(frozen=True)
 class ParticipantProgress:
     student_id: UUID

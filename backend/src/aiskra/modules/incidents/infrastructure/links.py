@@ -48,8 +48,8 @@ class SqlCardLinks:
         conditions: list[ColumnElement[bool]] = [C.status != "draft", C.saved_at >= since]
         if q.exclude is not None:
             conditions.append(C.id != q.exclude)
-        if q.author_id is not None:
-            conditions.append(C.author_id == q.author_id)
+        if q.author_id is not None:  # системные карточки (самостоятельная тренировка ДДС) — не обращения в 112
+            conditions += [C.author_id == q.author_id, C.origin != "system"]
         found = (
             await self._s.execute(
                 select(C.id, C.payload).where(*conditions).order_by(C.saved_at.desc()).limit(CANDIDATES)

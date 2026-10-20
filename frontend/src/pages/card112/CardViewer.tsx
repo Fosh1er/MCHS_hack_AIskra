@@ -166,7 +166,10 @@ export interface DdsMode {
   busy: boolean;
   onStatus: (b: ServiceStatusBody) => Promise<unknown>;
   onClose: () => void;
+  selfTraining?: boolean; // самостоятельная тренировка: окончательный статус — сразу автооценка с рекомендациями
 }
+
+const FINAL_DDS = new Set(['works_completed', 'works_refused', 'rejected']);
 
 /** Строка «Статус ▾ · Номер наряда · Комментарий · ✓ ✕» (dds/image8–9): в списке — только доступные переходы.
  *  Под ней — силы своей службы из справочника (п. 5.5): бригады, занятые на других карточках, выбрать нельзя. */
@@ -285,6 +288,9 @@ export function CardViewer({ view, me, dds }: { view: CardView; me: Me; dds?: Dd
   const services = [...view.services].sort((a, b) =>
     Number(b.code === dds?.service) - Number(a.code === dds?.service) || Number(b.is_main) - Number(a.is_main));
   const ownService = dds ? view.services.find((s) => s.code === dds.service) : undefined;
+  const finalDds = !!ownService && FINAL_DDS.has(ownService.status);
+  const finalAtOpen = useRef(finalDds); // окончательный статус поставлен сейчас, а не до открытия карточки
+  const justDecided = finalDds && !finalAtOpen.current;
   const lastOrderNo = [...(ownService?.history ?? [])].reverse().find((h) => h.order_no)?.order_no ?? '';
   const descriptionLines = (d.description ?? '').split('\n').filter(Boolean);
   const addressExtra = [
@@ -428,7 +434,8 @@ export function CardViewer({ view, me, dds }: { view: CardView; me: Me; dds?: Dd
             </>
           )}
           {dds && ownService && ownService.status !== 'added' && ownService.status !== 'received' && (
-            <AssessmentPanel cardId={view.id} role="dds" service={dds.service} auto={false} />
+            <AssessmentPanel key={justDecided ? 'decided' : 'opened'} cardId={view.id} role="dds" service={dds.service}
+              auto={!!dds.selfTraining && finalDds} fresh={!!dds.selfTraining && justDecided} />
           )}
         </div>
       </div>

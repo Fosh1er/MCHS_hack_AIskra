@@ -84,6 +84,11 @@ from aiskra.modules.training.application.commands.scenarios import (
     SetScenarioPsy,
     SetScenarioPsyHandler,
 )
+from aiskra.modules.training.application.commands.self_training import (
+    RequestDdsSelfCard,
+    RequestDdsSelfCardHandler,
+    SelfCardIssued,
+)
 from aiskra.modules.training.application.commands.sessions import (
     ChangeSessionState,
     ChangeSessionStateHandler,
@@ -874,6 +879,25 @@ async def my_sessions(
 @router.post("/sessions/feed", response_model=FeedResult, summary="Выпустить карточку занятия в очередь своей ДДС")
 async def feed(actor: Trainee, handler: Annotated[FeedDdsCardHandler, Depends(deps.provide_feed)]) -> FeedResult:
     return await handler(FeedDdsCard(actor=actor))
+
+
+class SelfCardIn(BaseModel):
+    service_code: str = Field(min_length=1, max_length=32, description="Код службы ДДС")
+
+
+@router.post(
+    "/self-training/dds",
+    response_model=SelfCardIssued,
+    status_code=201,
+    summary="Самостоятельная тренировка ДДС: учебная карточка вне занятия для своей службы",
+)
+async def dds_self_card(
+    body: SelfCardIn,
+    actor: Trainee,
+    meta: Meta,
+    handler: Annotated[RequestDdsSelfCardHandler, Depends(deps.provide_self_card)],
+) -> SelfCardIssued:
+    return await handler(RequestDdsSelfCard(actor=actor, service_code=body.service_code, meta=meta))
 
 
 @router.get("/sessions/{session_id}", response_model=SessionView, summary="Занятие")

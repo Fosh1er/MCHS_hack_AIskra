@@ -46,9 +46,19 @@ async def dds_scope(posts: DdsPosts, actor: Principal, service_code: str) -> lis
     return [None]
 
 
-def ensure_in_scope(state: DdsServiceState | None, sessions: list[UUID | None] | None) -> DdsServiceState:
-    """Карточка, не направленная в службу, черновик 112 или карточка другого занятия для ДДС «не существует»."""
+def is_self_training(state: DdsServiceState) -> bool:
+    """Учебная карточка самостоятельной тренировки ДДС: системная, вне занятия (автор — обучающийся, п. 2.1)."""
+    return state.session_id is None and state.origin == "system"
+
+
+def ensure_in_scope(
+    state: DdsServiceState | None, sessions: list[UUID | None] | None, viewer_id: UUID | None = None
+) -> DdsServiceState:
+    """Карточка, не направленная в службу, черновик 112, карточка другого занятия или чужая учебная карточка
+    самостоятельной тренировки для ДДС «не существует»."""
     if state is None or state.card_status == "draft" or (sessions is not None and state.session_id not in sessions):
+        raise NotFoundError("Карточка не поступала в эту службу", code="dds_card_not_found")
+    if sessions is not None and is_self_training(state) and state.author_id != viewer_id:
         raise NotFoundError("Карточка не поступала в эту службу", code="dds_card_not_found")
     return state
 
@@ -90,6 +100,7 @@ class SearchDdsJournalHandler:
                 q=query.q.strip(),
                 statuses=list(query.statuses),
                 session_ids=sessions,
+                viewer_id=query.actor.user_id,
                 limit=query.page_size,
                 offset=(query.page - 1) * query.page_size,
             )
@@ -112,6 +123,7 @@ class DdsCardView:
     service_code: str
     service_status: str
     next_statuses: list[str]
+    self_training: bool = False  # учебная карточка самостоятельной тренировки: оценка — сразу после решения
 
 
 class GetDdsCardHandler:
@@ -122,7 +134,9 @@ class GetDdsCardHandler:
 
     async def __call__(self, query: GetDdsCard) -> DdsCardView:
         sessions = await dds_scope(self._posts, query.actor, query.service_code)
-        ensure_in_scope(await self._repo.state(query.card_id, query.service_code), sessions)
+        state = ensure_in_scope(
+            await self._repo.state(query.card_id, query.service_code), sessions, query.actor.user_id
+        )
         card = await self._reader.get(query.card_id)
         own = next((s for s in card.services if s.code == query.service_code), None) if card else None
         if card is None or own is None or card.status == "draft":
@@ -133,6 +147,7 @@ class GetDdsCardHandler:
             service_code=own.code,
             service_status=own.status,
             next_statuses=[s.value for s in next_statuses(ServiceStatus(own.status))] if can_act else [],
+            self_training=is_self_training(state),
         )
 
 

@@ -317,6 +317,9 @@ export const useSessionState = (id: string) =>
 /** Идущее занятие обучающегося: опрашивается, чтобы старт и завершение преподавателем подхватывались без перезагрузки. */
 export const useMySession = (enabled = true) =>
   useQuery({ queryKey: ['my-session'], queryFn: () => http<MySession | null>(`${T}/sessions/my`), enabled, refetchInterval: 10_000 });
+/** Самостоятельная тренировка ДДС (п. 2.1): учебная карточка вне занятия для своей службы — видна только себе. */
+export interface SelfCardIssued { card_id: string; card_number: number; scenario_id: string; generated: boolean; waiting: number }
+export const requestDdsSelfCard = (service_code: string) => post<SelfCardIssued>('/self-training/dds', { service_code });
 export const feedDdsCard = () => post<{ card_id: string | null; waiting: number; reason: string }>('/sessions/feed');
 
 export interface MySessionRow {

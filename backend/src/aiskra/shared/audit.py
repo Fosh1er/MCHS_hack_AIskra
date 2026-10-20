@@ -58,6 +58,7 @@ class AuditEvent(StrEnum):
     SESSION_CREATED = "sessions.created"
     SESSION_STARTED = "sessions.started"
     SESSION_FINISHED = "sessions.finished"
+    DDS_SELF_CARD = "sessions.dds_self_card"
     SCENARIO_EDITED = "scenarios.edited"
     SCENARIO_REVIEWED = "scenarios.reviewed"
     SERVICE_STATUS_CHANGED = "dds.status_changed"
@@ -118,6 +119,7 @@ AUDIT_EVENT_TITLES: Mapping[AuditEvent, str] = {
     AuditEvent.SESSION_CREATED: "Создание занятия",
     AuditEvent.SESSION_STARTED: "Начало занятия",
     AuditEvent.SESSION_FINISHED: "Завершение занятия",
+    AuditEvent.DDS_SELF_CARD: "Учебная карточка ДДС для самостоятельной тренировки",
     AuditEvent.SCENARIO_EDITED: "Правка сценария",
     AuditEvent.SCENARIO_REVIEWED: "Проверка эталона по разделам (частичное утверждение)",
     AuditEvent.SERVICE_STATUS_CHANGED: "Изменение статуса службы (ДДС)",

@@ -31,7 +31,7 @@ async def load_state(
 ) -> DdsServiceState:
     """Строка службы в карточке, если пользователю можно работать с ней (`dds_scope`), иначе 403 / 404."""
     sessions = await dds_scope(posts, actor, service_code)
-    return ensure_in_scope(await repo.state(card_id, service_code), sessions)
+    return ensure_in_scope(await repo.state(card_id, service_code), sessions, actor.user_id)
 
 
 def _entry(
@@ -180,7 +180,9 @@ class SetDdsTimerPausedHandler(_Base):
             states = [st] if cmd.paused or st.pause_started_at is not None else []
         else:
             sessions = await dds_scope(self._posts, cmd.actor, cmd.service_code)
-            states = await self._repo.timer_states(cmd.service_code, paused=not cmd.paused, session_ids=sessions)
+            states = await self._repo.timer_states(
+                cmd.service_code, paused=not cmd.paused, session_ids=sessions, viewer_id=cmd.actor.user_id
+            )
         changed = 0
         try:
             for st in states:

@@ -13,7 +13,7 @@ import { ArmTopBar, shortName } from '../../shared/ui/ArmTopBar';
 import { ARM_MENU } from '../../shared/ui/armMenu';
 import { rememberDds } from './DdsSelectPage';
 import { PERMISSIONS } from '../../shared/api/auth';
-import { feedDdsCard, useMySession } from '../../shared/api/training';
+import { feedDdsCard, requestDdsSelfCard, useMySession } from '../../shared/api/training';
 import { SessionBanner } from '../../shared/ui/SessionBanner';
 
 export const DDS_NORM_SECONDS = 30; // ТЗ: тайминг по умолчанию; настраивается преподавателем в 4.2
@@ -73,7 +73,9 @@ export function DdsJournalPage() {
 
   // п. 4.2: на занятии с ролью ДДС этой службы карточки занятия приходят в очередь сами — темп и предел очереди
   // решает сервер (FeedDdsCard), страница только периодически спрашивает
-  const session = useMySession(me.permissions.includes(PERMISSIONS.trainingParticipate)).data ?? null;
+  const trainee = me.permissions.includes(PERMISSIONS.trainingParticipate);
+  const mySession = useMySession(trainee);
+  const session = mySession.data ?? null;
   const feeding = session?.role === 'dds' && session.dds_service_code === service && session.card_source !== 'trainee';
   const [feedNote, setFeedNote] = useState('');
   useEffect(() => {
@@ -87,6 +89,19 @@ export function DdsJournalPage() {
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [feeding, service]);
+
+  // п. 2.1, рекомендация экспертов п. 10: вне занятия обучающийся сам берёт учебную карточку своей службы — система
+  // выбирает сценарий банка (или создаёт новый), карточку видит только он, решение оценивается сразу
+  const selfTraining = trainee && mySession.isSuccess && session === null;
+  const [selfBusy, setSelfBusy] = useState(false);
+  const [selfNote, setSelfNote] = useState('');
+  const takeSelfCard = () => {
+    setSelfBusy(true);
+    requestDdsSelfCard(service)
+      .then((r) => { setSelfNote(`карточка № ${r.card_number} в очереди · ждут решения: ${r.waiting}`); void journal.refetch(); })
+      .catch((e: Error) => setSelfNote(e.message))
+      .finally(() => setSelfBusy(false));
+  };
 
   // таймеры ожидания тикают каждую секунду
   const [now, setNow] = useState(() => Date.now());
@@ -181,6 +196,15 @@ export function DdsJournalPage() {
             )}
           </div>
           <div className="arm-list__tools">
+            {selfTraining && (
+              <span>
+                <button type="button" className="arm-minibtn" disabled={selfBusy} onClick={takeSelfCard}
+                  title="Самостоятельная тренировка: система выдаст учебную карточку для этой службы и оценит ваше решение">
+                  {selfBusy ? 'выдаю…' : 'учебная карточка'}
+                </button>
+                {selfNote && <span className="dds-selfnote" role="status">{selfNote}</span>}
+              </span>
+            )}
             <label className="arm-switch">
               <input type="checkbox" role="switch" checked={notify} onChange={(e) => setNotify(e.target.checked)} />
               <span className="arm-switch__track" aria-hidden="true" />
@@ -200,7 +224,7 @@ export function DdsJournalPage() {
         {journal.isError && <div className="arm-empty">Не удалось загрузить реестр: {journal.error.message}</div>}
         {journal.data?.items.map((r) => <JournalRow key={r.id} inc={toInc(r)} normSec={DDS_NORM_SECONDS} onOpen={() => open(r.id)} />)}
         {journal.data && total === 0 && (
-          <div className="arm-empty">{q || filter ? 'Ничего не найдено' : 'Карточек пока нет. Они появятся, когда оператор 112 направит происшествие в эту службу.'}</div>
+          <div className="arm-empty">{q || filter ? 'Ничего не найдено' : `Карточек пока нет. Они появятся, когда оператор 112 направит происшествие в эту службу${selfTraining ? ', — или возьмите «учебную карточку»' : ''}.`}</div>
         )}
         <div className="arm-pager" style={{ marginTop: 16 }}>
           <label>Страница:{' '}
