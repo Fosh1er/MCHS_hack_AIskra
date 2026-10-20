@@ -19,6 +19,9 @@ import { SessionBanner } from '../../shared/ui/SessionBanner';
 export const DDS_NORM_SECONDS = 30; // ТЗ: тайминг по умолчанию; настраивается преподавателем в 4.2
 const PAGE_SIZES = [10, 15, 30, 50, 100];
 const WAITING = new Set(['added', 'received']);
+// Ждёт решения дольше часа при нормативе 30 с — карточку оставили на прошлом занятии или смене: таймер останавливается,
+// карточка помечается «просрочена» и не входит в «ждут решения» (иначе таймер показывал бы сутки — «6135:44»)
+const STALE_WAIT_SEC = 60 * 60;
 const FILTERS: { value: string; label: string; statuses: string[] }[] = [
   { value: '', label: 'все', statuses: [] },
   { value: 'new', label: 'новые (ждут решения)', statuses: ['added', 'received'] },
@@ -109,17 +112,23 @@ export function DdsJournalPage() {
   const pages = Math.max(1, Math.ceil(total / pageSize));
   const first = total ? (page - 1) * pageSize + 1 : 0;
   const last = Math.min(page * pageSize, total);
-  const waitingCount = journal.data?.items.filter((r) => WAITING.has(r.service_status)).length ?? 0;
+  const rows = journal.data?.items ?? [];
   const onSearch = (e: FormEvent) => { e.preventDefault(); setQ(draft.trim()); setPage(1); };
   const open = (id: string) => { setFresh((f) => { const n = new Set(f); n.delete(id); return n; }); navigate(`/arm/dds/${encodeURIComponent(service)}/${id}`); };
 
   // таймер ожидания стоит на паузе подсказок: с сервера (pause_started_at) или, пока ответ не пришёл, — локально
   const waitUntil = (r: DdsJournalRow) => (r.pause_started_at ? new Date(r.pause_started_at).getTime() : pauseSince ?? now);
+  /** Сколько карточка ждёт решения, с; не ждёт — undefined */
+  const waitOf = (r: DdsJournalRow) => (WAITING.has(r.service_status) && r.added_at
+    ? Math.max(0, Math.floor((waitUntil(r) - new Date(r.added_at).getTime() - (r.paused_ms ?? 0)) / 1000))
+    : undefined);
+  const isStale = (r: DdsJournalRow) => (waitOf(r) ?? 0) > STALE_WAIT_SEC;
+  const waitingCount = rows.filter((r) => waitOf(r) != null && !isStale(r)).length;
+  const staleCount = rows.filter(isStale).length;
   const toInc = (r: DdsJournalRow) => {
     const reg = r.registered_at ? new Date(r.registered_at) : null;
     const saved = r.added_at ? new Date(r.added_at) : null;
     const statusAt = r.service_status_at ? new Date(r.service_status_at) : null;
-    const waiting = WAITING.has(r.service_status) && saved;
     return {
       number: String(r.number),
       date: reg ? reg.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '',
@@ -132,7 +141,8 @@ export function DdsJournalPage() {
       descMeta: saved ? `${saved.toLocaleDateString('ru-RU')} ${saved.toLocaleTimeString('ru-RU')} ${r.operator_number ?? ''} ${r.author_name ? shortName(r.author_name) : ''} -` : '',
       operatorCell: r.channel === 'sms' ? 'СМС' : r.operator_number ?? '',
       arm: r.arm_number ?? '',
-      waitSec: waiting ? Math.max(0, Math.floor((waitUntil(r) - saved!.getTime() - (r.paused_ms ?? 0)) / 1000)) : undefined,
+      waitSec: isStale(r) ? undefined : waitOf(r),
+      stale: isStale(r),
       isNew: fresh.has(r.id),
     };
   };
@@ -164,6 +174,11 @@ export function DdsJournalPage() {
           <div className="arm-list__title">
             Список происшествий <Icon name="expand_less" size="sm" />
             {waitingCount > 0 && <span className="dds-waiting" role="status">ждут решения: {waitingCount}</span>}
+            {staleCount > 0 && (
+              <span className="dds-stale" title="Карточки ждут решения больше часа — они с прошлых занятий или смен">
+                просрочены: {staleCount}
+              </span>
+            )}
           </div>
           <div className="arm-list__tools">
             <label className="arm-switch">

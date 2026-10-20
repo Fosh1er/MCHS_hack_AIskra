@@ -312,6 +312,8 @@ export interface JournalIncident {
   serviceStatus: string; description: string; descMeta: string; operatorCell?: string; arm?: string;
   /** Учебная надстройка: сколько карточка ждёт реакции */
   waitSec?: number;
+  /** Ждёт решения так долго, что таймер не имеет смысла (карточка с прошлого занятия или смены) — «просрочена» */
+  stale?: boolean;
   isNew?: boolean;
 }
 export function JournalRow({ inc, normSec = 30, onOpen }: { inc: JournalIncident; normSec?: number; onOpen?: () => void }) {
@@ -334,7 +336,11 @@ export function JournalRow({ inc, normSec = 30, onOpen }: { inc: JournalIncident
         <div className="c-addr">{inc.address}</div>
         <div className="c-status">{inc.serviceStatus}</div>
         <div className="c-slate">
-          {st && <StatusPill surface="dark" status={st}>{st === 'ok' ? 'в норме' : formatMmSs(inc.waitSec!)}</StatusPill>}
+          {inc.stale ? (
+            <span title="Карточка ждёт решения больше часа — она с прошлого занятия или смены. Таймер остановлен.">
+              <StatusPill surface="dark" status="critical">просрочена</StatusPill>
+            </span>
+          ) : st && <StatusPill surface="dark" status={st}>{st === 'ok' ? 'в норме' : formatMmSs(inc.waitSec!)}</StatusPill>}
         </div>
         <div className="c-slate"><button type="button" onClick={onOpen} aria-label="Открыть карточку" style={{ border: 0, background: 'none', color: 'inherit', display: 'flex' }}><Icon name="clipboard" size="sm" /></button></div>
       </div>
