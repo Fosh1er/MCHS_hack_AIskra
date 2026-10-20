@@ -41,6 +41,7 @@ cd backend && uv run alembic upgrade head && uv run python -m aiskra.cli import-
 cd backend && uv run python -m aiskra.cli import-addresses   # адресный справочник и границы районов (п. 1.2)
 cd backend && uv run python -m aiskra.cli create-user --login admin --full-name "…" --role admin   # пользователь
 make e2e                             # F6.5: сквозные сценарии в браузере, стенд поднимается сам (раздел «E2E»)
+tools/stand/stand up [--local]       # 7.4: стенд на своём компьютере под доменом (Caddy + Let's Encrypt), docs/demo/Стенд_на_своём_компьютере.md
 ```
 **Перед каждым коммитом зелёными должны быть `make be-check` и `make fe-build`.**
 
