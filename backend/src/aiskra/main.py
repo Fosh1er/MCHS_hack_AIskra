@@ -118,9 +118,11 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
         )
 
     @app.exception_handler(AppError)
-    async def _app_error(_: Request, exc: AppError) -> JSONResponse:
+    async def _app_error(request: Request, exc: AppError) -> JSONResponse:
         status = next((code for cls, code in _STATUS.items() if isinstance(exc, cls)), 500)
-        return JSONResponse(status_code=status, content={"error": exc.code, "message": exc.message})
+        if isinstance(exc, ExternalServiceError):  # подробности — в журнал, пользователю — без адресов и кодов
+            log.warning("Внешний сервис: %s %s — %s", request.method, request.url.path, exc.message)
+        return JSONResponse(status_code=status, content={"error": exc.code, "message": exc.public_message})
 
     # Запрет по умолчанию (ADR-0010): всё под /api/v1 требует сессии, кроме /auth (вход публичный,
     # остальные эндпоинты /auth сами требуют пользователя; демо-вход F2 публичен только в demo и dev).

@@ -160,7 +160,7 @@ from aiskra.modules.training.application.voice_lab import LabMessage, VoiceLab
 from aiskra.modules.training.domain.material import MAX_BYTES, MaterialKind
 from aiskra.modules.training.domain.review import Decision
 from aiskra.modules.training.domain.stream_text import RemarkFilter
-from aiskra.shared.errors import AppError, DomainError, NotFoundError
+from aiskra.shared.errors import AppError, DomainError, ExternalServiceError, NotFoundError
 from aiskra.shared.security import Permission, Principal
 from aiskra.shared.web import CurrentPrincipal, Meta, require
 
@@ -401,7 +401,9 @@ async def replica_stream(
                 r = await handler(cmd, sink=sink)
             await queue.put(("final", _replica_out(r).model_dump(mode="json")))
         except AppError as e:
-            await queue.put(("error", {"code": e.code, "message": str(e)}))
+            if isinstance(e, ExternalServiceError):
+                log.warning("Потоковый ответ звонка %s: %s", call_id, e.message)
+            await queue.put(("error", {"code": e.code, "message": e.public_message}))
         except Exception:
             log.exception("Потоковый ответ звонка %s не удался", call_id)
             await queue.put(("error", {"code": "internal_error", "message": "Не удалось получить ответ собеседника"}))

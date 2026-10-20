@@ -12,6 +12,11 @@ class AppError(Exception):
         if code:
             self.code = code
 
+    @property
+    def public_message(self) -> str:
+        """Что увидит пользователь. У большинства ошибок — само сообщение: оно и пишется для пользователя."""
+        return self.message
+
 
 class DomainError(AppError):
     """Нарушено бизнес-правило (HTTP 422)."""
@@ -50,6 +55,19 @@ class ConfigError(AppError):
 
 
 class ExternalServiceError(AppError):
-    """Внешний сервис (модель, STT, TTS) недоступен или ответил некорректно (HTTP 503)."""
+    """Внешний сервис (модель, STT, TTS) недоступен или ответил некорректно (HTTP 503).
+
+    `message` — подробности для журнала (код ответа, адрес сервиса); пользователю уходит `public` — без них:
+    «402 Payment Required for url …» в окне разговора ничего не говорит обучающемуся."""
 
     code = "external_service_error"
+    public = "Сервис ИИ сейчас недоступен — попробуйте ещё раз"
+
+    def __init__(self, message: str, *, code: str | None = None, public: str | None = None) -> None:
+        super().__init__(message, code=code)
+        if public:
+            self.public = public
+
+    @property
+    def public_message(self) -> str:
+        return self.public

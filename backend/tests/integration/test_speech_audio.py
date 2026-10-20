@@ -111,3 +111,37 @@ def test_call_recording_wav(app_client: Callable[[], TestClient]) -> None:
         assert as_user(app_client, "petrov").get(url).status_code == 404  # чужой звонок
     finally:
         services.tts = real
+
+
+def test_stt_failure_shows_plain_message_and_logs_details(
+    app_client: Callable[[], TestClient], caplog: pytest.LogCaptureFixture
+) -> None:
+    """Модель распознавания ответила ошибкой (нет оплаты, сеть): обучающийся видит, что делать, а не код и адрес
+    сервиса — подробности остаются в журнале сервера."""
+    from aiskra.ai.ports import Transcript
+    from aiskra.modules.training.application.speech import STT_UNAVAILABLE
+    from aiskra.shared.errors import ExternalServiceError
+
+    detail = (
+        "распознавание речи недоступно (HTTPStatusError: Client error '402 Payment Required' for url 'https://x/v1')"
+    )
+
+    class BrokeSTT:
+        enabled = True
+        model_id = "stub-stt"
+
+        async def transcribe(self, audio: bytes, *, lang: str = "ru", mime: str = "audio/webm") -> Transcript:
+            raise ExternalServiceError(detail)
+
+    student = as_user(app_client, "student")
+    services = student.app.state.services  # type: ignore[attr-defined]
+    real, services.stt = services.stt, BrokeSTT()
+    try:
+        with caplog.at_level("WARNING"):
+            r = student.post("/api/v1/training/speech", files={"audio": ("a.webm", b"\x1aE", "audio/webm")})
+        assert r.status_code == 503
+        assert r.json() == {"error": "stt_unavailable", "message": STT_UNAVAILABLE}
+        assert "402" not in r.text and "http" not in r.text.lower()
+        assert detail in caplog.text  # подробности — для администратора, в журнале
+    finally:
+        services.stt = real

@@ -57,7 +57,7 @@ make e2e                             # F6.5: сквозные сценарии �
 5. **DI без фреймворка (ADR-0004).** В `api/deps.py` — `provider_stub(...)`. В `bootstrap.wire()` — `app.dependency_overrides[stub] = factory`. API не импортирует `bootstrap` и адаптеры.
 6. **ИИ только через `ModelRouter.for_task(AITask.X)`.** Никаких прямых HTTP-вызовов моделей и жёстко прописанных URL. Модель задачи задаётся в `config/ai.yaml`.
 7. **Кеш ИИ — декоратор (ADR-0006).** Режимы `exact` / `task` / `off` задаются в конфиге задачи. Детерминированные задачи (оценка) — `exact`, реплики актёров — `task` со `scope`, генерация — `off`.
-8. **Ошибки — исключения из `aiskra.shared.errors`.** HTTP-коды назначаются только в `main.py` (`DomainError` 422, `NotFoundError` 404, `PermissionDeniedError` 403, `ExternalServiceError` 503).
+8. **Ошибки — исключения из `aiskra.shared.errors`.** HTTP-коды назначаются только в `main.py` (`DomainError` 422, `NotFoundError` 404, `PermissionDeniedError` 403, `ExternalServiceError` 503). У `ExternalServiceError` `message` — подробности для журнала (код ответа, адрес), пользователю уходит `public_message` без них; своя фраза — `public=`.
 9. **ORM-модели** — в `modules/<m>/infrastructure/models.py`, регистрируются в `platform/models_registry.py`. Схема меняется **только миграцией Alembic**.
 10. **Язык.** Интерфейс, сообщения об ошибках, докстринги и документация — по-русски. Идентификаторы в коде — по-английски.
 
