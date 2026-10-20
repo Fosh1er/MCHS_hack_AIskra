@@ -87,7 +87,8 @@ class SqlCardReader:
     async def search(self, flt: JournalFilter) -> tuple[list[JournalRow], int]:
         conditions: list[ColumnElement[bool]] = []
         if flt.author_id is not None:
-            conditions.append(C.author_id == flt.author_id)
+            # учебные карточки самостоятельной тренировки ДДС (системные) — не работа обучающегося в 112
+            conditions += [C.author_id == flt.author_id, C.origin != "system"]
         if flt.q:
             pattern = f"%{search_key(flt.q)}%"
             conditions.append(or_(C.search_key.like(pattern), _users.c.search_key.like(pattern)))

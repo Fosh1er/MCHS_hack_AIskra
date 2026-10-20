@@ -20,6 +20,9 @@ class DdsServiceState:
     pause_started_at: datetime | None = None
     brigades: list[str] = field(default_factory=list)  # п. 5.5: силы службы, работающие по карточке
     session_id: UUID | None = None  # занятие карточки (п. 4.2); None — карточка вне занятия
+    # самостоятельная тренировка ДДС: системная карточка вне занятия видна только своему обучающемуся (автору)
+    origin: str = "student"
+    author_id: UUID | None = None
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -39,10 +42,16 @@ class DdsRepository(Protocol):
     async def state(self, card_id: UUID, service_code: str) -> DdsServiceState | None: ...
 
     async def timer_states(
-        self, service_code: str, *, paused: bool, session_ids: list[UUID | None] | None = None
+        self,
+        service_code: str,
+        *,
+        paused: bool,
+        session_ids: list[UUID | None] | None = None,
+        viewer_id: UUID | None = None,
     ) -> list[DdsServiceState]:
         """Карточки службы для паузы таймера (п. 5.3): `paused=False` — ждут решения, `True` — сейчас на паузе.
-        `session_ids` — только карточки этих занятий, None в списке — карточки вне занятий (сам None — все)."""
+        `session_ids` — только карточки этих занятий, None в списке — карточки вне занятий (сам None — все);
+        системные карточки вне занятий — только самостоятельной тренировки `viewer_id`."""
         ...
 
     async def set_pause(
@@ -77,6 +86,8 @@ class DdsFilter:
     statuses: list[str] = field(default_factory=list)  # статусы службы; пусто — все
     # только карточки этих занятий (обучающийся), None в списке — карточки вне занятий; None — все (преподаватель)
     session_ids: list[UUID | None] | None = None
+    # вне занятия: системные карточки (самостоятельная тренировка) — только этого обучающегося
+    viewer_id: UUID | None = None
     limit: int = 15
     offset: int = 0
 

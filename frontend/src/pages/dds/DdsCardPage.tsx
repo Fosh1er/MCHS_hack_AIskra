@@ -47,6 +47,7 @@ export function DdsCardPage() {
         busy: actions.status.isPending,
         onStatus: (b) => actions.status.mutateAsync(b),
         onClose: () => navigate(`/arm/dds/${encodeURIComponent(service)}`),
+        selfTraining: card.data.self_training,
       }}
     />
     </>
