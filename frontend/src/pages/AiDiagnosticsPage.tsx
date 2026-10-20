@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Button, Card, StatusPill } from '@smena112/ui-kit';
 import { useAIConfig, useHealth, useProbeModel } from '../shared/api/system';
+import { CabinetShell } from '../shared/ui/CabinetShell';
 
 export function AiDiagnosticsPage() {
   const health = useHealth();
@@ -12,8 +13,8 @@ export function AiDiagnosticsPage() {
   const [task, setTask] = useState('probe');
 
   return (
-    <div className="cab-content" style={{ maxWidth: 1100, margin: '0 auto' }}>
-      <h1 className="cab-title">Диагностика ИИ-провайдеров</h1>
+    // в кабинете администратора (F6.3: страница переехала с /dev/ai) — с меню, а не отдельным экраном
+    <CabinetShell kind="admin" active="ai" title="ИИ-модели" subtitle="провайдеры, назначение моделей на задачи, пробный запрос">
       <Card title="Состояние">
         {health.data ? (
           <div className="u-row">
@@ -52,6 +53,6 @@ export function AiDiagnosticsPage() {
         )}
         {probe.error && <p style={{ marginTop: 12 }}><StatusPill status="critical">{probe.error.message}</StatusPill></p>}
       </Card>
-    </div>
+    </CabinetShell>
   );
 }
