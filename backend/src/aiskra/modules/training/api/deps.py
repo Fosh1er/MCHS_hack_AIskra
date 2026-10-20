@@ -47,3 +47,5 @@ provide_replica_audio = provider_stub("training.ReplicaAudioHandler")
 provide_call_recording = provider_stub("training.CallRecordingHandler")
 provide_tick = provider_stub("training.TickCallHandler")  # F5: таймер ситуации ветвящегося сценария
 provide_branch_catalog = provider_stub("training.BranchCatalog")  # F5: каталог шаблонов ветвления
+provide_get_phonebook = provider_stub("training.GetPhonebookHandler")  # п. 2.3: телефонная книга ДДС
+provide_save_phonebook = provider_stub("training.SavePhonebookHandler")

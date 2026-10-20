@@ -1,15 +1,19 @@
-"""Руководства пользователя в PDF: docs/manuals/{teacher,student}.md → корень репозитория.
+"""Документы в PDF: docs/manuals/{teacher,student,admin,tech}.md → корень репозитория.
 
 Markdown → HTML (нумерация разделов и рисунков, титульный лист, содержание) → PDF печатью Chrome (Playwright).
 Скриншоты — docs/manuals/img, снимает `shoot.py`. Запуск из backend:
 
-    uv run --with markdown --with playwright python ../docs/manuals/build.py
+    uv run --with markdown --with playwright python ../docs/manuals/build.py [teacher student admin tech]
+
+Без аргументов собираются все документы. В front matter: `title`, `out`, `role` (роль на титуле) или `sub`
+(подзаголовок титула вместо роли).
 """
 
 from __future__ import annotations
 
 import html
 import re
+import sys
 from pathlib import Path
 
 import markdown
@@ -106,11 +110,15 @@ def number(body: str) -> tuple[str, list[tuple[int, str, str, str]]]:
     return body, toc
 
 
+def label(meta: dict[str, str]) -> str:
+    return f"{meta['title']} · {meta['role']}" if meta.get("role") else meta["title"]
+
+
 def page(meta: dict[str, str], body: str, toc: list[tuple[int, str, str, str]], cover_img: str) -> str:
     items = "".join(
         f'<li class="l{lv}"><span class="n">{num}</span><a href="#{a}">{t}</a></li>' for lv, num, t, a in toc
     )
-    return f"""<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>{meta["title"]} — {meta["role"]}</title>
+    return f"""<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>{label(meta).replace(" · ", " — ")}</title>
 <style>{CSS}</style></head><body>
 <section class="cover">
   <div class="cover__top"><span class="cover__logo">112</span><span class="cover__brand">Смена · учебный тренажёр</span></div>
@@ -118,9 +126,9 @@ def page(meta: dict[str, str], body: str, toc: list[tuple[int, str, str, str]], 
     <p class="cover__product">АИскра</p>
     <p class="cover__sub">ИИ-тренажёр оператора системы-112 и диспетчера ДДС</p>
     <p class="cover__title">{meta["title"]}</p>
-    <p class="cover__role">Роль «{meta["role"]}»</p>
+    <p class="cover__role">{f"Роль «{meta['role']}»" if meta.get("role") else meta.get("sub", "")}</p>
   </div>
-  <div class="cover__img"><img src="{cover_img}" alt=""></div>
+  {f'<div class="cover__img"><img src="{cover_img}" alt=""></div>' if cover_img else "<div></div>"}
   <div class="cover__bottom"><span>Версия {VERSION} · {DATE}</span><span>ЛЦТ-2026, задача № 9</span></div>
 </section>
 <section class="toc"><h1>Содержание</h1><ol>{items}</ol></section>
@@ -138,7 +146,9 @@ def build(name: str, cover: str) -> Path:
 
 
 def main() -> None:
-    jobs = [("teacher", "img/t03_home.jpg"), ("student", "img/s03_home.jpg")]
+    jobs = [("teacher", "img/t03_home.jpg"), ("student", "img/s03_home.jpg"), ("admin", ""), ("tech", "")]
+    if only := sys.argv[1:]:
+        jobs = [j for j in jobs if j[0] in only]
     footer = (
         '<div style="width:100%;font-size:8px;color:#777;padding:0 16mm 0 18mm;display:flex;justify-content:space-between;'
         'font-family:Helvetica Neue,Arial,sans-serif"><span>АИскра · {label}</span>'
@@ -159,7 +169,7 @@ def main() -> None:
                 print_background=True,
                 display_header_footer=True,
                 header_template="<span></span>",
-                footer_template=footer.format(label=f"{meta['title']} · {meta['role']}"),
+                footer_template=footer.format(label=label(meta)),
                 margin={"top": "16mm", "bottom": "18mm", "left": "18mm", "right": "16mm"},
                 prefer_css_page_size=False,
             )

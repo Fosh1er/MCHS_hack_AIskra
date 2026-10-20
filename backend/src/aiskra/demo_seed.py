@@ -31,9 +31,12 @@ from aiskra.modules.identity.infrastructure.groups import SqlGroupStore
 from aiskra.modules.identity.infrastructure.models import UserModel
 from aiskra.modules.training.application.commands.materials import UploadMaterial
 from aiskra.modules.training.application.commands.scenarios import GenerateScenarios
+from aiskra.modules.training.application.ports.phonebook import Phonebook
 from aiskra.modules.training.domain.material import MaterialKind
+from aiskra.modules.training.domain.phonebook import ContactRole, PhonebookEntry, validate_entries
 from aiskra.modules.training.infrastructure.branch_catalog import YamlBranchCatalog
 from aiskra.modules.training.infrastructure.models import ScenarioModel
+from aiskra.modules.training.infrastructure.phonebook import SqlPhonebookRepository
 from aiskra.platform.db import SqlAlchemyUnitOfWork, create_engine, create_session_factory
 from aiskra.platform.settings import Settings
 from aiskra.shared.errors import AppError
@@ -112,6 +115,22 @@ DEMO_USERS = [
     ),
 ]
 GROUP = "Смена 1 (демо)"
+# п. 2.3: абоненты IP-телефона демо-служб (ФИО и номера синтетические): должность, ФИО, условный номер
+DEMO_PHONEBOOKS: dict[str, list[tuple[str, str, str]]] = {
+    "S101": [
+        ("head", "Широков Валерий Михайлович", "101-10"),
+        ("response_chief", "Ермолаев Денис Олегович", "101-20"),
+        ("brigade_chief", "Голубев Станислав Юрьевич", "101-31"),
+        ("brigade_specialist", "Карпов Никита Андреевич", "101-32"),
+        ("applicant", "", ""),
+    ],
+    "S103": [
+        ("head", "Белоусова Татьяна Викторовна", "103-10"),
+        ("response_chief", "Мельников Роман Сергеевич", "103-20"),
+        ("brigade_chief", "Фомина Елена Аркадьевна", "103-31"),
+        ("brigade_specialist", "Тихонов Глеб Ильич", "103-32"),
+    ],
+}
 DEMO_PSY = ("panic", "crying", "hysteria", "aggression", "apathy", "stupor")  # п. 3.7, реакции на стресс (ЦЭПП МЧС)
 KIND_BY_EXT = {".docx": MaterialKind.INSTRUCTION, ".pdf": MaterialKind.REGULATION, ".xlsx": MaterialKind.CLASSIFIER}
 
@@ -278,6 +297,17 @@ async def seed(
                     SaveGroup(actor=actor, name=GROUP, members=members)
                 )
                 print(f"Группа: «{GROUP}» — {len(members)} обучающихся")
+
+        async with factory() as s:  # п. 2.3: телефонная книга ДДС для служб демо-диспетчеров
+            books = SqlPhonebookRepository(s)
+            for code, raw in DEMO_PHONEBOOKS.items():
+                if await books.get(code) is not None:
+                    print(f"Телефонная книга {code}: уже задана")
+                    continue
+                entries = validate_entries([PhonebookEntry(ContactRole(r), n, num) for r, n, num in raw])
+                await books.save(Phonebook(service_code=code, entries=entries, updated_by=ids.get("teacher")))
+                print(f"Телефонная книга {code}: {len(entries)} абонентов")
+            await s.commit()
 
         if materials_dir:
             async with factory() as s:
