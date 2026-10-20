@@ -148,7 +148,10 @@ class OpenAICompatibleTTS:
         if not profile.style or self._style == "none":
             return {}
         if self._style == "google":
-            return {"google-ai-studio": {"speech_metadata": {"style": profile.style}}}
+            # у Gemini TTS на OpenRouter два поставщика — AI Studio и Vertex: подача уходит обоим, иначе при
+            # маршрутизации в Vertex голос звучит без эмоции (проверено по /models/…/endpoints 20.10.2026)
+            meta = {"speech_metadata": {"style": profile.style}}
+            return {"google-ai-studio": meta, "google-vertex": meta}
         return {"openai": {"instructions": profile.style}}
 
     async def synthesize(self, text: str, *, voice: VoiceProfile) -> AudioBlob:

@@ -9,7 +9,8 @@
 #   STT_KIND=openai_compatible                    распознавание оператора (Qwen3-ASR, резерв — Whisper) — платно
 # Голос и распознавание используют тот же ключ. Для проверки без ключа — локальные make dev-tts и make dev-stt
 # (переменные STT_URL / TTS_URL), тот же адаптер: переключение — только переменными окружения.
-# Модели выбраны командой 19.10.2026 (F3): LLM — openai/gpt-4o; TTS — google/gemini-3.8-flash-tts (голос Zephyr),
+# Модели выбраны командой 19.10.2026 (F3), наличие проверено по каталогу OpenRouter 20.10.2026. LLM: реплики
+# собеседников — qwen/qwen3.8-flash, генерация и судья — openai/gpt-4o; TTS — google/gemini-3.8-flash-tts (Zephyr),
 # резерв — microsoft/mai-voice-2.1-flash (ru-RU-Masha); STT — qwen/qwen3-asr-0.6b, резерв — openai/whisper-large-v3-turbo.
 # Модели платные — поставьте лимит расходов на ключ. Любую можно заменить переменной окружения без правки файла.
 ai:
@@ -21,7 +22,7 @@ ai:
       kind: openai_compatible
       base_url: ${DEMO_LLM_URL:-https://openrouter.ai/api/v1}
       api_key_env: DEMO_LLM_API_KEY
-      model: ${DEMO_LLM_MODEL:-openai/gpt-4o}   # F3; альтернатива — Qwen flash
+      model: ${DEMO_LLM_MODEL:-openai/gpt-4o}   # генерация сценариев и ИИ-судья: качество важнее скорости
       timeout_s: 90
       max_concurrency: 2
       structured_output: json_object
@@ -31,7 +32,7 @@ ai:
       kind: openai_compatible
       base_url: ${DEMO_LLM_URL:-https://openrouter.ai/api/v1}
       api_key_env: DEMO_LLM_API_KEY
-      model: ${DEMO_SMALL_MODEL:-openai/gpt-4o}
+      model: ${DEMO_SMALL_MODEL:-qwen/qwen3.8-flash}   # реплики собеседников: быстро и дёшево
       timeout_s: 45
       max_concurrency: 2
       structured_output: json_object
