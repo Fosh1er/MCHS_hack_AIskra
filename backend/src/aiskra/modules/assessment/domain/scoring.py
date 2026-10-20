@@ -345,8 +345,10 @@ def assess_dds(
     calls: list[str],
     *,
     norm_seconds: float = DDS_NORM_SECONDS,
+    call_log: list[tuple[str, datetime]] | None = None,
 ) -> list[Criterion]:
-    """Критерии работы диспетчера ДДС по своей службе: история статусов и звонки."""
+    """Критерии работы диспетчера ДДС по своей службе: история статусов и звонки. `call_log` — стороны звонков
+    со временем начала: по нему проверяется порядок звонков относительно статусов (ТЗ 5.10)."""
     ref = reference or {}
     steps = [h for h in history if h.status not in ("added", "received")]
     out: list[Criterion] = []
@@ -368,9 +370,15 @@ def assess_dds(
 
     if first is not None and first.at and added_at:
         secs = max(0.0, (first.at - added_at).total_seconds())
+        received = next((h.at for h in history if h.status == "received" and h.at), None)
         c = Criterion("reaction", timing_score(secs, norm_seconds), critical=secs > 3 * norm_seconds)
         if secs > norm_seconds:
             c.errors.append(f"решение принято через {int(secs)} с при нормативе {int(norm_seconds)} с")
+        if received is not None and added_at <= received <= first.at:  # ТЗ #709: ожидание в очереди и разбор
+            wait = int((received - added_at).total_seconds())
+            c.note = f"в очереди {wait} с, после открытия {int((first.at - received).total_seconds())} с"
+            if wait > norm_seconds:
+                c.errors.append(f"карточка ждала в очереди {wait} с, прежде чем её открыли")
         out.append(c)
 
     if first is not None and first.status == "accepted":
@@ -407,8 +415,29 @@ def assess_dds(
         c = Criterion("calls", len(made & set(expected_calls)) / len(expected_calls))
         if "brigade" in expected_calls and "brigade" not in made:
             c.errors.append("не было связи со старшим группы — ход работ не подтверждён")
+        if call_log is not None and first is not None:
+            late = call_order_errors(steps, call_log)
+            if late and c.score:
+                c.score = round(c.score * 0.7, 3)  # как у статусов: нарушен порядок — 0,7 от доли
+            c.errors += late
         out.append(c)
     return out
+
+
+def call_order_errors(steps: list[StatusStep], call_log: list[tuple[str, datetime]]) -> list[str]:
+    """Порядок звонков ДДС (ТЗ 5.10, #684/#691): задание старшему группы — после решения «Принята», связь с ним —
+    до «Работы завершены» (иначе ход работ не подтверждён вовремя)."""
+    accepted = next((s.at for s in steps if s.status == "accepted" and s.at), None)
+    done = next((s.at for s in steps if s.status == "works_completed" and s.at), None)
+    brigade = [at for party, at in call_log if party == "brigade"]
+    if not brigade or accepted is None:
+        return []
+    errors = []
+    if all(at < accepted for at in brigade):
+        errors.append("старшему группы звонили только до «Принята» — задание бригаде дают после решения")
+    if done is not None and all(at > done for at in brigade):
+        errors.append("связь со старшим группы — только после «Работы завершены»: ход работ не подтверждён вовремя")
+    return errors
 
 
 def finish(

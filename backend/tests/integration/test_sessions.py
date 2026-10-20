@@ -112,6 +112,7 @@ def test_session_lifecycle_monitor_report(app_client: Callable[[], TestClient]) 
     op = by_role["112"]["cards"][0]
     assert op["card_number"] == card["number"] and op["score"] >= 90 and op["norm_s"] == 80
     assert by_role["dds"]["cards"][0]["score"] is not None
+    assert "max_time_s" in by_role["dds"] and by_role["dds"]["over_norm"] >= 0  # ТЗ 5.10: реакция по очереди
     assert report["heatmap"]["criteria"] and len(report["heatmap"]["rows"]) == 2
     assert sum(b["count"] for b in report["time_buckets"]) == 1
 

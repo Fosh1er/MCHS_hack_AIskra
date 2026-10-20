@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field, replace
+from datetime import datetime
 from uuid import UUID, uuid4
 
 from aiskra.modules.assessment.application.judge import Judge, JudgeOut
@@ -19,6 +20,7 @@ from aiskra.modules.assessment.domain.scoring import (
     WEIGHTS_DDS,
     Criterion,
     Result,
+    StatusStep,
     assess_card_112,
     assess_dds,
     finish,
@@ -64,6 +66,14 @@ def _judge_criteria(out: JudgeOut | None, keys: list[str], texts: list[str] | No
             c = rules_grammar(texts)
         crit.append(c)
     return crit
+
+
+def reaction_seconds(history: list[StatusStep], added_at: datetime | None) -> float | None:
+    """Время реакции ДДС по карточке: от поступления в службу до решения (для отчёта по очереди, ТЗ 5.10)."""
+    first = next((h for h in history if h.status not in ("added", "received")), None)
+    if first is None or first.at is None or added_at is None:
+        return None
+    return round(max(0.0, (first.at - added_at).total_seconds()), 1)
 
 
 def rules_grammar(texts: list[str]) -> Criterion:
@@ -185,7 +195,12 @@ class AssessCardHandler:
             if d is None or (cmd.actor.user_id not in d.actor_ids and not teacher):
                 raise NotFoundError("Работа ДДС по карточке не найдена", code="dds_attempt_not_found")
             criteria = assess_dds(
-                d.history, d.added_at, d.reference, d.calls, norm_seconds=s.norm_seconds or DDS_NORM_SECONDS
+                d.history,
+                d.added_at,
+                d.reference,
+                d.calls,
+                norm_seconds=s.norm_seconds or DDS_NORM_SECONDS,
+                call_log=d.call_log,
             )
             comments = [h.comment for h in d.history if h.comment]
             judged = await self._judge.check(legend="", description="", comments=comments) if comments else None
@@ -199,7 +214,7 @@ class AssessCardHandler:
                 weights,
                 d.reference is not None,
                 s.threshold,
-                {"norm_s": s.norm_seconds or DDS_NORM_SECONDS},
+                {"norm_s": s.norm_seconds or DDS_NORM_SECONDS, "reaction_s": reaction_seconds(d.history, d.added_at)},
             )
             student, number, service = actor, d.card_number, cmd.service_code
             psy_attempt = d.psy

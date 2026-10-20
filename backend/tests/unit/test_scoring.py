@@ -115,6 +115,29 @@ def test_dds_mistakes() -> None:
     assert crit["comments"].score == 0.5
 
 
+def test_dds_call_order_and_queue_wait() -> None:
+    """ТЗ 5.10: порядок звонков относительно статусов; время реакции — в очереди и после открытия (#709)."""
+    hist = [
+        step("added", 0, comment=None),
+        step("received", 25, comment=None),
+        step("accepted", 28, "7"),
+        step("response_started", 60),
+        step("arrived", 120),
+        step("works_in_progress", 180),
+        step("works_completed", 240),
+    ]
+    ref = {"first_status": "accepted", "expected_calls": ["brigade"]}
+    on_time = by_key(assess_dds(hist, T0, ref, ["brigade"], call_log=[("brigade", T0 + timedelta(seconds=90))]))
+    assert on_time["calls"].score == 1 and not on_time["calls"].errors
+    assert on_time["reaction"].note == "в очереди 25 с, после открытия 3 с"
+    early = by_key(assess_dds(hist, T0, ref, ["brigade"], call_log=[("brigade", T0 + timedelta(seconds=10))]))
+    assert early["calls"].score == 0.7 and "до «Принята»" in early["calls"].errors[0]
+    late = by_key(assess_dds(hist, T0, ref, ["brigade"], call_log=[("brigade", T0 + timedelta(seconds=300))]))
+    assert late["calls"].score == 0.7 and "после «Работы завершены»" in late["calls"].errors[0]
+    slow = [step("added", 0, comment=None), step("received", 40, comment=None), step("accepted", 45, "7")]
+    assert any("ждала в очереди 40 с" in e for e in by_key(assess_dds(slow, T0, ref, []))["reaction"].errors)
+
+
 def test_dds_rejection_when_should_react() -> None:
     crit = by_key(assess_dds([step("rejected", 10)], T0, {"first_status": "accepted"}, []))
     assert crit["decision"].score == 0 and "calls" not in crit

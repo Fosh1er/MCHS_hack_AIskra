@@ -87,6 +87,7 @@ export interface FeedbackView { text: string; updated_at: string | null }
 export interface StudentReport {
   student_id: string; full_name: string; role: '112' | 'dds'; service_code: string | null; cards: CardResult[];
   avg_score: number | null; passed_share: number | null; avg_time_s: number | null; not_assessed: number;
+  max_time_s?: number | null; over_norm?: number; // ТЗ 5.10: у ДДС — время реакции по очереди
   feedback?: FeedbackView | null;
 }
 export interface SessionReport {

@@ -50,7 +50,7 @@ function StudentsTable({ r }: { r: SessionReport }) {
     <Card title="Результаты обучающихся" subtitle="Нажмите строку, чтобы раскрыть карточки и отзыв" flush tour="t-results"
       actions={<Button size="sm" variant="ghost" onClick={() => setAll(!all)}>{all ? 'свернуть все' : 'раскрыть все'}</Button>}>
       <table className="cab-table">
-        <thead><tr><th>ФИО</th><th>Роль</th><th className="num">Карточек</th><th className="num">Средний балл</th><th className="num">Зачтено</th><th className="num">Среднее время, с</th><th className="num">Не оценено</th></tr></thead>
+        <thead><tr><th>ФИО</th><th>Роль</th><th className="num">Карточек</th><th className="num">Средний балл</th><th className="num">Зачтено</th><th className="num" title="Оператор 112 — заполнение карточки; ДДС — реакция по очереди: от поступления до решения">Среднее время, с</th><th className="num">Не оценено</th></tr></thead>
         <tbody>
           {r.students.map((s) => (
             <Fragment key={s.student_id}>
@@ -63,7 +63,10 @@ function StudentsTable({ r }: { r: SessionReport }) {
                 <td className="num">{s.cards.length}</td>
                 <td className="num">{num(s.avg_score)}</td>
                 <td className="num">{pct(s.passed_share)}</td>
-                <td className="num">{num(s.avg_time_s)}</td>
+                <td className="num">
+                  {num(s.avg_time_s)}
+                  {s.max_time_s != null && s.cards.length > 1 && <span className="cab-filters__label" title="Самая долгая карточка; сверх норматива"> макс. {num(s.max_time_s)}{s.over_norm ? ` · сверх норматива: ${s.over_norm}` : ''}</span>}
+                </td>
                 <td className="num">{s.not_assessed || ''}</td>
               </tr>
               {(all || open === s.student_id) && s.cards.map((c) => (

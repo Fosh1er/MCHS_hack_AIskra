@@ -43,6 +43,7 @@ class DdsAttempt:
     calls: list[str]  # стороны звонков по карточке: brigade | applicant | service
     actor_ids: set[UUID]  # кто ставил статусы
     psy: PsyAttempt | None = None  # п. 3.7: звонок заявителю из ДДС с психологическим профилем
+    call_log: list[tuple[str, datetime]] | None = None  # стороны звонков со временем начала (порядок, ТЗ 5.10)
 
 
 class AttemptSource(Protocol):

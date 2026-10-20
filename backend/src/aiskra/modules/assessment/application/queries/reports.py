@@ -84,6 +84,8 @@ class StudentReport:
     avg_time_s: float | None
     not_assessed: int
     feedback: FeedbackView | None = None
+    max_time_s: float | None = None  # самая долгая карточка; у ДДС — реакция по очереди (ТЗ 5.10, #709)
+    over_norm: int = 0  # карточек дольше норматива
 
 
 @dataclass(frozen=True)
@@ -118,7 +120,9 @@ def _avg(values: list[float]) -> float | None:
 
 
 def _result(card: ReportCard, rec: AssessmentRecord | None, norm: float, role: str) -> CardResult:
-    processing = card.processing_s if role == "112" else None
+    # ДДС (ТЗ 5.10): время реакции по карточке из оценки — по нему отчёт считает реакцию по очереди
+    reaction = (rec.details.get("stats") or {}).get("reaction_s") if rec and role == "dds" else None
+    processing = card.processing_s if role == "112" else (float(reaction) if reaction is not None else None)
     return CardResult(
         card_id=card.card_id,
         card_number=card.number,
@@ -193,7 +197,7 @@ async def build_report(
         ptimes = [r.processing_s for r in results if r.processing_s is not None]
         all_scores += scores
         all_passed += passed
-        times += ptimes
+        times += ptimes if p.role == "112" else []  # распределение — время заполнения карточки 112
         per_key: dict[str, list[float]] = defaultdict(list)
         for r in results:
             for k, v in r.criteria.items():
@@ -217,6 +221,8 @@ async def build_report(
                 avg_score=_avg(scores),
                 passed_share=round(sum(passed) / len(passed), 3) if passed else None,
                 avg_time_s=_avg(ptimes),
+                max_time_s=max(ptimes) if ptimes else None,
+                over_norm=sum(1 for r in results if r.deviation_s is not None and r.deviation_s > 0),
                 not_assessed=sum(1 for r in results if r.score is None),
                 feedback=_feedback(feedback, p.student_id),
             )
