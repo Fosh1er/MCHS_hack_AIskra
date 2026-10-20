@@ -68,8 +68,12 @@ def _queue_statuses_brigade_call_recording(ui: Session, sid: str) -> None:
     own = next(s for s in view["card"]["services"] if s["code"] == SERVICE)
     assert own.get("brigades"), own  # силы службы сохранены со статусом (п. 5.5)
 
-    # IP-телефон: звонок старшему группы, ИИ докладывает
-    page.get_by_role("button", name="Старший группы").first.click()
+    # IP-телефон: у демо-служб задана телефонная книга (demo_seed) — набор номера не из книги не начинает звонок,
+    # звонок начальнику аварийной бригады из книги — ИИ докладывает
+    page.get_by_label("Номер абонента").fill("999-99")
+    page.get_by_role("button", name="вызов").click()
+    expect(page.get_by_label("IP-телефон").get_by_role("alert")).to_have_text("Номер не обслуживается")
+    page.get_by_role("button", name="Начальник аварийной бригады").first.click()
     box = page.get_by_placeholder(COMPOSER)
     expect(box).to_be_visible()
     ask(page, "Доложите обстановку")

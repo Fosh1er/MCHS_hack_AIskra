@@ -9,7 +9,7 @@ from __future__ import annotations
 import random
 from collections.abc import Callable
 from contextlib import AbstractAsyncContextManager
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import timedelta
 from typing import Any
 from uuid import UUID
@@ -25,6 +25,7 @@ from aiskra.modules.training.application.branching import (
 )
 from aiskra.modules.training.application.commands.scenarios import ScenarioGenerator
 from aiskra.modules.training.application.events import EventSink, emit
+from aiskra.modules.training.application.ports.phonebook import PhonebookRepository
 from aiskra.modules.training.application.ports.scenarios import (
     CallRepository,
     CardContextSource,
@@ -35,6 +36,13 @@ from aiskra.modules.training.application.ports.sessions import ServiceSwitches, 
 from aiskra.modules.training.application.psy import PsyDirector, TurnSignals, start_psy
 from aiskra.modules.training.domain.actors import topic_of
 from aiskra.modules.training.domain.call import Call, CallMessage, CallParty, CallStatus, ReplicaVia, Speaker
+from aiskra.modules.training.domain.phonebook import (
+    NOT_SERVED,
+    ContactRole,
+    PhonebookEntry,
+    contact_greeting,
+    resolve_number,
+)
 from aiskra.modules.training.domain.psy import PsyState, choose_profile, psy_settings, tone_from_psy
 from aiskra.modules.training.domain.scenario import Scenario
 from aiskra.modules.training.domain.tone import CallerTone, ToneSnapshot, tone_for_legend
@@ -327,18 +335,43 @@ class StartDdsCall(Command):
     party: CallParty
     target_service: str | None = None
     incoming: bool = False  # старший группы сам звонит в ДДС с докладом (#691)
+    number: str | None = None  # набранный номер: абонент телефонной книги ДДС или заявитель из карточки
 
 
 class StartDdsCallHandler(_CallBase):
+    def __init__(self, *args: object, phonebook: PhonebookRepository | None = None, **kwargs: object) -> None:
+        super().__init__(*args, **kwargs)  # type: ignore[arg-type]
+        self._phonebook = phonebook
+
+    async def _contact(self, cmd: StartDdsCall, applicant_phone: str) -> tuple[CallParty, PhonebookEntry | None]:
+        """Телефонная книга ДДС: кому звонит диспетчер. Книги у службы нет — всё как раньше, `number` не принимается."""
+        if cmd.incoming or self._phonebook is None:
+            return cmd.party, None
+        book = await self._phonebook.get(cmd.service_code)
+        entries = book.entries if book else []
+        if cmd.number is not None:
+            entry = resolve_number(entries, cmd.number, applicant_phone) if entries else None
+            if entry is None:
+                raise DomainError(NOT_SERVED, code="number_not_served")
+            if entry.role is ContactRole.APPLICANT:
+                return CallParty.APPLICANT, None
+            return CallParty.BRIGADE, entry
+        if entries and cmd.party is CallParty.APPLICANT and all(e.role is not ContactRole.APPLICANT for e in entries):
+            raise DomainError("Номера заявителя нет в телефонной книге службы", code="applicant_not_in_book")
+        return cmd.party, None
+
     async def __call__(self, cmd: StartDdsCall) -> CallStarted:
         ctx = await self._cards.dds_context(cmd.card_id, cmd.service_code)
         if ctx is None:
             raise NotFoundError("Карточка не поступала в эту службу", code="dds_card_not_found")
+        party, entry = await self._contact(cmd, ctx.applicant_phone)
+        cmd = replace(cmd, party=party)
         if cmd.party is CallParty.SERVICE and (not cmd.target_service or cmd.target_service not in ctx.services):
             raise DomainError("Можно звонить только в службы этой карточки", code="bad_target_service")
         call = Call(
             student_id=cmd.actor.user_id,
             role="dds",
+            contact={**entry.to_json(), "title": entry.title} if entry else None,
             party=cmd.party,
             direction="in" if cmd.incoming else "out",
             started_at=self._clock.now(),
@@ -359,8 +392,10 @@ class StartDdsCallHandler(_CallBase):
             await self._say(call, Speaker.PARTY, f"ДДС? Старший группы. {report}")
             await self._commit()
             return CallStarted(call_id=call.id, scenario_id=ctx.scenario_id, aon="", channel="ip")
-        greeting = PARTY_GREETING.get(cmd.party) or (
-            f"Дежурный {ctx.services[cmd.target_service or ''][0]}, слушаю." if cmd.target_service else "Слушаю."
+        greeting = (
+            (contact_greeting(entry) if entry else None)
+            or PARTY_GREETING.get(cmd.party)
+            or (f"Дежурный {ctx.services[cmd.target_service or ''][0]}, слушаю." if cmd.target_service else "Слушаю.")
         )
         await self._say(call, Speaker.PARTY, greeting, tone.snapshot() if tone else None)
         await self._commit()
@@ -520,7 +555,7 @@ class SendReplicaHandler(_CallBase):
             raise NotFoundError("Карточка не найдена", code="dds_card_not_found")
         if call.party is CallParty.BRIGADE:
             short = ctx.services.get(call.service_code, (call.service_code, ""))[0]
-            return await self._actors.brigade(ctx, short, history, text, sink), None
+            return await self._actors.brigade(ctx, short, history, text, sink, contact=call.contact), None
         return await self._actors.service(ctx, call.target_service or "", history, text, sink), None
 
 
@@ -554,7 +589,7 @@ class EndCallHandler(_CallBase):
                     event=AuditEvent.CALL_ENDED,
                     actor=cmd.actor,
                     meta=cmd.meta,
-                    description=f"{direction} звонок: {who[call.party]}, {secs} с",
+                    description=f"{direction} звонок: {(call.contact or {}).get('title') or who[call.party]}, {secs} с",
                     object_type="call",
                     object_id=str(call.id),
                     data={

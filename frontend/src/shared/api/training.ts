@@ -33,6 +33,7 @@ export interface CallView {
   mode?: ReplicaVia; // как оператор вёл разговор: самый «голосовой» из способов его реплик
   ended_by?: string | null; psy?: CallPsy | null; // п. 3.7
   branching?: boolean; branch?: BranchDebrief | null; // F5: ветвящийся сценарий — таймер /tick и «Итог ситуации»
+  contact?: { role: string; title: string; name: string; number: string } | null; // абонент телефонной книги ДДС
 }
 
 // ------------------------------------------------------------------ F5: ветвящиеся сценарии (ADR-0014)
@@ -80,8 +81,32 @@ export const endCall = (id: string) => post<{ status: string }>(`/calls/${id}/en
 export interface HoldResult { status: string; held_s: number; hung_up: boolean }
 export const holdCall = (id: string) => post<HoldResult>(`/calls/${id}/hold`);
 export const resumeCall = (id: string) => post<HoldResult>(`/calls/${id}/resume`);
-export const startDdsCall = (b: { card_id: string; service_code: string; party: CallView['party']; target_service?: string | null; incoming?: boolean }) =>
+/** `number` — набранный номер: абонент телефонной книги ДДС или заявитель из карточки; иначе 422 «Номер не обслуживается». */
+export const startDdsCall = (b: { card_id: string; service_code: string; party: CallView['party']; target_service?: string | null; incoming?: boolean; number?: string }) =>
   post<CallStarted>('/calls/dds', b);
+
+// ------------------------------------------------------------------ телефонная книга ДДС (п. 2.3, рекомендация экспертов)
+export type ContactRole = 'head' | 'response_chief' | 'brigade_chief' | 'brigade_specialist' | 'applicant';
+export interface PhonebookEntry { role: ContactRole; title?: string; name: string; number: string }
+export interface Phonebook {
+  service_code: string; configured: boolean; entries: PhonebookEntry[]; max_entries: number;
+  roles: { code: ContactRole; title: string }[]; updated_at: string | null;
+}
+const phonebookKey = (service: string) => ['dds-phonebook', service];
+export const usePhonebook = (service: string | undefined) =>
+  useQuery({
+    queryKey: phonebookKey(service ?? ''), enabled: !!service, staleTime: 60_000,
+    queryFn: () => http<Phonebook>(`${T}/dds-phonebook/${encodeURIComponent(service!)}`),
+  });
+export const useSavePhonebook = (service: string) => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (entries: PhonebookEntry[]) => http<Phonebook>(`${T}/dds-phonebook/${encodeURIComponent(service)}`, {
+      method: 'PUT', body: JSON.stringify({ entries: entries.map(({ role, name, number }) => ({ role, name, number })) }),
+    }),
+    onSuccess: (book) => qc.setQueryData(phonebookKey(service), book),
+  });
+};
 export const getCall = (id: string) => http<CallView>(`${T}/calls/${id}`);
 /** F5: таймер ситуации — пока звонок идёт, раз в 5 с; ответ — реплики-события, если ситуация изменилась сама. */
 export const tickCall = (id: string) => post<Replica[]>(`/calls/${id}/tick`);

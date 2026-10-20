@@ -23,6 +23,7 @@ from aiskra.modules.training.api import deps
 from aiskra.modules.training.api.schemas import (
     AnswerIn,
     BranchTemplateOut,
+    ContactRoleOut,
     CreatedOut,
     CreateSessionIn,
     DdsCallIn,
@@ -31,6 +32,9 @@ from aiskra.modules.training.api.schemas import (
     GeneratedOut,
     GenerateIn,
     IncomingIn,
+    PhonebookEntryOut,
+    PhonebookIn,
+    PhonebookOut,
     PsyProfileOut,
     ReplicaIn,
     ReplicaOut,
@@ -67,6 +71,7 @@ from aiskra.modules.training.application.commands.materials import (
     UploadMaterial,
     UploadMaterialHandler,
 )
+from aiskra.modules.training.application.commands.phonebook import SavePhonebook, SavePhonebookHandler
 from aiskra.modules.training.application.commands.scenario_review import (
     ReviewSections,
     ReviewSectionsHandler,
@@ -96,6 +101,7 @@ from aiskra.modules.training.application.commands.sessions import (
 )
 from aiskra.modules.training.application.ports.branching import BranchCatalog
 from aiskra.modules.training.application.ports.materials import MaterialRow
+from aiskra.modules.training.application.ports.phonebook import Phonebook
 from aiskra.modules.training.application.ports.psy import PsyCatalog
 from aiskra.modules.training.application.ports.sessions import StudentRow
 from aiskra.modules.training.application.psy import TurnSignals
@@ -113,6 +119,7 @@ from aiskra.modules.training.application.queries.materials import (
     ListMaterialsHandler,
     MaterialView,
 )
+from aiskra.modules.training.application.queries.phonebook import GetPhonebook, GetPhonebookHandler
 from aiskra.modules.training.application.queries.psy_methodology import (
     GetPsyMethodology,
     MethodologyView,
@@ -163,6 +170,7 @@ from aiskra.modules.training.application.speech import (
 )
 from aiskra.modules.training.application.voice_lab import LabMessage, VoiceLab
 from aiskra.modules.training.domain.material import MAX_BYTES, MaterialKind
+from aiskra.modules.training.domain.phonebook import MAX_ENTRIES, ROLE_TITLES, PhonebookEntry
 from aiskra.modules.training.domain.review import Decision
 from aiskra.modules.training.domain.stream_text import RemarkFilter
 from aiskra.shared.errors import AppError, DomainError, ExternalServiceError, NotFoundError
@@ -334,8 +342,50 @@ async def dds_call(
             party=body.party,
             target_service=body.target_service,
             incoming=body.incoming,
+            number=body.number,
         )
     )
+
+
+def _phonebook_out(service_code: str, book: Phonebook | None) -> PhonebookOut:
+    entries = book.entries if book else []
+    return PhonebookOut(
+        service_code=service_code,
+        configured=bool(entries),
+        entries=[PhonebookEntryOut(role=e.role, title=e.title, name=e.name, number=e.number) for e in entries],
+        max_entries=MAX_ENTRIES,
+        roles=[ContactRoleOut(code=r, title=t) for r, t in ROLE_TITLES.items()],
+        updated_at=book.updated_at if book else None,
+    )
+
+
+@router.get(
+    "/dds-phonebook/{service_code}",
+    response_model=PhonebookOut,
+    summary="Телефонная книга ДДС: абоненты IP-телефона службы (п. 2.3)",
+    dependencies=[Depends(require(Permission.TRAINING_PARTICIPATE, Permission.LESSONS_CONDUCT))],
+)
+async def get_phonebook(
+    service_code: str, handler: Annotated[GetPhonebookHandler, Depends(deps.provide_get_phonebook)]
+) -> PhonebookOut:
+    return _phonebook_out(service_code, await handler(GetPhonebook(service_code=service_code)))
+
+
+@router.put(
+    "/dds-phonebook/{service_code}",
+    response_model=PhonebookOut,
+    summary="Задать телефонную книгу ДДС целиком: не больше 10 абонентов, номера не повторяются",
+)
+async def save_phonebook(
+    service_code: str,
+    body: PhonebookIn,
+    actor: Teacher,
+    meta: Meta,
+    handler: Annotated[SavePhonebookHandler, Depends(deps.provide_save_phonebook)],
+) -> PhonebookOut:
+    entries = [PhonebookEntry(role=e.role, name=e.name, number=e.number) for e in body.entries]
+    book = await handler(SavePhonebook(actor=actor, service_code=service_code, entries=entries, meta=meta))
+    return _phonebook_out(book.service_code, book)
 
 
 @router.post("/calls/{call_id}/replicas", response_model=ReplicaOut, summary="Реплика оператора → ответ ИИ-собеседника")

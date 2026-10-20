@@ -20,6 +20,7 @@ from aiskra.modules.training.application.events import EventSink, emit
 from aiskra.modules.training.application.ports.scenarios import DdsCallContext
 from aiskra.modules.training.domain.actors import applicant_reply, brigade_reply, service_reply
 from aiskra.modules.training.domain.call import CallMessage, Speaker
+from aiskra.modules.training.domain.phonebook import PhonebookEntry, contact_reply
 from aiskra.modules.training.domain.tone import EMOTION_TITLES, CallerTone, color_reply
 from aiskra.shared.errors import ExternalServiceError
 
@@ -237,7 +238,10 @@ class Actors:
         history: list[CallMessage],
         question: str,
         sink: EventSink | None = None,
+        contact: dict[str, Any] | None = None,
     ) -> str:
+        """Старший группы своей службы; `contact` — абонент телефонной книги ДДС: тот же агент, но в его должности."""
+        entry = PhonebookEntry.from_json(contact) if contact else None
         data = {
             "service_status": ctx.service_status,
             "order_no": ctx.order_no,
@@ -252,14 +256,18 @@ class Actors:
             system = load_prompt(AITask.BRIGADE_ACTOR).format(
                 service=service_short, context=context, status=ctx.service_status
             )
-            text = await self._ask(
-                AITask.BRIGADE_ACTOR, system, history, question, f"{ctx.card_id}:{ctx.service_status}", sink
-            )
+            scope = f"{ctx.card_id}:{ctx.service_status}"
+            if entry is not None:
+                system += (
+                    f"\n\nСейчас ты — не старший группы, а {entry.title.lower()} ({entry.name or 'ФИО не названо'}). "
+                    "Отвечай с позиции этой должности: что знаешь от подчинённых и что можешь решить сам."
+                )
+                scope += f":{entry.role.value}"
+            text = await self._ask(AITask.BRIGADE_ACTOR, system, history, question, scope, sink)
             if text:
                 return text
-        if report:
-            return report
-        return brigade_reply(data, question)
+        base = report or brigade_reply(data, question)
+        return contact_reply(entry, base) if entry is not None else base
 
     async def service(
         self,

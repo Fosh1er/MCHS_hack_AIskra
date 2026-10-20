@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from aiskra.modules.training.domain.call import CallParty, ReplicaVia
+from aiskra.modules.training.domain.phonebook import ContactRole
 from aiskra.modules.training.domain.session import CardSource, SessionMode
 from aiskra.modules.training.domain.tone import ToneSnapshot
 
@@ -48,6 +50,40 @@ class DdsCallIn(_Strict):
     party: CallParty
     target_service: str | None = Field(default=None, max_length=64)
     incoming: bool = Field(default=False, description="Входящий доклад старшего группы")
+    number: str | None = Field(
+        default=None, max_length=32, description="Набранный номер: абонент книги ДДС или заявитель из карточки"
+    )
+
+
+class PhonebookEntryIn(_Strict):
+    role: ContactRole
+    name: str = Field(default="", max_length=200)
+    number: str = Field(default="", max_length=32)
+
+
+class PhonebookIn(_Strict):
+    entries: list[PhonebookEntryIn] = Field(max_length=50, description="Абоненты службы, не больше 10")
+
+
+class PhonebookEntryOut(BaseModel):
+    role: ContactRole
+    title: str
+    name: str
+    number: str
+
+
+class ContactRoleOut(BaseModel):
+    code: ContactRole
+    title: str
+
+
+class PhonebookOut(BaseModel):
+    service_code: str
+    configured: bool = Field(description="Книга задана — телефон ДДС показывает её абонентов и номеронабиратель")
+    entries: list[PhonebookEntryOut]
+    max_entries: int
+    roles: list[ContactRoleOut]
+    updated_at: datetime | None = None
 
 
 class ReplicaIn(_Strict):

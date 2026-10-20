@@ -196,6 +196,7 @@ class SqlCallRepository:
         row.held_at = call.held_at
         row.held_ms = call.held_ms or None
         row.repeat_of = call.repeat_of
+        row.contact = dict(call.contact) if call.contact is not None else None
         row.answered_at = call.answered_at
         row.ended_at = call.ended_at
 
@@ -226,6 +227,7 @@ class SqlCallRepository:
             held_at=as_utc(row.held_at),
             held_ms=row.held_ms or 0,
             repeat_of=row.repeat_of,
+            contact=dict(row.contact) if row.contact else None,
         )
 
     async def get(self, call_id: UUID) -> Call | None:
