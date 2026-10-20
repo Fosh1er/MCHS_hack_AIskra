@@ -166,7 +166,7 @@ export interface DdsMode {
   busy: boolean;
   onStatus: (b: ServiceStatusBody) => Promise<unknown>;
   onClose: () => void;
-  selfTraining?: boolean; // самостоятельная тренировка: окончательный статус — сразу автооценка с рекомендациями
+  selfTraining?: boolean; // самостоятельная тренировка (учебная карточка вне занятия)
 }
 
 const FINAL_DDS = new Set(['works_completed', 'works_refused', 'rejected']);
@@ -435,7 +435,7 @@ export function CardViewer({ view, me, dds }: { view: CardView; me: Me; dds?: Dd
           )}
           {dds && ownService && ownService.status !== 'added' && ownService.status !== 'received' && (
             <AssessmentPanel key={justDecided ? 'decided' : 'opened'} cardId={view.id} role="dds" service={dds.service}
-              auto={!!dds.selfTraining && finalDds} fresh={!!dds.selfTraining && justDecided} />
+              auto={finalDds} fresh={justDecided} />
           )}
         </div>
       </div>
