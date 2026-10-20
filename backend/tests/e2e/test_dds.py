@@ -89,6 +89,11 @@ def _queue_statuses_brigade_call_recording(ui: Session, sid: str) -> None:
         set_status(page, value, text)
         assert status() == value
 
+    # окончательный статус своей службы — автооценка сама, без «проверить» (рекомендации — только по слабым критериям)
+    panel = page.get_by_label("Автооценка")
+    expect(panel.locator(".assess__score")).to_be_visible()
+    expect(panel.get_by_role("button", name="проверить снова")).to_be_visible()
+
     # запись звонка старшему группы: WAV из журнала звонков IP-телефона
     rec = page.locator(".ipphone__logrow a", has_text="запись").first
     expect(rec).to_be_visible()
