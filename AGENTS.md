@@ -129,7 +129,7 @@ tools/stand/stand up [--local]       # 7.4: стенд на своём комп�
 - **Промпты:** `aiskra/ai/prompts/<task>/v1.md` (`scenario_generation`, `applicant_actor`, `brigade_actor`, `service_actor`), загрузка — `aiskra.ai.prompts.load_prompt`.
 - **Связь модулей:** `aiskra/integration/training_sources.py` реализует порты `training` через `dictionaries` и `incidents` (модули друг друга не импортируют).
 - **API:** `/api/v1/training/scenarios…`, `/training/calls/incoming`, `/calls/dds`, `/calls/{id}/answer|replicas|end`, `/training/cards/{id}/calls`. CLI `generate-scenarios --count N`.
-- **Фронт:** входящий вызов — `pages/journal/JournalPage.tsx`; панель разговора — `shared/ui/CallPanel.tsx`; софтфон ДДС — `pages/dds/DdsSoftphone.tsx`.
+- **Фронт:** входящий вызов — `pages/journal/JournalPage.tsx`; панель разговора — `shared/ui/CallPanel.tsx`; софтфон ДДС — `pages/dds/DdsSoftphone.tsx` (свёрнут по умолчанию — зелёный кружок `.ipphone-fab`, кнопка «IP-телефон», над панелью служб; при входящем докладе пульсирует; e2e нажимает его перед набором).
 
 ## Эмоции и голос ИИ-собеседника (п. 3.6, этапы V1–V4) — что уже есть
 - **Состояние** — `training/domain/tone.py:CallerTone`: эмоция, напряжение, доверие, готовность отвечать (0–10). Начальное — `tone_for_legend` (сложность легенды, группа — первые цифры кода классификатора). Хранится в `training_calls.tone`, снимок у каждой реплики заявителя — `training_call_messages.tone` (миграция 0015).
