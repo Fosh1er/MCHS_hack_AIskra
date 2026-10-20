@@ -98,7 +98,7 @@ export function LineChart({ points, yMax, yStep, unit, seriesLabel, threshold, h
           </g>
         ))}
         {points.map((p, i) => (i % every === 0 && i < n - every / 2 ? (
-          <text key={p.t} className="viz-tick" x={x(i)} y={H - 6} textAnchor={i === 0 ? 'start' : 'middle'}>{p.t}</text>
+          <text key={i} className="viz-tick" x={x(i)} y={H - 6} textAnchor={i === 0 ? 'start' : 'middle'}>{p.t}</text>
         ) : null))}
         <text className="viz-tick" x={x(n - 1)} y={H - 6} textAnchor="end">{points[n - 1].t}</text>
         {threshold && (
@@ -131,7 +131,7 @@ export function LineChart({ points, yMax, yStep, unit, seriesLabel, threshold, h
       <div className="viz-table" id={tableId}>
         <table className="cab-table">
           <thead><tr><th>Время</th><th className="num">{seriesLabel}</th></tr></thead>
-          <tbody>{points.map((p) => <tr key={p.t}><td>{p.t}</td><td className="num">{fmt(p.v)} {unit}</td></tr>)}</tbody>
+          <tbody>{points.map((p, i) => <tr key={i}><td>{p.t}</td><td className="num">{fmt(p.v)} {unit}</td></tr>)}</tbody>
         </table>
       </div>
     </figure>
