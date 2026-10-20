@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field, replace
+from datetime import datetime
 from uuid import UUID, uuid4
 
 from aiskra.modules.assessment.application.judge import Judge, JudgeOut
@@ -19,14 +20,19 @@ from aiskra.modules.assessment.domain.scoring import (
     WEIGHTS_DDS,
     Criterion,
     Result,
+    StatusStep,
     assess_card_112,
     assess_dds,
     finish,
+    repeat_link,
 )
 from aiskra.shared.application import Command, UnitOfWork
 from aiskra.shared.audit import AuditEntry, AuditEvent, AuditRecorder, RequestMeta
 from aiskra.shared.errors import DomainError, NotFoundError
 from aiskra.shared.security import Permission, Principal
+from aiskra.shared.spelling import check_operator_text
+
+RULE_PENALTY = 0.2  # грамотность без модели: −0,2 за каждое замечание правил
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -48,15 +54,38 @@ class AssessCard(Command):
     meta: RequestMeta = field(default_factory=RequestMeta)
 
 
-def _judge_criteria(out: JudgeOut | None, keys: list[str]) -> list[Criterion]:
+def _judge_criteria(out: JudgeOut | None, keys: list[str], texts: list[str] | None = None) -> list[Criterion]:
+    """Критерии ИИ-судьи. Без модели смысл и регламентность — «не проверено», а грамотность проверяют правила
+    (ТЗ 4.5, 5.10): повторы, латиница в русском слове, пробелы, скобки, частые орфографические ошибки."""
     crit = []
     for key in keys:
         score = getattr(out, key if key != "description_meaning" else "meaning", None) if out else None
         c = Criterion(key, score, note="" if out else "не проверено: ИИ-судья не подключён")
         if out and key == "grammar":
             c.errors = [f"«{r.quote}» → {r.fix}" for r in out.errors]
+        elif key == "grammar" and texts is not None and any(t.strip() for t in texts):
+            c = rules_grammar(texts)
         crit.append(c)
     return crit
+
+
+def reaction_seconds(history: list[StatusStep], added_at: datetime | None) -> float | None:
+    """Время реакции ДДС по карточке: от поступления в службу до решения (для отчёта по очереди, ТЗ 5.10)."""
+    first = next((h for h in history if h.status not in ("added", "received")), None)
+    if first is None or first.at is None or added_at is None:
+        return None
+    return round(max(0.0, (first.at - added_at).total_seconds()), 1)
+
+
+def rules_grammar(texts: list[str]) -> Criterion:
+    remarks = [r for t in texts for r in check_operator_text("текст", t)]
+    c = Criterion(
+        "grammar",
+        round(max(0.0, 1 - RULE_PENALTY * len(remarks)), 3),
+        note="проверено правилами (ИИ-судья не подключён)",
+    )
+    c.errors = [f"«{r.quote.strip() or r.quote}» → {r.fix} ({r.rule})" for r in remarks[:6]]
+    return c
 
 
 def psy_details(result: Result, attempt: PsyAttempt) -> dict[str, object]:
@@ -131,11 +160,12 @@ class AssessCardHandler:
                 raise NotFoundError("Карточка не найдена", code="card_not_found")
             if a.status == "draft":
                 raise DomainError("Карточка ещё не сохранена", code="card_not_saved")
+            repeat = a.repeat_of is not None  # ТЗ 4.6: по повторному звонку важна привязка, а не поля заново
             criteria = assess_card_112(
                 a.data,
                 a.services,
                 a.processing_s,
-                a.reference,
+                None if repeat else a.reference,
                 a.asked_topics,
                 norm_seconds=s.norm_seconds or CARD_NORM_SECONDS,
                 names=a.service_names,
@@ -143,15 +173,19 @@ class AssessCardHandler:
                 spoken=a.legend_text or None,
                 caller=a.caller,
             )
+            if repeat:
+                criteria.append(repeat_link(a.main_card_id, a.repeat_targets, a.repeat_number))
             judged = (
                 await self._judge.check(
                     legend=a.legend_text, description=str(a.data.get("description") or ""), comments=[]
                 )
-                if a.reference
+                if a.reference and not repeat
                 else None
             )
-            if a.reference:
-                criteria += _judge_criteria(judged, ["description_meaning", "grammar"])
+            if a.reference and not repeat:
+                criteria += _judge_criteria(
+                    judged, ["description_meaning", "grammar"], [str(a.data.get("description") or "")]
+                )
             weights = {**WEIGHTS_112, **s.weights}
             stats = {"processing_s": a.processing_s, "norm_s": s.norm_seconds or CARD_NORM_SECONDS}
             result = finish("112", criteria, weights, a.reference is not None, s.threshold, stats)
@@ -165,11 +199,16 @@ class AssessCardHandler:
             if d is None or (cmd.actor.user_id not in d.actor_ids and not teacher):
                 raise NotFoundError("Работа ДДС по карточке не найдена", code="dds_attempt_not_found")
             criteria = assess_dds(
-                d.history, d.added_at, d.reference, d.calls, norm_seconds=s.norm_seconds or DDS_NORM_SECONDS
+                d.history,
+                d.added_at,
+                d.reference,
+                d.calls,
+                norm_seconds=s.norm_seconds or DDS_NORM_SECONDS,
+                call_log=d.call_log,
             )
             comments = [h.comment for h in d.history if h.comment]
             judged = await self._judge.check(legend="", description="", comments=comments) if comments else None
-            criteria += _judge_criteria(judged, ["regulation", "grammar"]) if comments else []
+            criteria += _judge_criteria(judged, ["regulation", "grammar"], comments) if comments else []
             weights = {**WEIGHTS_DDS, **s.weights}
             # оценка — обучающемуся-ДДС: он сам или тот, кто ставил статусы (если запускает преподаватель)
             actor = cmd.actor.user_id if cmd.actor.user_id in d.actor_ids else next(iter(d.actor_ids), None)
@@ -179,7 +218,7 @@ class AssessCardHandler:
                 weights,
                 d.reference is not None,
                 s.threshold,
-                {"norm_s": s.norm_seconds or DDS_NORM_SECONDS},
+                {"norm_s": s.norm_seconds or DDS_NORM_SECONDS, "reaction_s": reaction_seconds(d.history, d.added_at)},
             )
             student, number, service = actor, d.card_number, cmd.service_code
             psy_attempt = d.psy

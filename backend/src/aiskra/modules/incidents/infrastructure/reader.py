@@ -10,6 +10,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import Any
 from uuid import UUID
 
@@ -118,7 +119,35 @@ class SqlCardReader:
                 base.order_by(_REGISTERED_AT.desc(), C.number.desc()).limit(flt.limit).offset(flt.offset)
             )
         ).all()
-        return [self._row(*r) for r in rows], total
+        return await self._with_links([self._row(*r) for r in rows]), total
+
+    def _journal_select(self) -> Any:
+        return (
+            select(C, DISPLAY_STATUS.label("display_status"), _users.c.full_name, _okrugs.c.short, _districts.c.name)
+            .outerjoin(_users, _users.c.id == C.author_id)
+            .outerjoin(_okrugs, _okrugs.c.code == C.okrug_code)
+            .outerjoin(_districts, _districts.c.code == C.district_code)
+        )
+
+    async def rows_where(self, *conditions: ColumnElement[bool], limit: int = 50) -> list[JournalRow]:
+        """Строки журнала по условию (п. 1.6: совпадения и окно связей) — тот же вид, что в «Списке происшествий»."""
+        found = (
+            await self._s.execute(
+                self._journal_select().where(*conditions).order_by(_REGISTERED_AT.desc(), C.number.desc()).limit(limit)
+            )
+        ).all()
+        return await self._with_links([self._row(*r) for r in found])
+
+    async def _with_links(self, rows: list[JournalRow]) -> list[JournalRow]:
+        """«Связи»: подчинённая знает главную по своему столбцу, у главной — есть подчинённые."""
+        if not rows:
+            return rows
+        mains = set(
+            (
+                await self._s.execute(select(C.main_card_id).where(C.main_card_id.in_([r.id for r in rows])).distinct())
+            ).scalars()
+        )
+        return [replace(r, linked=r.main_card_id is not None or r.id in mains) for r in rows]
 
     @staticmethod
     def _row(c: C, display: str, author: str | None, okrug: str | None, district: str | None) -> JournalRow:
@@ -142,6 +171,7 @@ class SqlCardReader:
             victims_count=c.victims_count,
             address_line=_address(c.address_text, okrug, district),
             description=c.description,
+            main_card_id=c.main_card_id,
         )
 
     # ------------------------------------------------------------------ карточка

@@ -14,8 +14,16 @@ const LABELS: Record<string, string> = {
   norm_112: 'Норматив карточки 112, с', norm_dds: 'Норматив решения ДДС, с', threshold: 'Порог «зачтено», балл',
   difficulty: 'Сложность вызовов, 1–5', call_interval_s: 'Темп вызовов 112, с', feed_interval_s: 'Темп карточек ДДС, с',
   max_waiting: 'Очередь ДДС, не больше', keep: 'Хранить копий', call_stream: 'Поток учебных вызовов 112: 1 — работает, 0 — остановлен', dds_feed: 'Выдача карточек в очередь ДДС: 1 — работает, 0 — остановлена', auto: 'Ежедневная копия: 1 — включена, 0 — нет', daily_hour: 'Час ежедневной копии (МСК, 0–23)', retention_days: 'Срок хранения журнала аудита, дней (от 183)',
+  hold_max_s: 'Удержание: заявитель ждёт не дольше, с', level: 'Уровень журнала процесса',
 };
-const TITLES: Record<string, string> = { session_defaults: 'Занятие по умолчанию', backup: 'Хранение копий', services: 'Сервисы тренажёра: запуск и остановка', audit: 'Журнал аудита' };
+const LOG_LEVELS = [[10, 'DEBUG — подробно'], [20, 'INFO — обычный'], [30, 'WARNING — предупреждения'], [40, 'ERROR — ошибки'], [50, 'CRITICAL — только сбои']] as const;
+const TITLES: Record<string, string> = { session_defaults: 'Занятие по умолчанию', backup: 'Хранение копий', services: 'Сервисы тренажёра: запуск и остановка', audit: 'Журнал аудита',
+  telephony: 'IP-телефония', logging: 'Журналирование' };
+const SUBTITLES: Record<string, string> = {
+  session_defaults: 'Подставляются в новое занятие; преподаватель может изменить',
+  telephony: 'Встроенный софтфон тренажёра (SIP-шлюз не подключён): входящие 112, звонки ДДС, удержание',
+  logging: 'Применяется сразу, без перезапуска; записи — в разделе «Логи»',
+};
 const size = bytes;
 
 function Section({ k, values }: { k: string; values: Record<string, number> }) {
@@ -25,11 +33,15 @@ function Section({ k, values }: { k: string; values: Record<string, number> }) {
   useEffect(() => setF(values), [values]);
   const dirty = Object.keys(f).some((x) => f[x] !== values[x]);
   return (
-    <Card title={TITLES[k] ?? k} subtitle={k === 'session_defaults' ? 'Подставляются в новое занятие; преподаватель может изменить' : undefined}>
+    <Card title={TITLES[k] ?? k} subtitle={SUBTITLES[k]}>
       <div className="tch-form tch-form--grid">
         {Object.keys(values).map((x) => (
           <label key={x}>{LABELS[x] ?? x}
-            <input type="number" min={limits[x]?.[1]} max={limits[x]?.[2]} value={f[x]} onChange={(e) => setF({ ...f, [x]: Number(e.target.value) })} />
+            {k === 'logging' && x === 'level'
+              ? <select value={f[x]} onChange={(e) => setF({ ...f, [x]: Number(e.target.value) })}>
+                  {LOG_LEVELS.map(([v, label]) => <option key={v} value={v}>{label}</option>)}
+                </select>
+              : <input type="number" min={limits[x]?.[1]} max={limits[x]?.[2]} value={f[x]} onChange={(e) => setF({ ...f, [x]: Number(e.target.value) })} />}
           </label>
         ))}
       </div>

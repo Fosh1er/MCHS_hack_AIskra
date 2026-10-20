@@ -44,6 +44,7 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "max_waiting": 3,  # сколько карточек одновременно ждут в очереди ДДС (#706)
     "psy": dict(PSY_DEFAULTS),  # п. 3.7: психологический модификатор, по умолчанию выключен
     "branch": {"weight": 0.0},  # F5: вес блока «Развитие ситуации» в итоговом балле, по умолчанию информативно
+    "repeat_share": 0,  # ТЗ 4.6: доля входящих — повторный звонок заявителя по своей сохранённой карточке, %
 }
 
 
@@ -84,6 +85,9 @@ class TrainingSession:
         self.settings["branch"] = {"weight": float(branch.get("weight") or 0)}
         if not 0 <= self.settings["branch"]["weight"] <= 1:
             raise DomainError("Вес блока «Развитие ситуации» — от 0 до 1", code="bad_setting")
+        self.settings["repeat_share"] = int(self.settings.get("repeat_share") or 0)
+        if not 0 <= self.settings["repeat_share"] <= 100:
+            raise DomainError("Доля повторных обращений — от 0 до 100 %", code="bad_setting")
         try:
             check_settings(self.settings["psy"])
         except ValueError as e:

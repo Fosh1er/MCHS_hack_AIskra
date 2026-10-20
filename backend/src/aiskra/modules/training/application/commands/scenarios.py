@@ -25,6 +25,7 @@ from aiskra.modules.training.application.ports.branching import BranchCatalog
 from aiskra.modules.training.application.ports.materials import MaterialContext
 from aiskra.modules.training.application.ports.psy import PsyCatalog
 from aiskra.modules.training.application.ports.scenarios import ScenarioFactsSource, ScenarioRepository
+from aiskra.modules.training.domain.actors import ANSWER_TOPICS, answer_fact_errors
 from aiskra.modules.training.domain.branching import Template, apply_texts, event_nodes
 from aiskra.modules.training.domain.review import accept_all
 from aiskra.modules.training.domain.scenario import FLAG_FACTS, Scenario, ScenarioStatus, build_scenario, offline_story
@@ -430,9 +431,10 @@ class EditScenarioHandler:
             raise
         return EditResult(status=s.status.value, grammar=remarks, checked_by=by)
 
-    async def _check_grammar(self, s: Scenario) -> tuple[list[Remark], str]:
+    async def _check_grammar(self, s: Scenario, fields: dict[str, str] | None = None) -> tuple[list[Remark], str]:
         """П. 3.6: после каждой ручной правки — правила всегда, модель — если подключена (сбой модели не мешает)."""
-        fields = {"title": s.title, **{k: str(s.legend.get(k) or "") for k in ("opening", "what", "details")}}
+        if fields is None:
+            fields = {"title": s.title, **{k: str(s.legend.get(k) or "") for k in ("opening", "what", "details")}}
         remarks = check_legend(fields)
         model = self._router.for_task(AITask.JUDGE)
         if model.provider_name == "fake":
@@ -452,6 +454,143 @@ class EditScenarioHandler:
         seen = {r.quote for r in remarks}
         remarks += [Remark("текст", e.quote, e.fix, "ИИ-проверка") for e in out.errors if e.quote not in seen]
         return remarks, "rules+model"
+
+
+ANSWER_MAX = 400
+
+
+class AnswerOut(BaseModel):
+    answer: str = Field(max_length=ANSWER_MAX)
+
+
+ANSWER_PROMPT = (
+    "Ты пишешь реплику заявителя учебного вызова 112. Перепиши ОДИН ответ заявителя на вопрос оператора по "
+    "комментарию преподавателя: разговорная речь, 1–3 предложения, без новых фактов — адрес, имена, число "
+    'пострадавших и признаки бери только из легенды. Верни JSON {"answer": текст ответа}.'
+)
+
+
+@dataclass(frozen=True, kw_only=True)
+class EditAnswer(Command):
+    """Перегенерация или правка ОДНОГО ответа заявителя из прогона (ТЗ 3.4: «по комментарию преподавателя система
+    перегенерирует вопрос / ответ»). `text` — вписать вручную (работает без модели), `comment` — переписать моделью,
+    ни того ни другого — вернуть ответ по легенде. Сценарий возвращается в черновики, как при любой правке."""
+
+    actor: Principal
+    scenario_id: UUID
+    topic: str
+    text: str | None = None
+    comment: str | None = None
+    meta: RequestMeta = field(default_factory=RequestMeta)
+
+
+class EditAnswerHandler(EditScenarioHandler):
+    async def _rewrite(self, s: Scenario, topic: str, question: str, current: str, comment: str) -> str:
+        model = self._router.for_task(AITask.SCENARIO_GENERATION)
+        if model.provider_name == "fake":
+            raise DomainError(
+                "Переписать ответ по комментарию может только подключённая модель (config/ai.yaml) — "
+                "без неё впишите ответ вручную",
+                code="ai_unavailable",
+            )
+        facts = {
+            "легенда": {k: s.legend.get(k) for k in ("what", "details", "address", "applicant", "victims", "facts")},
+            "тема_вопроса": topic,
+            "вопрос_оператора": question,
+            "текущий_ответ": current,
+            "комментарий_преподавателя": comment,
+        }
+        try:
+            result = await model.complete(
+                [
+                    ChatMessage(role="system", content=ANSWER_PROMPT),
+                    ChatMessage(role="user", content=json.dumps(facts, ensure_ascii=False, default=str)),
+                ],
+                schema=AnswerOut,
+            )
+            out = result.parsed if isinstance(result.parsed, AnswerOut) else AnswerOut.model_validate_json(result.text)
+        except (ExternalServiceError, ValueError) as e:
+            raise DomainError(f"Модель недоступна: {e}", code="ai_unavailable") from e
+        return out.answer
+
+    async def __call__(self, cmd: EditAnswer) -> EditResult:  # type: ignore[override]
+        if cmd.topic not in ANSWER_TOPICS:
+            raise DomainError(f"Нет темы ответа «{cmd.topic}»", code="bad_answer_topic")
+        s = await self._repo.get(cmd.scenario_id)
+        if s is None:
+            raise NotFoundError("Сценарий не найден", code="scenario_not_found")
+        answers = dict(s.legend.get("answers") or {})
+        if cmd.text is not None and cmd.text.strip():
+            text = " ".join(cmd.text.split())
+        elif cmd.comment and cmd.comment.strip():
+            text = " ".join(
+                (
+                    await self._rewrite(
+                        s, cmd.topic, QUESTION_OF.get(cmd.topic, cmd.topic), answers.get(cmd.topic, ""), cmd.comment
+                    )
+                ).split()
+            )
+        else:
+            text = ""
+        if len(text) > ANSWER_MAX:
+            raise DomainError(f"Ответ — не длиннее {ANSWER_MAX} символов", code="answer_too_long")
+        if text:
+            problems = answer_fact_errors(s.legend, cmd.topic, text)
+            if problems:
+                raise DomainError(
+                    "Ответ меняет факты легенды: " + "; ".join(problems) + " — эталон карточки строится по ним",
+                    code="answer_changes_facts",
+                )
+            answers[cmd.topic] = text
+        else:
+            answers.pop(cmd.topic, None)
+        s.legend["answers"] = answers
+        if not answers:
+            s.legend.pop("answers", None)
+        remarks, by = await self._check_grammar(s, {f"ответ: {cmd.topic}": text}) if text else ([], "rules")
+        s.legend["grammar_check"] = {
+            "at": datetime.now(UTC).isoformat(),
+            "by": by,
+            "remarks": [asdict(r) for r in remarks],
+        }
+        s.status = ScenarioStatus.DRAFT
+        s.approved_by = None
+        try:
+            await self._repo.save(s)
+            await self._audit.record(
+                AuditEntry(
+                    event=AuditEvent.SCENARIO_EDITED,
+                    actor=cmd.actor,
+                    meta=cmd.meta,
+                    description=f"{s.title}: ответ заявителя «{cmd.topic}» "
+                    + (
+                        "переписан моделью по комментарию"
+                        if not cmd.text and cmd.comment
+                        else "изменён"
+                        if text
+                        else "по легенде"
+                    ),
+                    object_type="scenario",
+                    object_id=str(s.id),
+                )
+            )
+            await self._uow.commit()
+        except Exception:
+            await self._uow.rollback()
+            raise
+        return EditResult(status=s.status.value, grammar=remarks, checked_by=by)
+
+
+QUESTION_OF = {
+    "opening": "Служба 112, что у вас случилось?",
+    "what": "Что у вас случилось?",
+    "address": "Назовите адрес.",
+    "floor": "Подъезд, этаж, квартира?",
+    "victims": "Есть пострадавшие?",
+    "name": "Как вас зовут?",
+    "status": "Кем вы приходитесь пострадавшему?",
+    "phone": "Ваш номер телефона?",
+}
 
 
 @dataclass(frozen=True, kw_only=True)

@@ -27,6 +27,7 @@ export interface CallMessage {
 }
 export interface CallView {
   id: string; role: string; party: 'applicant' | 'brigade' | 'service'; direction: 'in' | 'out'; status: string; aon: string;
+  repeat_of?: string | null; // ТЗ 4.6: повторный звонок по этой карточке
   card_id: string | null; service_code: string | null; target_service: string | null;
   started_at: string; answered_at: string | null; ended_at: string | null; messages: CallMessage[]; tone?: Tone | null;
   mode?: ReplicaVia; // как оператор вёл разговор: самый «голосовой» из способов его реплик
@@ -75,6 +76,10 @@ export const sendReplica = (id: string, text: string, via: ReplicaVia = 'text', 
 /** «Пауза» (п. 3.7): остановить тяжёлый учебный звонок; блок «Работа с заявителем» не оценивается. */
 export const pauseCall = (id: string) => post<{ status: string }>(`/calls/${id}/pause`);
 export const endCall = (id: string) => post<{ status: string }>(`/calls/${id}/end`);
+/** ТЗ 6.1: удержание; `hung_up` — заявитель не дождался (настройка администратора «IP-телефония»). */
+export interface HoldResult { status: string; held_s: number; hung_up: boolean }
+export const holdCall = (id: string) => post<HoldResult>(`/calls/${id}/hold`);
+export const resumeCall = (id: string) => post<HoldResult>(`/calls/${id}/resume`);
 export const startDdsCall = (b: { card_id: string; service_code: string; party: CallView['party']; target_service?: string | null; incoming?: boolean }) =>
   post<CallStarted>('/calls/dds', b);
 export const getCall = (id: string) => http<CallView>(`${T}/calls/${id}`);
@@ -196,7 +201,7 @@ export interface ScenarioView {
   review?: SectionReview[];
   branching?: BranchGraph | null; // F5: граф ситуации
 }
-export interface PreviewItem { question: string; answer: string; reference: string }
+export interface PreviewItem { question: string; answer: string; reference: string; topic: string | null; custom: boolean }
 export interface ScenarioFilter { status?: string; difficulty?: number; card_type?: string; source?: string; psy?: string; page: number; page_size: number }
 
 const qs = (o: Record<string, unknown>) =>
@@ -259,12 +264,19 @@ export const useEditScenario = () =>
   useInvalidating(({ id, ...b }: ScenarioEdit & { id: string }) => http<EditScenarioResult>(`${T}/scenarios/${id}`, { method: 'PATCH', body: JSON.stringify(b) }),
     [['scenarios'], ['scenario'], ['scenario-preview']]);
 
+/** ТЗ 3.4: один ответ заявителя из прогона — вручную (`text`) или моделью по комментарию; пустое — по легенде. */
+export const useEditAnswer = () =>
+  useInvalidating(({ id, topic, ...b }: { id: string; topic: string; text?: string; comment?: string }) =>
+    http<EditScenarioResult>(`${T}/scenarios/${id}/answers/${topic}`, { method: 'PUT', body: JSON.stringify(b) }),
+  [['scenarios'], ['scenario'], ['scenario-preview']]);
+
 // ------------------------------------------------------------------ п. 4.2: занятия
 export type SessionMode = 'cards_112' | 'dds_actions' | 'mixed';
 export type CardSource = 'generated' | 'trainee' | 'mixed';
 export interface SessionSettings {
   norm_112: number; norm_dds: number; threshold: number; difficulty: number;
   call_interval_s: number; feed_interval_s: number; max_waiting: number;
+  repeat_share: number; // ТЗ 4.6: доля входящих — повторный звонок по своей карточке, %
   psy?: PsySettings;
   branch?: { weight: number }; // F5: вес блока «Развитие ситуации»; 0 — информативно
 }

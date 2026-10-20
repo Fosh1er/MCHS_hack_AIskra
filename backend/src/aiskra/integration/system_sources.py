@@ -19,6 +19,16 @@ class SystemSessionDefaults:
         return {k: int(v) if k in ("difficulty", "max_waiting") else v for k, v in values.items()}
 
 
+class SystemTelephonySettings:
+    """Порт `TelephonySettings` модуля training: раздел «IP-телефония» настроек администратора (п. 2.2)."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._s = session
+
+    async def hold_max_s(self) -> int:
+        return int(merged("telephony", await SqlSettingsStore(self._s).get("telephony"))["hold_max_s"])
+
+
 class SystemRetentionPolicy:
     """Порт `RetentionPolicy` модуля audit: срок хранения журнала — из настроек администратора."""
 

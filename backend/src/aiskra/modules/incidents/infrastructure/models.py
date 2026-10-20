@@ -54,6 +54,8 @@ class IncidentCardModel(Base):
     checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     checked_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
     search_key: Mapped[str | None] = mapped_column(Text)  # номер, адрес, телефоны, заявитель, описание (п. 1.3)
+    # п. 1.6 (ТЗ 4.6): подчинённая карточка привязана к главной (повторное обращение), миграция 0021
+    main_card_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 

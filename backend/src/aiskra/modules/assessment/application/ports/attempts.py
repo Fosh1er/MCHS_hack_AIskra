@@ -30,6 +30,11 @@ class Card112Attempt:
     caller: CallerFacts | None = None  # как менялось состояние ИИ-заявителя (п. 3.6); None — без состояния
     psy: PsyAttempt | None = None  # п. 3.7: разговор с заявителем, у которого был психологический профиль
     branch: BranchAttempt | None = None  # F5: итог ветвящегося сценария; None — сценарий без ветвления
+    # ТЗ 4.6: карточка заведена по повторному звонку — к какой карточке её надо привязать и к чему привязана
+    repeat_of: UUID | None = None
+    repeat_targets: set[UUID] = field(default_factory=set)  # исходная карточка и её главная
+    repeat_number: int | None = None
+    main_card_id: UUID | None = None
 
 
 @dataclass(frozen=True)
@@ -43,6 +48,7 @@ class DdsAttempt:
     calls: list[str]  # стороны звонков по карточке: brigade | applicant | service
     actor_ids: set[UUID]  # кто ставил статусы
     psy: PsyAttempt | None = None  # п. 3.7: звонок заявителю из ДДС с психологическим профилем
+    call_log: list[tuple[str, datetime]] | None = None  # стороны звонков со временем начала (порядок, ТЗ 5.10)
 
 
 class AttemptSource(Protocol):

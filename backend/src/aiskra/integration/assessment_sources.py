@@ -209,7 +209,35 @@ class IncidentAttempts:
             caller=await self._caller(list(calls)) if calls else None,
             psy=psy,
             branch=await self._branch(card.id),
+            **await self._repeat(card.id),
         )
+
+    async def _repeat(self, card_id: UUID) -> dict[str, Any]:
+        """ТЗ 4.6: карточка по повторному звонку — исходная карточка, её главная и к чему привязана эта."""
+        repeat_of = (
+            await self._s.execute(
+                select(CallModel.repeat_of).where(CallModel.card_id == card_id, CallModel.repeat_of.is_not(None))
+            )
+        ).scalar()
+        main = (
+            await self._s.execute(select(IncidentCardModel.main_card_id).where(IncidentCardModel.id == card_id))
+        ).scalar_one_or_none()
+        if repeat_of is None:
+            return {"main_card_id": main}
+        orig = (
+            await self._s.execute(
+                select(IncidentCardModel.number, IncidentCardModel.main_card_id).where(
+                    IncidentCardModel.id == repeat_of
+                )
+            )
+        ).first()
+        targets = {repeat_of} | ({orig.main_card_id} if orig and orig.main_card_id else set())
+        return {
+            "repeat_of": repeat_of,
+            "repeat_targets": targets,
+            "repeat_number": orig.number if orig else None,
+            "main_card_id": main,
+        }
 
     async def dds(self, card_id: UUID, service_code: str) -> DdsAttempt | None:
         card = await SqlCardReader(self._s).get(card_id)
@@ -241,15 +269,15 @@ class IncidentAttempts:
         ).scalar_one_or_none()
         if added is not None and paused_ms:  # п. 5.3: пауза на подсказки не входит во время реакции
             added += timedelta(milliseconds=paused_ms)
-        parties = (
-            (
-                await self._s.execute(
-                    select(CallModel.party).where(CallModel.card_id == card_id, CallModel.service_code == service_code)
-                )
+        call_rows = (
+            await self._s.execute(
+                select(CallModel.party, CallModel.started_at)
+                .where(CallModel.card_id == card_id, CallModel.service_code == service_code)
+                .order_by(CallModel.started_at)
             )
-            .scalars()
-            .all()
-        )
+        ).all()
+        parties = [r.party for r in call_rows]
+        call_log = [(r.party, at) for r in call_rows if (at := as_utc(r.started_at)) is not None]
         scenario = await self._scenario(card_id)
         return DdsAttempt(
             card_id=card.id,
@@ -259,6 +287,7 @@ class IncidentAttempts:
             added_at=added,
             reference=dict(scenario.reference_dds) if scenario and scenario.reference_dds else None,
             calls=list(parties),
+            call_log=call_log,
             actor_ids=actors,
             psy=await self._psy(card.id, "dds", service_code, [s.code for s in card.services]),
         )

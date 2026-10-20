@@ -144,7 +144,9 @@ class Actors:
         offline = applicant_reply(legend, question, revealed)
         if self._online(AITask.APPLICANT_ACTOR):
             public = {
-                k: legend[k] for k in ("applicant", "address", "what", "details", "facts", "victims") if k in legend
+                k: legend[k]
+                for k in ("applicant", "address", "what", "details", "facts", "victims", "answers")
+                if k in legend
             }
             version = "v4" if situation else self._router.for_task(AITask.APPLICANT_ACTOR).profile.prompt_version
             system = load_prompt(AITask.APPLICANT_ACTOR, version).format(
@@ -187,7 +189,11 @@ class Actors:
         вызывающий берёт офлайн-реплику профиля."""
         if not self._online(AITask.APPLICANT_ACTOR):
             return None
-        public = {k: legend[k] for k in ("applicant", "address", "what", "details", "facts", "victims") if k in legend}
+        public = {
+            k: legend[k]
+            for k in ("applicant", "address", "what", "details", "facts", "victims", "answers")
+            if k in legend
+        }
         system = (
             load_prompt(AITask.APPLICANT_ACTOR, "v3")
             .replace("{legend}", json.dumps(public, ensure_ascii=False, indent=1))

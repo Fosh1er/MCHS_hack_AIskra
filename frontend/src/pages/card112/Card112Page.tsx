@@ -2,26 +2,27 @@
  *  /arm/112 — открыть новую карточку (Insert), /arm/112/:id — заполнение своей черновой или просмотр сохранённой. */
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { useQueries, useQueryClient } from '@tanstack/react-query';
+import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { http } from '../../shared/api/http';
 import { homeFor, useMe, type Me } from '../../shared/api/auth';
 import {
   useCardTypes, useEnum, useResolvedServices, useServices, useTerritory,
   type IncidentTypeDetails, type Questionnaire,
 } from '../../shared/api/dictionaries';
-import { SERVICE_STATUS, setCardTimerPaused, useCard, useOpenCard, useSaveCard, type CardView } from '../../shared/api/incidents';
+import { SERVICE_STATUS, setCardTimerPaused, useCard, useMatches, useOpenCard, useSaveCard, type CardView } from '../../shared/api/incidents';
 import { dropDraft, loadDraft, saveDraft } from '../../shared/api/resilience';
 import { shortName } from '../../shared/ui/ArmTopBar';
 import { CardHeader } from './CardHeader';
 import { CardViewer } from './CardViewer';
 import { CallPanel } from '../../shared/ui/CallPanel';
 import { useScreenTour, useTourPause } from '../../shared/onboarding/OnboardingProvider';
-import { answerCall } from '../../shared/api/training';
+import { answerCall, getCall } from '../../shared/api/training';
 import { ApplicantRow, VictimsRow } from './ApplicantBlock';
 import { AddressBlock, DescriptionBlock } from './AddressBlock';
 import { WhatHappened, cardTypeLabel } from './WhatHappened';
 import { QuestionnairePanel } from './QuestionnairePanel';
 import { ServicesBar, type SavedService } from './ServicesBar';
+import { LinksDialog, MatchesDialog } from './CardLinks';
 import { AddServicesModal, CloseCardModal, EmptyCardModal, SaveModal } from './Modals';
 import { focusId, useHotkeys, type HotkeyMap } from './useHotkeys';
 import {
@@ -77,7 +78,7 @@ export function Card112Page() {
   const editable = card.data.status === 'draft' && card.data.author_id === me.user_id;
   // сохранённая карточка — экран просмотра (п. 1.3); чужой черновик преподаватель видит в раскладке заполнения
   if (card.data.status !== 'draft') return <>{<CardViewer key={card.data.id} view={card.data} me={me} />}{dock}</>;
-  return <>{<CardEditor key={`${card.data.id}:${card.data.status}`} view={card.data} editable={editable} me={me} />}{dock}</>;
+  return <>{<CardEditor key={`${card.data.id}:${card.data.status}`} view={card.data} editable={editable} me={me} callId={callId} />}{dock}</>;
 }
 
 type ModalKind = null | 'services' | 'save' | 'close' | 'new' | 'no_contact' | 'call_dropped';
@@ -97,7 +98,7 @@ function useTourTimerPause(view: CardView, editable: boolean, now: number): numb
   return Math.max(view.paused_ms ?? 0, localMs) + ongoing;
 }
 
-function CardEditor({ view, editable, me }: { view: CardView; editable: boolean; me: Me }) {
+function CardEditor({ view, editable, me, callId }: { view: CardView; editable: boolean; me: Me; callId?: string | null }) {
   const readOnly = !editable;
   const navigate = useNavigate();
   const qc = useQueryClient();
@@ -116,6 +117,23 @@ function CardEditor({ view, editable, me }: { view: CardView; editable: boolean;
     if (draft) setBanner({ title: 'Восстановлен черновик карточки', items: [`сохранён на этом компьютере в ${new Date(draft.at).toLocaleTimeString('ru-RU')}`] });
   }, [draft]);
   const qRefs = useRef<(HTMLDivElement | null)[]>([]);
+
+  // --- п. 1.6 (ТЗ 4.6): повторные обращения — недавние карточки с тем же номером или адресом. Сами по себе они
+  // показываются только при повторном звонке заявителя: в учебном банке сценарии повторяются вместе с номером,
+  // и баннер на каждом таком совпадении мешал бы. Иначе — оранжевая кнопка «совпадение» у адреса (`image61`).
+  const matches = useMatches({
+    phones: [state.phones.aon, state.phones.provided, state.phones.on_site],
+    street: state.address.street ?? '', house: state.address.house ?? '', exclude: view.id,
+  }, editable);
+  const found = matches.data ?? [];
+  const byPhone = found.filter((r) => r.match === 'phone');
+  const call = useQuery({ queryKey: ['call-meta', callId], queryFn: () => getCall(callId!), enabled: editable && !!callId, staleTime: Infinity });
+  const [matchShown, setMatchShown] = useState(false);
+  const [autoShown, setAutoShown] = useState(false);
+  useEffect(() => {
+    if (editable && !autoShown && call.data?.repeat_of && byPhone.length > 0) { setMatchShown(true); setAutoShown(true); }
+  }, [editable, autoShown, call.data?.repeat_of, byPhone.length]);
+  const [linksOpen, setLinksOpen] = useState(false);
 
   // --- справочники
   const cardTypes = useCardTypes();
@@ -233,7 +251,8 @@ function CardEditor({ view, editable, me }: { view: CardView; editable: boolean;
         <ApplicantRow state={state} dispatch={dispatch} statuses={statuses.data ?? []} channels={channels.data ?? []} readOnly={readOnly} />
         <VictimsRow state={state} dispatch={dispatch} readOnly={readOnly} onEmpty={(kind) => setModal(kind)} />
         <div className="arm112__col">
-          <AddressBlock state={state} dispatch={dispatch} okrugs={territory.data?.okrugs ?? []} districts={territory.data?.districts ?? []} readOnly={readOnly} />
+          <AddressBlock state={state} dispatch={dispatch} okrugs={territory.data?.okrugs ?? []} districts={territory.data?.districts ?? []} readOnly={readOnly}
+            onMatch={editable && found.length > 0 ? () => setMatchShown(true) : undefined} />
           <DescriptionBlock state={state} dispatch={dispatch} ambulance={ambulance} readOnly={readOnly} />
         </div>
         <div className="arm112__col">
@@ -276,7 +295,12 @@ function CardEditor({ view, editable, me }: { view: CardView; editable: boolean;
         panel={panel} saved={savedServices} busy={save.isPending}
         onRemove={(s) => dispatch({ type: 'removeService', code: s.code, auto: s.auto })}
         onAdd={() => setModal('services')} onSave={trySave} onClose={closeCard} onNew={newCard}
+        onLinks={() => setLinksOpen(true)}
       />
+      {matchShown && found.length > 0 && (
+        <MatchesDialog cardId={view.id} by={byPhone.length ? 'phone' : 'address'} rows={[...byPhone, ...found.filter((r) => r.match !== 'phone')]} onClose={() => setMatchShown(false)} />
+      )}
+      {linksOpen && <LinksDialog cardId={view.id} onClose={() => setLinksOpen(false)} />}
 
       {modal === 'services' && (
         <AddServicesModal
