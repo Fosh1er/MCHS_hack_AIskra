@@ -24,6 +24,7 @@ class SystemStatus:
         try:
             async with self._sv.engine.connect() as conn:
                 await conn.execute(text("SELECT 1"))
+                version = str(conn.dialect.server_version_info or "")
                 users: int = (await conn.execute(text("SELECT COUNT(*) FROM users"))).scalar_one()
                 cards: int = (await conn.execute(text("SELECT COUNT(*) FROM incident_cards"))).scalar_one()
         except Exception as e:
@@ -34,11 +35,23 @@ class SystemStatus:
             "ok" if ms < 200 else "warn",
             [
                 ("СУБД", self._sv.engine.dialect.name),
+                ("версия", ".".join(x for x in version.strip("()").replace(" ", "").split(",") if x) or "—"),
+                ("база", self._sv.engine.url.database or "—"),
+                ("пул соединений", self._pool()),
                 ("отклик", f"{ms:.0f} мс"),
                 ("пользователей", str(users)),
                 ("карточек", str(cards)),
             ],
+            # п. 2.2: адрес и пароль БД — в переменных окружения (секреты вне БД, ADR-0003), здесь — только просмотр
+            "подключение задаётся переменной AISKRA_DATABASE_URL",
         )
+
+    def _pool(self) -> str:
+        pool = self._sv.engine.pool
+        size = getattr(pool, "size", None)
+        if not callable(size):
+            return type(pool).__name__
+        return f"{size()} + до {getattr(pool, '_max_overflow', 0)} доп., занято {pool.checkedout()}"  # type: ignore[attr-defined]
 
     def _ai(self) -> ServiceState:
         tasks = self._sv.model_router.describe()

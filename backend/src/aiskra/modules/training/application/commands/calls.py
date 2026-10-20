@@ -10,6 +10,7 @@ import random
 from collections.abc import Callable
 from contextlib import AbstractAsyncContextManager
 from dataclasses import dataclass, field
+from datetime import timedelta
 from typing import Any
 from uuid import UUID
 
@@ -30,7 +31,7 @@ from aiskra.modules.training.application.ports.scenarios import (
     DdsCallContext,
     ScenarioRepository,
 )
-from aiskra.modules.training.application.ports.sessions import ServiceSwitches, SessionRepository
+from aiskra.modules.training.application.ports.sessions import ServiceSwitches, SessionRepository, TelephonySettings
 from aiskra.modules.training.application.psy import PsyDirector, TurnSignals, start_psy
 from aiskra.modules.training.domain.actors import topic_of
 from aiskra.modules.training.domain.call import Call, CallMessage, CallParty, CallStatus, ReplicaVia, Speaker
@@ -210,6 +211,9 @@ class StartIncomingCallHandler(_CallBase):
         if self._switches and not await self._switches.enabled("call_stream"):
             raise DomainError("Поток учебных вызовов остановлен администратором", code="service_stopped")
         rng = random.Random(cmd.seed)
+        repeat = await self._repeat_call(cmd, rng)
+        if repeat is not None:
+            return repeat
         scenario = await self._scenarios.random_approved(rng, cmd.groups or None, cmd.difficulty)
         if scenario is None:  # банк пуст — сценарий на лету, сохраняется черновиком для проверки преподавателем
             scenario = await self._gen.generate(rng, cmd.groups, cmd.difficulty or 2, None)
@@ -231,6 +235,43 @@ class StartIncomingCallHandler(_CallBase):
         await self._commit()
         return CallStarted(call_id=call.id, scenario_id=scenario.id, aon=aon, channel="mts", warning=warning)
 
+    async def _repeat_call(self, cmd: StartIncomingCall, rng: random.Random) -> CallStarted | None:
+        """ТЗ 4.6: заявитель перезванивает по уже сохранённой карточке (доля — настройка занятия `repeat_share`, по
+        умолчанию 0). Тот же номер и легенда; оператор должен найти карточку и привязать новую к ней."""
+        if self._sessions is None:
+            return None
+        session = await self._sessions.running_for_student(cmd.actor.user_id)
+        share = int((session.settings.get("repeat_share") or 0) if session else 0)
+        if share <= 0 or rng.random() * 100 >= share:
+            return None
+        prev = await self._calls.repeat_candidate(cmd.actor.user_id, self._clock.now() - REPEAT_WINDOW)
+        scenario = await self._scenarios.get(prev.scenario_id) if prev and prev.scenario_id else None
+        if prev is None or scenario is None:
+            return None
+        call = Call(
+            student_id=cmd.actor.user_id,
+            role="112",
+            party=CallParty.APPLICANT,
+            direction="in",
+            started_at=self._clock.now(),
+            scenario_id=scenario.id,
+            aon=prev.aon,
+            tone=tone_for_legend(scenario.legend, scenario.incident_type_code),
+            repeat_of=prev.card_id,
+        )
+        await self._calls.add(call)
+        await self._commit()
+        return CallStarted(call_id=call.id, scenario_id=scenario.id, aon=prev.aon, channel="mts")
+
+
+REPEAT_WINDOW = timedelta(minutes=30)  # повторный звонок — по карточке не старше получаса
+
+
+def repeat_opening(legend: dict[str, Any]) -> str:
+    """Первая фраза повторного звонка (ТЗ 4.6): заявитель уже звонил и спрашивает, когда приедут."""
+    what = str(legend.get("what") or "происшествие").rstrip(".").lower()
+    return f"Алло, я уже звонил(а) вам недавно — у нас {what}. Когда приедут? Никого до сих пор нет!"
+
 
 @dataclass(frozen=True, kw_only=True)
 class AnswerCall(Command):
@@ -251,6 +292,8 @@ class AnswerCallHandler(_CallBase):
             scenario = await self._scenarios.get(call.scenario_id)
             if scenario is not None:
                 text = scenario.legend.get("opening") or f"Здравствуйте, у нас {scenario.legend.get('what', 'беда')}."
+                if call.repeat_of is not None:
+                    text = repeat_opening(scenario.legend)
                 call.revealed = [*call.revealed, "opening"]
                 styled = self._psy.opening(call.psy, scenario.legend) if self._psy and call.psy else None
                 if styled is not None:  # п. 3.7: профиль ведёт и реплику, и голосовое состояние
@@ -562,6 +605,74 @@ class PauseCallHandler(_CallBase):
         )
         await self._commit()
         return call.status.value
+
+
+HOLD_MAX_S = 60  # без настроек администратора: столько заявитель ждёт на удержании
+
+
+@dataclass(frozen=True, kw_only=True)
+class HoldCall(Command):
+    """Удержание (софтфон, ТЗ 6.1): «поставить на удержание» и «снять с удержания». Заявитель, которого держали
+    дольше настройки «IP-телефония → удержание» (п. 2.2), не дожидается и кладёт трубку."""
+
+    actor: Principal
+    call_id: UUID
+    hold: bool  # True — поставить, False — снять
+    meta: RequestMeta = field(default_factory=RequestMeta)
+
+
+@dataclass(frozen=True)
+class HoldResult:
+    status: str
+    held_s: int = 0  # сколько длилось снятое удержание
+    hung_up: bool = False  # заявитель не дождался
+
+
+class HoldCallHandler(_CallBase):
+    def __init__(
+        self, *args: object, audit: AuditRecorder, telephony: TelephonySettings | None = None, **kwargs: object
+    ) -> None:
+        super().__init__(*args, **kwargs)  # type: ignore[arg-type]
+        self._audit = audit
+        self._telephony = telephony
+
+    async def __call__(self, cmd: HoldCall) -> HoldResult:
+        call = await self._own_call(cmd.call_id, cmd.actor)
+        now = self._clock.now()
+        if cmd.hold:
+            if not call.hold(now):
+                return HoldResult(status=call.status.value)
+            await self._say(call, Speaker.SYSTEM, "Звонок на удержании")
+            event, description, result = AuditEvent.CALL_HELD, "Звонок поставлен на удержание", None
+        else:
+            if call.status is not CallStatus.HELD:
+                call.resume(now)  # завершённый — понятная ошибка; уже снят — без изменений
+                return HoldResult(status=call.status.value)
+            secs = call.resume(now)
+            limit = await self._telephony.hold_max_s() if self._telephony else HOLD_MAX_S
+            hung_up = call.party is CallParty.APPLICANT and secs > limit
+            if hung_up:
+                await self._say(call, Speaker.SYSTEM, f"Заявитель не дождался на удержании ({secs} с) и положил трубку")
+                call.end(now, by="party")
+            else:
+                await self._say(call, Speaker.SYSTEM, f"Снят с удержания (ожидание {secs} с)")
+            event = AuditEvent.CALL_RESUMED
+            description = f"Звонок снят с удержания через {secs} с" + (" — заявитель положил трубку" if hung_up else "")
+            result = HoldResult(status=call.status.value, held_s=secs, hung_up=hung_up)
+        await self._calls.save(call)
+        await self._audit.record(
+            AuditEntry(
+                event=event,
+                actor=cmd.actor,
+                meta=cmd.meta,
+                description=description,
+                object_type="call",
+                object_id=str(call.id),
+                data={"card_id": str(call.card_id) if call.card_id else None, "party": call.party.value},
+            )
+        )
+        await self._commit()
+        return result or HoldResult(status=call.status.value)
 
 
 @dataclass(frozen=True, kw_only=True)

@@ -84,6 +84,11 @@ class CallRepository(Protocol):
 
     async def calls_of_card(self, card_id: UUID, student_id: UUID | None) -> list[Call]: ...
 
+    async def repeat_candidate(self, student_id: UUID, since: datetime) -> Call | None:
+        """ТЗ 4.6: завершённый входящий звонок обучающегося с сохранённой карточкой, по которой ещё не было
+        повторного звонка, — заявитель может перезвонить по нему."""
+        ...
+
 
 @dataclass(frozen=True)
 class DdsCallContext:

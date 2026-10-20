@@ -80,6 +80,7 @@ export interface JournalRow {
   operator_number: string | null; arm_number: string | null; author_name: string | null; channel: string | null;
   registered_at: string | null; card_types: string[]; empty_call: 'no_contact' | 'call_dropped' | null;
   has_victims: boolean; victims_count: number; address_line: string | null; description: string | null;
+  linked?: boolean; main_card_id?: string | null; match?: 'phone' | 'address' | null; // п. 1.6: связи, совпадение
 }
 export interface JournalPage { items: JournalRow[]; total: number; page: number; page_size: number }
 export interface JournalQuery {
@@ -218,3 +219,34 @@ export const setDdsTimerPaused = (service: string, paused: boolean, cardId?: str
   http<{ cards: number }>(`/api/v1/incidents/dds/${encodeURIComponent(service)}/timer`, {
     method: 'POST', body: JSON.stringify({ paused, card_id: cardId ?? null }),
   });
+
+// ------------------------------------------------------------------ п. 1.6 (ТЗ 4.6): повторные обращения и связи
+export interface MatchQuery { phones: string[]; street: string; house: string; exclude: string }
+export interface LinksView { main_id: string | null; rows: JournalRow[] }
+const digits = (p: string) => p.replace(/\D/g, '');
+/** Недавние карточки с тем же телефоном или адресом («Есть карточка с заявителем по этому номеру», `image62`). */
+export const useMatches = (q: MatchQuery, enabled: boolean) => {
+  const phones = q.phones.filter((p) => digits(p).length >= 6);
+  const params = new URLSearchParams();
+  phones.forEach((p) => params.append('phone', p));
+  if (q.street && q.house) { params.set('street', q.street); params.set('house', q.house); }
+  params.set('exclude', q.exclude);
+  const any = phones.length > 0 || (!!q.street && !!q.house);
+  return useQuery({
+    queryKey: ['matches', params.toString()], enabled: enabled && any, staleTime: 15_000, placeholderData: keepPreviousData,
+    queryFn: () => http<JournalRow[]>(`/api/v1/incidents/matches?${params.toString()}`),
+  });
+};
+export const useCardLinks = (id: string, enabled: boolean) =>
+  useQuery({ queryKey: ['card-links', id], queryFn: () => http<LinksView>(`${I}/${id}/links`), enabled: !!id && enabled });
+export const useLinkCard = (id: string) => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (mainId: string | null) => http<LinksView>(`${I}/${id}/link`, { method: 'POST', body: JSON.stringify({ main_id: mainId }) }),
+    onSuccess: (v) => {
+      qc.setQueryData(['card-links', id], v);
+      void qc.invalidateQueries({ queryKey: ['card-links'] });
+      void qc.invalidateQueries({ queryKey: ['journal'] });
+    },
+  });
+};

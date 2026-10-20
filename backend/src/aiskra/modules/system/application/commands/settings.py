@@ -1,4 +1,5 @@
-"""Настройки системы (п. 5.2): тайминг и пороги занятия по умолчанию, параметры резервного копирования.
+"""Настройки системы (п. 5.2, 2.2): тайминг и пороги занятия по умолчанию, резервное копирование, запуск и остановка
+подсистем, IP-телефония, уровень журнала (применяется сразу — `RuntimeSettings`).
 Хранятся в `system_settings`; без записи действуют значения по умолчанию. Модели ИИ правятся в config/ai.yaml
 (секреты и адреса — вне БД, ADR-0003), здесь — только просмотр."""
 
@@ -7,7 +8,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from aiskra.modules.system.application.ports.admin import SettingsStore
+from aiskra.modules.system.application.ports.admin import RuntimeSettings, SettingsStore
 from aiskra.shared.application import Command, Query, UnitOfWork
 from aiskra.shared.audit import AuditEntry, AuditEvent, AuditRecorder, RequestMeta
 from aiskra.shared.errors import DomainError
@@ -32,6 +33,12 @@ LIMITS: dict[str, dict[str, tuple[float, float, float]]] = {
     "services": {  # п. 2.2: запуск (1) и остановка (0) подсистем тренажёра из панели администратора
         "call_stream": (1, 0, 1),  # поток учебных вызовов 112
         "dds_feed": (1, 0, 1),  # выдача системных карточек в очередь ДДС
+    },
+    "telephony": {  # п. 2.2, ТЗ 6.4: IP-телефония тренажёра (SIP-шлюз не подключён — встроенный софтфон)
+        "hold_max_s": (60, 10, 600),  # столько заявитель ждёт на удержании, потом кладёт трубку (ТЗ 6.1)
+    },
+    "logging": {  # п. 2.2: уровень журнала процесса; применяется сразу, без перезапуска
+        "level": (20, 10, 50),  # 10 — DEBUG, 20 — INFO, 30 — WARNING, 40 — ERROR, 50 — CRITICAL
     },
     "audit": {
         "retention_days": (365, 183, 3650),  # срок хранения журнала аудита; не меньше 6 месяцев (п. 6.2)
@@ -70,10 +77,13 @@ class UpdateSettings(Command):
 
 
 class UpdateSettingsHandler:
-    def __init__(self, store: SettingsStore, audit: AuditRecorder, uow: UnitOfWork) -> None:
+    def __init__(
+        self, store: SettingsStore, audit: AuditRecorder, uow: UnitOfWork, runtime: RuntimeSettings | None = None
+    ) -> None:
         self._store = store
         self._audit = audit
         self._uow = uow
+        self._runtime = runtime
 
     async def __call__(self, cmd: UpdateSettings) -> dict[str, float]:
         limits = LIMITS.get(cmd.key)
@@ -104,4 +114,6 @@ class UpdateSettingsHandler:
         except Exception:
             await self._uow.rollback()
             raise
+        if self._runtime is not None:
+            self._runtime.apply(cmd.key, after)
         return after

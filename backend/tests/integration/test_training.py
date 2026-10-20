@@ -104,6 +104,29 @@ def test_incoming_call_with_ai_applicant(app_client: Callable[[], TestClient]) -
     assert teacher.get(f"/api/v1/training/calls/{call['call_id']}").status_code == 200
 
 
+def test_call_hold_and_resume(app_client: Callable[[], TestClient]) -> None:
+    """ТЗ 6.1: удержание — реплики не идут, после снятия разговор продолжается; события в журнале звонка."""
+    student = as_user(app_client, "student")
+    call = student.post("/api/v1/training/calls/incoming", json={}).json()
+    cid = call["call_id"]
+    card = student.post("/api/v1/incidents/cards", json={"aon": call["aon"], "scenario_id": call["scenario_id"]}).json()
+    student.post(f"/api/v1/training/calls/{cid}/answer", json={"card_id": card["id"]})
+    held = student.post(f"/api/v1/training/calls/{cid}/hold").json()
+    assert held["status"] == "held"
+    blocked = student.post(f"/api/v1/training/calls/{cid}/replicas", json={"text": "Назовите адрес"})
+    assert blocked.status_code == 422 and blocked.json()["error"] == "call_held"
+    assert student.get(f"/api/v1/training/calls/{cid}").json()["status"] == "held"
+    resumed = student.post(f"/api/v1/training/calls/{cid}/resume").json()
+    assert resumed["status"] == "active" and not resumed["hung_up"]
+    assert student.post(f"/api/v1/training/calls/{cid}/replicas", json={"text": "Назовите адрес"}).status_code == 200
+    texts = [m["text"] for m in student.get(f"/api/v1/training/calls/{cid}").json()["messages"]]
+    assert "Звонок на удержании" in texts and any(t.startswith("Снят с удержания") for t in texts)
+    other = as_user(app_client, "petrov")
+    assert other.post(f"/api/v1/training/calls/{cid}/hold").status_code == 404
+    student.post(f"/api/v1/training/calls/{cid}/end")
+    assert student.post(f"/api/v1/training/calls/{cid}/hold").status_code == 422
+
+
 def test_tone_follows_operator(app_client: Callable[[], TestClient]) -> None:
     """П. 3.6: состояние заявителя меняется от тона оператора и сохраняется у каждой его реплики."""
     student = as_user(app_client, "student")

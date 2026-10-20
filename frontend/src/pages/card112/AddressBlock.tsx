@@ -19,8 +19,9 @@ function Field({ label, value, onChange, readOnly, id }: { label: string; value:
   );
 }
 
-export function AddressBlock({ state, dispatch, okrugs, districts, readOnly }: {
+export function AddressBlock({ state, dispatch, okrugs, districts, readOnly, onMatch }: {
   state: CardState; dispatch: (a: Action) => void; okrugs: Okrug[]; districts: District[]; readOnly: boolean;
+  onMatch?: () => void; // п. 1.6: по этому адресу есть недавние карточки — «совпадение» (`image61`)
 }) {
   const a = state.address;
   const [open, setOpen] = useState(false);
@@ -150,6 +151,7 @@ export function AddressBlock({ state, dispatch, okrugs, districts, readOnly }: {
         <span className="arm-field__label">Описательный адрес:</span>
         <textarea className="arm112-textarea" rows={2} value={a.descriptive} readOnly={readOnly} onChange={(e) => set({ descriptive: e.target.value })} />
       </label>
+      {!readOnly && onMatch && <button type="button" className="arm-match" onClick={onMatch} title="Есть недавние карточки по этому адресу"><Icon name="warning" size="sm" />совпадение</button>}
       {!readOnly && <button type="button" className="arm-minibtn arm112-minibtn" onClick={() => dispatch({ type: 'clearAddress' })}>очистить адрес</button>}
     </div>
   );

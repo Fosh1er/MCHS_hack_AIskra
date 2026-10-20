@@ -67,6 +67,19 @@ function GroupInsights() {
           ))}
         </ul>
       </div>
+      {d.summary && (
+        <div className="arm-panel">
+          <b>Выводы {d.source === 'ai' ? `ИИ (${d.model ?? 'модель'})` : 'по правилам (модель не подключена)'}</b>
+          <p style={{ margin: '8px 0 4px', fontSize: 13 }}>{d.summary}</p>
+          {d.insights.length > 0 && <ul style={{ margin: '4px 0', paddingLeft: 18, fontSize: 13 }}>{d.insights.map((x) => <li key={x}>{x}</li>)}</ul>}
+          {d.actions.length > 0 && (
+            <>
+              <b style={{ fontSize: 13 }}>На следующее занятие</b>
+              <ol style={{ margin: '4px 0 0', paddingLeft: 18, fontSize: 13 }}>{d.actions.map((x) => <li key={x}>{x}</li>)}</ol>
+            </>
+          )}
+        </div>
+      )}
       <div className="arm-panel">
         <b>Частые ошибки</b>
         <ol style={{ margin: '8px 0 0', paddingLeft: 18, fontSize: 13 }}>

@@ -11,7 +11,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Composer, Icon, Transcript, type TranscriptMessage } from '@smena112/ui-kit';
 import { ApiError } from '../api/http';
-import { endCall, getCall, pauseCall, replicaAudioUrl, sendReplica, speakUrl, streamReplica, type PhraseCue, tickCall, transcribe, useSpeechStatus, type CallMessage, type PsyLive, type Replica, type ReplicaVia, type StreamMetrics, type Tone } from '../api/training';
+import { endCall, getCall, holdCall, pauseCall, resumeCall, replicaAudioUrl, sendReplica, speakUrl, streamReplica, type PhraseCue, tickCall, transcribe, useSpeechStatus, type CallMessage, type PsyLive, type Replica, type ReplicaVia, type StreamMetrics, type Tone } from '../api/training';
 import { useActiveTour } from '../onboarding/OnboardingProvider';
 import { useHandsFree, type HandsFreeState } from '../voice/useHandsFree';
 import { VAD_PROFILES, isLikelyEcho, type VadProfileName } from '../voice/vad';
@@ -144,6 +144,7 @@ export function CallPanel({ callId, title, subtitle, partyName, initial, onEnded
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const [ended, setEnded] = useState(false);
+  const [held, setHeld] = useState(false); // ТЗ 6.1: звонок на удержании — реплики не идут, собеседник ждёт
   const [error, setError] = useState('');
   const [startedAt, setStartedAt] = useState<number>(() => Date.now());
   const [now, setNow] = useState(() => Date.now());
@@ -225,6 +226,7 @@ export function CallPanel({ callId, title, subtitle, partyName, initial, onEnded
       setMessages(c.messages);
       setStartedAt(new Date(c.answered_at ?? c.started_at).getTime());
       setEnded(c.status === 'ended');
+      setHeld(c.status === 'held');
       setPsy(!!c.psy);
       if (c.psy) setPsyLevel({ level: c.psy.level });
       setBranching(!!c.branching);
@@ -341,6 +343,25 @@ export function CallPanel({ callId, title, subtitle, partyName, initial, onEnded
     setEnded(true);
     onEnded?.();
   };
+  const toggleHold = async () => {
+    setError('');
+    try {
+      if (!held) {
+        await holdCall(callId);
+        stopVoice();
+        setHeld(true);
+        setMessages((m) => [...m, { speaker: 'system', text: 'Звонок на удержании', at: new Date().toISOString() }]);
+        return;
+      }
+      const r = await resumeCall(callId);
+      setHeld(false);
+      setMessages((m) => [...m, {
+        speaker: 'system', at: new Date().toISOString(),
+        text: r.hung_up ? `Заявитель не дождался на удержании (${r.held_s} с) и положил трубку` : `Снят с удержания (ожидание ${r.held_s} с)`,
+      }]);
+      if (r.hung_up) { setEnded(true); onEnded?.(); }
+    } catch (e) { setError((e as Error).message); }
+  };
   const hangup = async () => {
     if (!ended) await endCall(callId).catch(() => undefined);
     stopVoice();
@@ -358,7 +379,7 @@ export function CallPanel({ callId, title, subtitle, partyName, initial, onEnded
   });
   const [recognizing, setRecognizing] = useState(0);
   const tour = useActiveTour(); // на время подсказок микрофон закрыт (п. 5.3)
-  const handsFreeOn = handsFree && speech && secure && !ended && !tour;
+  const handsFreeOn = handsFree && speech && secure && !ended && !held && !tour;
   const hf = useHandsFree({
     enabled: handsFreeOn,
     profile: vadProfile,
@@ -418,7 +439,7 @@ export function CallPanel({ callId, title, subtitle, partyName, initial, onEnded
         <div className="arm-dock__title">
           <span><Icon name="phone" size="sm" /> {title}</span>
           <span className="call-panel__head">
-            <span className="call-panel__timer" aria-label="Длительность разговора">{ended ? 'завершён' : `${pad(Math.floor(secs / 60))}:${pad(secs % 60)}`}</span>
+            <span className="call-panel__timer" aria-label="Длительность разговора">{ended ? 'завершён' : `${held ? 'удержание · ' : ''}${pad(Math.floor(secs / 60))}:${pad(secs % 60)}`}</span>
             <button type="button" className="call-panel__fold" aria-expanded={!collapsed}
               title={collapsed ? 'Развернуть разговор' : 'Свернуть разговор в полосу — открыть карточку под ним'}
               onClick={() => setCollapsed((c) => !c)}>{collapsed ? 'развернуть' : 'свернуть'}</button>
@@ -432,8 +453,9 @@ export function CallPanel({ callId, title, subtitle, partyName, initial, onEnded
         {psyLevel && <PsyMeter level={psyLevel.level} title={psyLevel.title} last={psyLevel.last} />}
         <Transcript messages={transcript} />
         {error && <div className="call-panel__err" role="alert">{error}</div>}
-        {!ended && <Composer value={text} onChange={setText} onSend={() => { void send(); }} />}
-        {!ended && speech && handsFree && (
+        {!ended && held && <div className="call-panel__sub" role="status">Звонок на удержании — собеседник ждёт. Снимите с удержания, чтобы продолжить разговор.</div>}
+        {!ended && !held && <Composer value={text} onChange={setText} onSend={() => { void send(); }} />}
+        {!ended && !held && speech && handsFree && (
           <div className={`call-panel__hf is-${hf}`} role="status" aria-live="polite">
             <span className="call-panel__hf-dot" aria-hidden="true" />
             <span className="call-panel__hf-text">{hfText}</span>
@@ -444,7 +466,7 @@ export function CallPanel({ callId, title, subtitle, partyName, initial, onEnded
             </select>
           </div>
         )}
-        {!ended && speech && !handsFree && (
+        {!ended && !held && speech && !handsFree && (
           <button type="button" className={`call-panel__talk${talk.state === 'recording' ? ' is-on' : ''}`}
             disabled={!secure || busy || talk.state === 'recognizing' || talk.state === 'starting'}
             title={secure ? 'Сказать реплику в трубку голосом' : 'Голосовой ввод работает по https или на localhost'}
@@ -472,6 +494,14 @@ export function CallPanel({ callId, title, subtitle, partyName, initial, onEnded
         {!ended && psy && (
           <button type="button" className="call-panel__close" title="Остановить тяжёлый учебный звонок: он не будет оценён" onClick={() => { void pause(); }}>
             пауза
+          </button>
+        )}
+        {!ended && (
+          <button type="button" className="call-panel__close" aria-pressed={held} disabled={busy}
+            aria-label={held ? 'снять с удержания' : 'удержание'}
+            title={held ? 'Снять с удержания и вернуться к разговору' : 'Поставить собеседника на удержание: он ждёт, реплики не идут'}
+            onClick={() => { void toggleHold(); }}>
+            {held ? 'снять' : 'удержание'}
           </button>
         )}
         {!ended

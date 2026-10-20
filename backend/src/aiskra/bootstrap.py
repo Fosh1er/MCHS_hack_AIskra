@@ -31,7 +31,12 @@ from aiskra.integration.session_sources import (
     SqlScenarioBank,
     TrainingDdsPosts,
 )
-from aiskra.integration.system_sources import SystemRetentionPolicy, SystemServiceSwitches, SystemSessionDefaults
+from aiskra.integration.system_sources import (
+    SystemRetentionPolicy,
+    SystemServiceSwitches,
+    SystemSessionDefaults,
+    SystemTelephonySettings,
+)
 from aiskra.integration.training_sources import DictionaryScenarioFacts, IncidentCardContext
 from aiskra.integration.validation_sources import ScenarioBankCases
 from aiskra.modules.assessment.api import deps as assessment_deps
@@ -124,6 +129,7 @@ from aiskra.modules.incidents.application.commands.dds import (
     MarkServiceReceivedHandler,
     SetDdsTimerPausedHandler,
 )
+from aiskra.modules.incidents.application.commands.link_card import LinkCardHandler
 from aiskra.modules.incidents.application.commands.open_card import OpenCardHandler
 from aiskra.modules.incidents.application.commands.record_card_view import RecordCardViewHandler
 from aiskra.modules.incidents.application.commands.save_card import SaveCardHandler
@@ -134,8 +140,10 @@ from aiskra.modules.incidents.application.queries.dds import (
     SearchDdsJournalHandler,
 )
 from aiskra.modules.incidents.application.queries.get_card import GetCardHandler
+from aiskra.modules.incidents.application.queries.links import FindMatchesHandler, GetLinksHandler
 from aiskra.modules.incidents.application.queries.search_journal import SearchJournalHandler
 from aiskra.modules.incidents.infrastructure.dds import SqlDdsReader, SqlDdsRepository
+from aiskra.modules.incidents.infrastructure.links import SqlCardLinks
 from aiskra.modules.incidents.infrastructure.reader import SqlCardReader
 from aiskra.modules.incidents.infrastructure.repositories import SqlCardRepository
 from aiskra.modules.system.api import deps as system_deps
@@ -146,7 +154,7 @@ from aiskra.modules.system.application.commands.backups import (
     RestoreBackupHandler,
 )
 from aiskra.modules.system.application.commands.probe_model import ProbeModelHandler
-from aiskra.modules.system.application.commands.settings import GetSettingsHandler, UpdateSettingsHandler
+from aiskra.modules.system.application.commands.settings import GetSettingsHandler, UpdateSettingsHandler, merged
 from aiskra.modules.system.application.queries.admin import GetAlertsHandler, GetStatusHandler, RecentLogsHandler
 from aiskra.modules.system.application.queries.get_ai_config import GetAIConfigHandler
 from aiskra.modules.system.infrastructure.settings import SqlSettingsStore
@@ -156,6 +164,7 @@ from aiskra.modules.training.application.branching import BranchDirector
 from aiskra.modules.training.application.commands.calls import (
     AnswerCallHandler,
     EndCallHandler,
+    HoldCallHandler,
     PauseCallHandler,
     SendReplicaHandler,
     StartDdsCallHandler,
@@ -169,6 +178,7 @@ from aiskra.modules.training.application.commands.materials import (
 )
 from aiskra.modules.training.application.commands.scenario_review import ReviewSectionsHandler
 from aiskra.modules.training.application.commands.scenarios import (
+    EditAnswerHandler,
     EditScenarioHandler,
     GenerateScenariosHandler,
     ReviewScenarioHandler,
@@ -221,6 +231,7 @@ from aiskra.platform import logbuffer
 from aiskra.platform.backup import FileBackupStore
 from aiskra.platform.db import SqlAlchemyUnitOfWork, create_engine, create_session_factory
 from aiskra.platform.deps import get_session
+from aiskra.platform.logbuffer import ProcessRuntime
 from aiskra.platform.models_registry import metadata as _all_models  # noqa: F401 — все ORM-модели в одном реестре
 from aiskra.platform.ratelimit import SlidingWindowThrottle
 from aiskra.platform.services import Services
@@ -492,6 +503,17 @@ def _wire_incidents(app: FastAPI) -> None:
     def append(session: Session) -> AppendCardHandler:
         return AppendCardHandler(SqlCardRepository(session), SqlAuditRecorder(session), SqlAlchemyUnitOfWork(session))
 
+    def link_card(session: Session) -> LinkCardHandler:
+        return LinkCardHandler(
+            SqlCardRepository(session), SqlCardLinks(session), SqlAuditRecorder(session), SqlAlchemyUnitOfWork(session)
+        )
+
+    def find_matches(session: Session) -> FindMatchesHandler:
+        return FindMatchesHandler(SqlCardLinks(session))
+
+    def card_links(session: Session) -> GetLinksHandler:
+        return GetLinksHandler(SqlCardRepository(session), SqlCardLinks(session))
+
     def add_workout(session: Session) -> AddWorkoutHandler:
         return AddWorkoutHandler(
             SqlCardRepository(session), SqlAuditRecorder(session), SqlAlchemyUnitOfWork(session), clock
@@ -507,6 +529,9 @@ def _wire_incidents(app: FastAPI) -> None:
     ov[incidents_deps.provide_set_flags] = set_flags
     ov[incidents_deps.provide_card_timer] = card_timer
     ov[incidents_deps.provide_append] = append
+    ov[incidents_deps.provide_link_card] = link_card
+    ov[incidents_deps.provide_links] = card_links
+    ov[incidents_deps.provide_matches] = find_matches
     ov[incidents_deps.provide_add_workout] = add_workout
     ov[incidents_deps.provide_record_view] = record_view
 
@@ -640,6 +665,11 @@ def _wire_training(app: FastAPI, services: Services) -> None:
     def pause_call(session: Session) -> PauseCallHandler:
         return PauseCallHandler(*call_parts(session), audit=SqlAuditRecorder(session))
 
+    def hold_call(session: Session) -> HoldCallHandler:
+        return HoldCallHandler(
+            *call_parts(session), audit=SqlAuditRecorder(session), telephony=SystemTelephonySettings(session)
+        )
+
     def set_scenario_psy(session: Session) -> SetScenarioPsyHandler:
         return SetScenarioPsyHandler(
             SqlScenarioRepository(session), catalog, SqlAuditRecorder(session), SqlAlchemyUnitOfWork(session)
@@ -689,6 +719,7 @@ def _wire_training(app: FastAPI, services: Services) -> None:
     ov[training_deps.provide_speech_status] = lambda: SpeechStatus(stt=services.stt.enabled, tts=services.tts.enabled)
     ov[training_deps.provide_end_call] = end_call
     ov[training_deps.provide_pause_call] = pause_call
+    ov[training_deps.provide_hold_call] = hold_call
     ov[training_deps.provide_set_scenario_psy] = set_scenario_psy
     ov[training_deps.provide_psy_catalog] = lambda: catalog
     ov[training_deps.provide_psy_methodology] = lambda: PsyMethodologyHandler(catalog)  # F4
@@ -708,6 +739,14 @@ def _wire_sessions(app: FastAPI, services: Services) -> None:
 
     def edit(session: Session) -> EditScenarioHandler:
         return EditScenarioHandler(
+            SqlScenarioRepository(session),
+            services.model_router,
+            SqlAuditRecorder(session),
+            SqlAlchemyUnitOfWork(session),
+        )
+
+    def edit_answer(session: Session) -> EditAnswerHandler:
+        return EditAnswerHandler(
             SqlScenarioRepository(session),
             services.model_router,
             SqlAuditRecorder(session),
@@ -766,6 +805,7 @@ def _wire_sessions(app: FastAPI, services: Services) -> None:
         return ListStudentsHandler(SqlStudentDirectory(session))
 
     ov[training_deps.provide_edit_scenario] = edit
+    ov[training_deps.provide_edit_answer] = edit_answer
     ov[training_deps.provide_preview] = preview
     ov[training_deps.provide_create_session] = create
     ov[training_deps.provide_session_state] = state
@@ -865,7 +905,7 @@ def _wire_assessment(app: FastAPI, services: Services) -> None:
         return GetAssessmentHandler(SqlAssessmentRepository(session))
 
     def insights(session: Session) -> GroupInsightsHandler:
-        return GroupInsightsHandler(SqlAssessmentRepository(session))
+        return GroupInsightsHandler(SqlAssessmentRepository(session), services.model_router)
 
     ov[assessment_deps.provide_assess] = assess
     ov[assessment_deps.provide_get] = get
@@ -958,7 +998,7 @@ def _wire_admin(app: FastAPI, services: Services) -> None:
 
     def update_settings(session: Session) -> UpdateSettingsHandler:
         return UpdateSettingsHandler(
-            SqlSettingsStore(session), SqlAuditRecorder(session), SqlAlchemyUnitOfWork(session)
+            SqlSettingsStore(session), SqlAuditRecorder(session), SqlAlchemyUnitOfWork(session), ProcessRuntime()
         )
 
     def create_backup(session: Session) -> CreateBackupHandler:
@@ -979,6 +1019,18 @@ def _wire_admin(app: FastAPI, services: Services) -> None:
     ov[system_deps.provide_status] = lambda: GetStatusHandler(status)
     ov[system_deps.provide_logs] = lambda: RecentLogsHandler(logs)
     ov[system_deps.provide_alerts] = lambda: GetAlertsHandler(status, logs)  # п. 10.6
+
+
+async def apply_runtime_settings(services: Services) -> None:
+    """При старте — сохранённые администратором настройки процесса (п. 2.2: уровень журнала)."""
+    try:
+        async with services.session_factory() as session:
+            stored = await SqlSettingsStore(session).get("logging")
+    except Exception:  # схема ещё не создана (первый запуск) — остаётся уровень из переменных окружения
+        logging.getLogger(__name__).warning("настройки журнала не прочитаны — уровень из окружения", exc_info=True)
+        return
+    if stored:
+        ProcessRuntime().apply("logging", merged("logging", stored))
 
 
 async def daily_backup_loop(services: Services, period_s: float = 60.0) -> None:

@@ -85,6 +85,15 @@ class ReviewSectionsIn(_Strict):
     )
 
 
+class EditAnswerIn(_Strict):
+    """ТЗ 3.4: один ответ заявителя из прогона — вписать вручную или переписать моделью по комментарию."""
+
+    text: str | None = Field(
+        default=None, max_length=400, description="Ответ вручную; пусто вместе с comment — по легенде"
+    )
+    comment: str | None = Field(default=None, min_length=3, max_length=1000, description="Переписать моделью")
+
+
 class EditScenarioIn(_Strict):
     title: str | None = Field(default=None, min_length=3, max_length=200)
     difficulty: int | None = Field(default=None, ge=1, le=5)
@@ -112,6 +121,7 @@ class SessionSettingsIn(_Strict):
     call_interval_s: float | None = Field(default=None, ge=5, le=3600)
     feed_interval_s: float | None = Field(default=None, ge=5, le=3600)
     max_waiting: int | None = Field(default=None, ge=1, le=10)
+    repeat_share: int | None = Field(default=None, ge=0, le=100, description="Повторные обращения, % вызовов (4.6)")
     psy: PsySettingsIn | None = None
     branch: BranchSettingsIn | None = None
 

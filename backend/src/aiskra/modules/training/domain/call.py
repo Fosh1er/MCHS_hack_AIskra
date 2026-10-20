@@ -22,6 +22,7 @@ class CallParty(StrEnum):
 class CallStatus(StrEnum):
     RINGING = "ringing"
     ACTIVE = "active"
+    HELD = "held"  # ТЗ 6.1: на удержании — собеседник ждёт, реплики не идут
     ENDED = "ended"
 
 
@@ -79,6 +80,9 @@ class Call:
     psy: dict[str, Any] | None = None  # п. 3.7: снимок профиля заявителя и текущее состояние (ADR-0012)
     ended_by: str | None = None  # operator | party — кто завершил звонок
     branch: dict[str, Any] | None = None  # F5: ход ветвления — что сказал оператор и когда, путь по узлам (ADR-0014)
+    held_at: datetime | None = None  # ТЗ 6.1: удержание идёт с этого момента
+    held_ms: int = 0  # сколько всего звонок был на удержании (без текущего)
+    repeat_of: UUID | None = None  # ТЗ 4.6: повторный звонок заявителя по этой (уже сохранённой) карточке
     id: UUID = field(default_factory=uuid4)
 
     def answer(self, now: datetime) -> None:
@@ -89,11 +93,44 @@ class Call:
             self.answered_at = now
 
     def end(self, now: datetime, by: str = "operator") -> None:
+        if self.status is CallStatus.HELD:
+            self._release(now)
         if self.status is not CallStatus.ENDED:
             self.status = CallStatus.ENDED
             self.ended_at = now
             self.ended_by = by
 
+    def hold(self, now: datetime) -> bool:
+        """Поставить на удержание (софтфон, ТЗ 6.1). Повтор запроса — без изменений (False)."""
+        if self.status is CallStatus.HELD:
+            return False
+        if self.status is not CallStatus.ACTIVE:
+            raise DomainError(
+                "Удержание — только во время разговора" if self.status is CallStatus.RINGING else "Звонок уже завершён",
+                code="call_not_active",
+            )
+        self.status = CallStatus.HELD
+        self.held_at = now
+        return True
+
+    def resume(self, now: datetime) -> int:
+        """Снять с удержания; возвращает, сколько секунд длилось это удержание (повтор запроса — 0)."""
+        if self.status is not CallStatus.HELD:
+            if self.status is CallStatus.ENDED:
+                raise DomainError("Звонок уже завершён", code="call_ended")
+            return 0
+        secs = self._release(now)
+        self.status = CallStatus.ACTIVE
+        return secs
+
+    def _release(self, now: datetime) -> int:
+        ms = max(0, int((now - self.held_at).total_seconds() * 1000)) if self.held_at else 0
+        self.held_ms += ms
+        self.held_at = None
+        return ms // 1000
+
     def ensure_active(self) -> None:
         if self.status is CallStatus.ENDED:
             raise DomainError("Звонок завершён — наберите снова", code="call_ended")
+        if self.status is CallStatus.HELD:
+            raise DomainError("Звонок на удержании — снимите его с удержания", code="call_held")

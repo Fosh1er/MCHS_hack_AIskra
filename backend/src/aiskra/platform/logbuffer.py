@@ -56,3 +56,19 @@ def install() -> RingBufferHandler:
         if logging.getLogger().level > logging.INFO or logging.getLogger().level == logging.NOTSET:
             logging.getLogger().setLevel(logging.INFO)
     return _handler
+
+
+def apply_level(level: int) -> None:
+    """Уровень журнала процесса из настроек администратора (п. 2.2): корневой логгер и буфер панели «логи»."""
+    level = level if level in _ORDER.values() else logging.INFO
+    logging.getLogger().setLevel(level)
+    if _handler is not None:
+        _handler.setLevel(min(level, logging.INFO) if level <= logging.INFO else level)
+
+
+class ProcessRuntime:
+    """Порт `RuntimeSettings` модуля system: применяет разделы настроек к процессу без перезапуска."""
+
+    def apply(self, key: str, values: dict[str, float]) -> None:
+        if key == "logging":
+            apply_level(int(values.get("level", logging.INFO)))

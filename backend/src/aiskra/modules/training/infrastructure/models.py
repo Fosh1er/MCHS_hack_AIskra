@@ -95,6 +95,9 @@ class CallModel(Base):
     tone: Mapped[dict[str, Any] | None] = mapped_column(JsonType)  # состояние заявителя (п. 3.6)
     psy: Mapped[dict[str, Any] | None] = mapped_column(JsonType)  # п. 3.7: профиль и состояние заявителя
     branch: Mapped[dict[str, Any] | None] = mapped_column(JsonType)  # F5: ход ветвления в звонке
+    held_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))  # ТЗ 6.1: удержание идёт сейчас
+    held_ms: Mapped[int | None] = mapped_column(Integer)  # сколько всего длилось удержание
+    repeat_of: Mapped[uuid.UUID | None] = mapped_column(Uuid)  # ТЗ 4.6: повторный звонок по этой карточке
     ended_by: Mapped[str | None] = mapped_column(String(16))  # operator | party
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     answered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

@@ -8,6 +8,12 @@ from typing import Any, Protocol
 from uuid import UUID
 
 
+class RuntimeSettings(Protocol):
+    """Применить раздел настроек к работающему процессу без перезапуска (п. 2.2): уровень журнала и т. п."""
+
+    def apply(self, key: str, values: dict[str, float]) -> None: ...
+
+
 class SettingsStore(Protocol):
     async def get(self, key: str) -> dict[str, Any] | None: ...
 

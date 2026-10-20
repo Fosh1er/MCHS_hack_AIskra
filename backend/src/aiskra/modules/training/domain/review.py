@@ -40,7 +40,10 @@ def section_content(s: Scenario, key: str) -> Any:
     lg, ref = s.legend, s.reference_card
     match key:
         case "story":
-            return {k: lg.get(k) for k in ("opening", "what", "details")}
+            story = {k: lg.get(k) for k in ("opening", "what", "details")}
+            if lg.get("answers"):  # ТЗ 3.4: переписанные ответы заявителя — часть речи; без них отпечаток прежний
+                story["answers"] = lg["answers"]
+            return story
         case "applicant":
             return {k: lg.get(k) for k in ("applicant", "address", "victims", "facts")}
         case "classification":

@@ -111,6 +111,8 @@ class PreviewItem:
     question: str
     answer: str
     reference: str  # что оператор должен занести в карточку
+    topic: str | None = None  # тема вопроса: по ней преподаватель переписывает этот ответ (ТЗ 3.4)
+    custom: bool = False  # ответ переписан преподавателем
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -145,5 +147,6 @@ class PreviewScenarioHandler:
         for question, exp in zip(PREVIEW_QUESTIONS, expected, strict=True):
             r = applicant_reply(s.legend, question, revealed)
             revealed = r.revealed
-            out.append(PreviewItem(question=question, answer=r.text, reference=exp))
+            custom = bool(r.topic and (s.legend.get("answers") or {}).get(r.topic))
+            out.append(PreviewItem(question=question, answer=r.text, reference=exp, topic=r.topic, custom=custom))
         return out

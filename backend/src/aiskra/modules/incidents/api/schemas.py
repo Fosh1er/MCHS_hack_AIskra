@@ -192,3 +192,9 @@ class DdsTimerIn(BaseModel):
 
 class DdsTimerOut(BaseModel):
     cards: int = Field(description="У скольких карточек таймер остановлен или запущен снова")
+
+
+class LinkIn(BaseModel):
+    """п. 1.6: главная карточка для привязки; null — отвязать."""
+
+    main_id: UUID | None = None

@@ -41,7 +41,23 @@ function Switch({ label, checked, onChange }: { label: string; checked: boolean;
   );
 }
 
-function Row({ row, title, isNew, open }: { row: JournalRow; title: string; isNew: boolean; open: () => void }) {
+/** Заголовок «Списка происшествий» (`image57`); тот же — в окне совпадений и связей (п. 1.6). */
+export function JournalHead() {
+  return (
+    <div className="arm-j112 arm-jhead">
+      <div /><div>Связи</div><div /><div>ЧС</div><div /><div>Опер.</div><div>АРМ</div><div>Номер</div>
+      <div>Дата <Icon name="arrow_down" size="xs" /></div><div>Время</div><div>Что случилось</div>
+      <div>Постр.</div><div>Статус</div><div>Адрес</div><div>Проверена</div>
+    </div>
+  );
+}
+
+export const rowTitle = (r: JournalRow, titles: Map<string, string>) => {
+  if (r.empty_call) return r.empty_call === 'no_contact' ? '<Нет контакта>' : '<Срыв связи>';
+  return r.card_types.map((c) => titles.get(c) ?? c).join(', ');
+};
+
+export function Row({ row, title, isNew, open }: { row: JournalRow; title: string; isNew: boolean; open: () => void }) {
   const [expanded, setExpanded] = useState(false);
   const at = row.registered_at ? new Date(row.registered_at) : null;
   const sms = row.channel === 'sms';
@@ -51,7 +67,7 @@ function Row({ row, title, isNew, open }: { row: JournalRow; title: string; isNe
     <div className="arm-jitem" data-testid="journal-row">
       <div className={`arm-j112 arm-jrow${isNew ? ' arm-jrow--new' : ''}`} onDoubleClick={open} title={row.author_name ?? undefined}>
         <div><button type="button" className="arm-jbtn" aria-label={expanded ? 'Свернуть' : 'Развернуть'} aria-expanded={expanded} onClick={() => setExpanded(!expanded)}><Icon name={expanded ? 'expand_less' : 'expand_more'} size="sm" /></button></div>
-        <div className="c-slate" />
+        <div className={row.linked ? 'arm-jlink' : 'c-slate'} title={row.linked ? 'Есть связанные карточки (повторное обращение)' : undefined}>{row.linked && <Icon name="link" size="sm" />}</div>
         <div className={row.is_incident ? 'c-chp' : 'c-slate'} title={row.is_incident ? 'ЧП' : undefined}><Icon name="bookmark" size="sm" /></div>
         <div className={row.is_emergency ? 'c-chs' : undefined} title={row.is_emergency ? 'ЧС' : undefined}><Icon name="bolt" size="sm" /></div>
         <div><Icon name="timer" size="sm" /></div>
@@ -121,10 +137,7 @@ export function JournalPage() {
   const first = total ? (page - 1) * pageSize + 1 : 0;
   const last = Math.min(page * pageSize, total);
 
-  const titleOf = (r: JournalRow) => {
-    if (r.empty_call) return r.empty_call === 'no_contact' ? '<Нет контакта>' : '<Срыв связи>';
-    return r.card_types.map((c) => titles.get(c) ?? c).join(', ');
-  };
+  const titleOf = (r: JournalRow) => rowTitle(r, titles);
   const open = (id: string) => { setFresh((f) => { const n = new Set(f); n.delete(id); return n; }); navigate(`/arm/112/${id}`); };
   const onSearch = (e: FormEvent) => { e.preventDefault(); setApplied(draft); setPage(1); };
   const reset = () => { setDraft(EMPTY_DRAFT); setApplied(EMPTY_DRAFT); setFilter(''); setPage(1); };
@@ -231,11 +244,7 @@ export function JournalPage() {
             </select>
           </div>
         </div>
-        <div className="arm-j112 arm-jhead">
-          <div /><div>Связи</div><div /><div>ЧС</div><div /><div>Опер.</div><div>АРМ</div><div>Номер</div>
-          <div>Дата <Icon name="arrow_down" size="xs" /></div><div>Время</div><div>Что случилось</div>
-          <div>Постр.</div><div>Статус</div><div>Адрес</div><div>Проверена</div>
-        </div>
+        <JournalHead />
         {journal.isError && <div className="arm-empty">Не удалось загрузить журнал: {journal.error.message}</div>}
         {journal.data?.items.map((r) => <Row key={r.id} row={r} title={titleOf(r)} isNew={fresh.has(r.id)} open={() => open(r.id)} />)}
         {journal.data && total === 0 && (
