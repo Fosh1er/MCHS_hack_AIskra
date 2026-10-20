@@ -58,8 +58,9 @@ def skip_tour(page: Page) -> None:
 
 
 def start_dds_lesson(request: Any, web: str, password: str, insecure: bool) -> tuple[Any, str]:
-    """Занятие «Действия ДДС» для dds1 («Служба 101») от имени преподавателя: вне занятия реестр ДДС обучающемуся
-    закрыт (ТЗ 2.7, 2.8 — 403 `dds_not_assigned`), карточки системы поступают в очередь только на занятии."""
+    """Занятие «Действия ДДС» для dds1 («Служба 101») от имени преподавателя: смоук проверяет работу диспетчера на
+    занятии (ТЗ 2.7, 2.8 — своя служба и карточки своего занятия), карточки системы поступают потоком занятия.
+    Вне занятия — свободная практика по карточкам вне занятий (`integration/test_dds_practice.py`)."""
     api = request.new_context(base_url=web, ignore_https_errors=insecure)
     r = api.post("/api/v1/auth/login", data={"login": "teacher", "password": password})
     assert r.ok, f"вход преподавателя: {r.status} {r.text()[:200]}"
