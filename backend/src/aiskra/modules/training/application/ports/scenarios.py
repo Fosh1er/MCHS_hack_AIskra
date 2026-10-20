@@ -65,9 +65,10 @@ class ScenarioRepository(Protocol):
     ) -> tuple[list[ScenarioRow], int]: ...
 
     async def random_approved(
-        self, rng: random.Random, groups: list[int] | None, difficulty: int | None = None
+        self, rng: random.Random, groups: list[int] | None, difficulty: int | None = None, service: str | None = None
     ) -> Scenario | None:
-        """Случайный утверждённый сценарий групп; `difficulty` — ближайшие к ней по сложности."""
+        """Случайный утверждённый сценарий групп; `difficulty` — ближайшие к ней по сложности; `service` — сначала
+        сценарии, где служба есть в эталоне (карточку ДДС получает служба, которой она положена)."""
         ...
 
 

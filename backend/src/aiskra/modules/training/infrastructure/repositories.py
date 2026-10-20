@@ -13,6 +13,7 @@ from aiskra.modules.training.application.ports.scenarios import ScenarioRow
 from aiskra.modules.training.domain.call import Call, CallMessage, CallParty, CallStatus, ReplicaVia, Speaker
 from aiskra.modules.training.domain.review import Decision, review_state
 from aiskra.modules.training.domain.scenario import Scenario, ScenarioStatus
+from aiskra.modules.training.domain.self_training import reference_services
 from aiskra.modules.training.domain.tone import CallerTone, ToneSnapshot
 from aiskra.modules.training.infrastructure.models import CallMessageModel, CallModel, ScenarioModel
 from aiskra.platform.types import as_utc
@@ -142,19 +143,25 @@ class SqlScenarioRepository:
         ], total
 
     async def random_approved(
-        self, rng: random.Random, groups: list[int] | None, difficulty: int | None = None
+        self, rng: random.Random, groups: list[int] | None, difficulty: int | None = None, service: str | None = None
     ) -> Scenario | None:
         found = (
             await self._s.execute(
-                select(ScenarioModel.id, ScenarioModel.incident_type_code, ScenarioModel.difficulty).where(
-                    ScenarioModel.status == "approved"
-                )
+                select(
+                    ScenarioModel.id,
+                    ScenarioModel.incident_type_code,
+                    ScenarioModel.difficulty,
+                    ScenarioModel.reference_card,
+                ).where(ScenarioModel.status == "approved")
             )
         ).all()
-        pool = [(sid, diff) for sid, code, diff in found if not groups or _group(code) in groups]
+        pool = [(sid, diff, ref) for sid, code, diff, ref in found if not groups or _group(code) in groups]
+        if service:  # поток ДДС: сначала сценарии, где служба диспетчера есть в эталоне — кошку не везут в скорую
+            own = [x for x in pool if service in reference_services(x[2] or {})]
+            pool = own or pool
         if pool and difficulty is not None:  # сложность занятия (п. 3.7): сначала сценарии нужного уровня
-            best = min(abs(d - difficulty) for _, d in pool)
-            pool = [(sid, d) for sid, d in pool if abs(d - difficulty) == best]
+            best = min(abs(d - difficulty) for _, d, _ in pool)
+            pool = [x for x in pool if abs(x[1] - difficulty) == best]
         return await self.get(rng.choice(pool)[0]) if pool else None
 
 
