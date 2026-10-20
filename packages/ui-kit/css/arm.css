@@ -1297,3 +1297,21 @@ body:has(.dds-editor) .ipphone > .arm-dock__section:not(.ipphone__screen) { disp
 .call-psy__why { flex-basis: 100%; }
 .call-psy__why.is-up { color: var(--c-orange-600); }
 .call-psy__why.is-down { color: var(--s-ok); }
+
+/* ---------- п. 1.6: повторные обращения и связи карточек (image61, image62, image65–68) ---------- */
+.arm-links { position: fixed; inset: 0; z-index: var(--z-modal); display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, .35); }
+.arm-links__box { width: min(1500px, 96vw); background: var(--c-steel-500); box-shadow: var(--shadow-popover); }
+.arm-links__head { padding: 22px 20px; background: var(--c-wine-600); color: var(--text-inverse); font-size: 22px; font-weight: var(--fw-bold); text-align: center; }
+.arm-links__body { max-height: 50vh; overflow: auto; padding: 14px 20px; }
+.arm-links__row { display: flex; align-items: stretch; gap: 10px; margin-bottom: 6px; }
+.arm-links__row .arm-jitem, .arm-links__row .arm-jhead { flex: 1; min-width: 0; }
+.arm-links__act--gap { visibility: hidden; border: 0; }
+.arm-links__act { align-self: flex-start; min-width: 112px; height: 38px; padding: 0 14px; border: 2px solid var(--text-inverse); background: var(--c-graphite-700); color: var(--text-inverse); font-weight: var(--fw-bold); cursor: pointer; }
+.arm-links__act:hover:enabled { background: var(--c-wine-600); }
+.arm-links__act:disabled { opacity: .6; cursor: default; }
+.arm-links__foot { display: flex; align-items: center; gap: 16px; padding: 12px 20px; background: var(--c-wine-600); color: var(--text-inverse); font-size: 20px; font-weight: var(--fw-bold); }
+.arm-links__foot--center { justify-content: center; }
+.arm-links__back { padding: 8px 18px; border: 1px solid var(--text-inverse); background: transparent; color: var(--text-inverse); font-size: 20px; font-weight: var(--fw-bold); cursor: pointer; }
+.arm-links__err { padding: 8px 20px; background: var(--c-paper-100); color: var(--s-critical); }
+.arm-jlink { background: var(--c-wine-600); color: var(--text-inverse); }
+.arm-match { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 16px; border: 0; background: var(--c-orange-600); color: var(--text-inverse); font-weight: var(--fw-bold); cursor: pointer; }

@@ -498,9 +498,10 @@ export function CallPanel({ callId, title, subtitle, partyName, initial, onEnded
         )}
         {!ended && (
           <button type="button" className="call-panel__close" aria-pressed={held} disabled={busy}
-            title={held ? 'Вернуться к разговору' : 'Поставить собеседника на удержание: он ждёт, реплики не идут'}
+            aria-label={held ? 'снять с удержания' : 'удержание'}
+            title={held ? 'Снять с удержания и вернуться к разговору' : 'Поставить собеседника на удержание: он ждёт, реплики не идут'}
             onClick={() => { void toggleHold(); }}>
-            {held ? 'снять с удержания' : 'удержание'}
+            {held ? 'снять' : 'удержание'}
           </button>
         )}
         {!ended

@@ -33,13 +33,14 @@ function useFitCount(total: number): [React.RefObject<HTMLDivElement>, number] {
   return [ref, fit];
 }
 
-export function ServicesBar({ panel, saved, onRemove, onAdd, onSave, onClose, onNew, busy }: {
+export function ServicesBar({ panel, saved, onRemove, onAdd, onSave, onClose, onNew, busy, onLinks }: {
   panel: PanelService[];
   saved: SavedService[] | null;
   onRemove: (s: PanelService) => void;
   onAdd: () => void;
   onSave: () => void;
   onClose: () => void;
+  onLinks?: () => void; // п. 1.6: окно связей карточки
   onNew: () => void;
   busy: boolean;
 }) {
@@ -65,7 +66,7 @@ export function ServicesBar({ panel, saved, onRemove, onAdd, onSave, onClose, on
       ) : (
         <span className="arm112-rel"><Hint k="Alt+S" /><button id="save-card" type="button" className="arm-savebtn" onClick={onSave} disabled={busy}>сохранить</button></span>
       )}
-      <button type="button" className="arm-sqbtn" disabled title={`Связи карточек — ${LATER} (1.6)`} aria-label="Связи"><Icon name="link" /></button>
+      <button type="button" className="arm-sqbtn" disabled={!onLinks} onClick={onLinks} title="Связи карточек (повторные обращения)" aria-label="Связи"><Icon name="link" /></button>
       <button type="button" className="arm-sqbtn" disabled title={`Напоминание — ${LATER}`} aria-label="Напоминание"><Icon name="timer" /></button>
       <button type="button" className="arm-sqbtn" disabled title={`Перевод вызова — ${LATER} (1.4)`} aria-label="Перевод"><Icon name="hand" /></button>
       <button type="button" className="arm-sqbtn" disabled title={`Важное происшествие — ${LATER}`} aria-label="Важное происшествие"><Icon name="bell" /></button>

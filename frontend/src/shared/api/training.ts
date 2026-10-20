@@ -27,6 +27,7 @@ export interface CallMessage {
 }
 export interface CallView {
   id: string; role: string; party: 'applicant' | 'brigade' | 'service'; direction: 'in' | 'out'; status: string; aon: string;
+  repeat_of?: string | null; // ТЗ 4.6: повторный звонок по этой карточке
   card_id: string | null; service_code: string | null; target_service: string | null;
   started_at: string; answered_at: string | null; ended_at: string | null; messages: CallMessage[]; tone?: Tone | null;
   mode?: ReplicaVia; // как оператор вёл разговор: самый «голосовой» из способов его реплик
@@ -275,6 +276,7 @@ export type CardSource = 'generated' | 'trainee' | 'mixed';
 export interface SessionSettings {
   norm_112: number; norm_dds: number; threshold: number; difficulty: number;
   call_interval_s: number; feed_interval_s: number; max_waiting: number;
+  repeat_share: number; // ТЗ 4.6: доля входящих — повторный звонок по своей карточке, %
   psy?: PsySettings;
   branch?: { weight: number }; // F5: вес блока «Развитие ситуации»; 0 — информативно
 }

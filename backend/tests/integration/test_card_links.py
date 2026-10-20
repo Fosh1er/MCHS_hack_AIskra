@@ -100,6 +100,7 @@ def test_repeat_call_in_session_and_assessment(app_client: Callable[[], TestClie
     ).json()
     opening = student.post(f"/api/v1/training/calls/{again['call_id']}/answer", json={"card_id": card2["id"]}).json()
     assert "уже звонил" in opening["text"]
+    assert student.get(f"/api/v1/training/calls/{again['call_id']}").json()["repeat_of"] == card["id"]
     assert [m["number"] for m in student.get(f"{M}/matches", params={"phone": again["aon"]}).json()] == [card["number"]]
     student.post(
         f"{M}/cards/{card2['id']}/save", json={"data": fill_from_reference(ref, again["aon"]), "services": services}

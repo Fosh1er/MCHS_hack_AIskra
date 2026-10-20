@@ -15,6 +15,7 @@ import { AddressMap } from './AddressMap';
 import { AssessmentPanel } from '../../shared/ui/AssessmentPanel';
 import { CallReview } from '../../shared/ui/CallReview';
 import { Hint } from './Hint';
+import { LinksDialog } from './CardLinks';
 import { focusId, useHotkeys, type HotkeyMap } from './useHotkeys';
 import { TourHelpButton } from '../../shared/onboarding/OnboardingProvider';
 
@@ -246,6 +247,7 @@ export function CardViewer({ view, me, dds }: { view: CardView; me: Me; dds?: Dd
   const [banner, setBanner] = useState<string | null>(null);
   const [showMap, setShowMap] = useState(false);
   const [editor, setEditor] = useState(false);
+  const [links, setLinks] = useState(false); // п. 1.6: окно связей карточки
 
   // «Просмотр карточки» — в аудит один раз за открытие экрана
   const viewed = useRef(false);
@@ -495,7 +497,7 @@ export function CardViewer({ view, me, dds }: { view: CardView; me: Me; dds?: Dd
             {dds && ownService && dds.next.length > 0 && (
               <button type="button" className="arm-savebtn" data-tour="dds-status" onClick={() => { setHistory(null); setEditor(true); }}>изменить статус</button>
             )}
-            <button type="button" className="arm-sqbtn" disabled title="Связи карточек — п. 1.6" aria-label="Связи"><Icon name="link" /></button>
+            <button type="button" className="arm-sqbtn" disabled={!!dds} onClick={() => setLinks(true)} title={dds ? 'Связи карточек — в АРМ-112' : 'Связи карточек (повторные обращения)'} aria-label="Связи"><Icon name="link" /></button>
             <button type="button" className="arm-sqbtn" disabled title="Напоминание — появится в следующих пунктах плана" aria-label="Напоминание"><Icon name="timer" /></button>
             <button type="button" className="arm-sqbtn" disabled title="Важное происшествие — появится в следующих пунктах плана" aria-label="Важное происшествие"><Icon name="bell" /></button>
             <TourHelpButton />
@@ -506,6 +508,7 @@ export function CardViewer({ view, me, dds }: { view: CardView; me: Me; dds?: Dd
         {services.slice(0, 6).map(tab)}
       </ServiceBar>
 
+      {links && <LinksDialog cardId={view.id} onClose={() => setLinks(false)} />}
       {returning && (
         <ReturnModal busy={actions.returned.isPending} onClose={() => setReturning(false)}
           onConfirm={(comment) => actions.returned.mutate(comment, { onSuccess: () => setReturning(false), onError: (e) => { setReturning(false); fail(e); } })} />
